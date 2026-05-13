@@ -1,0 +1,14 @@
+{
+  "mdt": "MDT",
+  "mobile_data_terminal": "Mobiles Datenterminal",
+  "open_mdt": "MDT öffnen",
+  "close_mdt": "MDT schließen",
+  "loading": "Wird geladen...",
+  "error": "Fehler",
+  "success": "Erfolg",
+  "cancel": "Abbrechen",
+  "confirm": "Bestätigen",
+  "delete": "Löschen",
+  "edit": "Bearbeiten",
+  "save": "Speichern"
+}

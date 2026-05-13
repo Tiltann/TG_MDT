@@ -1,0 +1,14 @@
+{
+  "mdt": "MDT",
+  "mobile_data_terminal": "Mobile Data Terminal",
+  "open_mdt": "Open MDT",
+  "close_mdt": "Close MDT",
+  "loading": "Loading...",
+  "error": "Error",
+  "success": "Success",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "delete": "Delete",
+  "edit": "Edit",
+  "save": "Save"
+}
