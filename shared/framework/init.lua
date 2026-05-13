@@ -21,3 +21,5 @@ Framework      = {}
 Framework.name = detect()
 
 Debug.info(('Framework detected: %s'):format(Framework.name))
+
+
