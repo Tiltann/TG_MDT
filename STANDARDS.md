@@ -1,622 +1,473 @@
-# STANDARDS - MDT Coding & Design Guidelines
+﻿# TG_MDT — Coding Standards
 
-**Alle Beiträge zu diesem Projekt müssen diese Standards einhalten.** Dies ist verbindlich für alle Pull Requests.
-
----
-
-## 📋 Inhaltsverzeichnis
-
-1. [Allgemeine Prinzipien](#allgemeine-prinzipien)
-2. [Git & Versionskontrolle](#git--versionskontrolle)
-3. [Code-Stil](#code-stil)
-4. [Projektstruktur](#projektstruktur)
-5. [Komponenten & UI](#komponenten--ui)
-6. [Styling & Design-System](#styling--design-system)
-7. [Internationalisierung (i18n)](#internationalisierung-i18n)
-8. [Dokumentation](#dokumentation)
-9. [Testing](#testing)
-10. [Performance](#performance)
-11. [Sicherheit](#sicherheit)
-12. [Accessibility (a11y)](#accessibility-a11y)
-13. [Naming Conventions](#naming-conventions)
+All contributions must follow these standards. No exceptions.
 
 ---
 
-## 🎯 Allgemeine Prinzipien
+## Table of Contents
 
-### Modularität
-- **Bausteine statt Monolith**: Jede Fraktion sollte Module unabhängig aktivieren/deaktivieren können
-- **Lose Kopplung**: Module kommunizieren über definierte Interfaces, nicht über globale Zustände
-- **High Cohesion**: Zusammengehörige Funktionalität in einem Modul
-
-### Wartbarkeit
-- Code sollte lesbar sein - **Klarheit vor Cleverness**
-- Kurze Funktionen mit klaren Aufgaben (Single Responsibility Principle)
-- Häufig änderter Code sollte leicht testbar sein
-
-### Skalierbarkeit
-- Architektur muss wachsen können: von 5 auf 50+ Fraktionen
-- Datenstrukturen müssen für große Datenmengen optimiert sein
-- UI sollte responsive und schnell auch bei vielen Elementen bleiben
-
-### "Eine Familie"
-- Einheitliche Code-Standards über alle Module hinweg
-- Gemeinsames Design-System (Farben, Typen, Komponenten)
-- Aber: Jede Fraktion hat ihre Identität (Akzentfarbe, Logo)
+1. [General Principles](#general-principles)
+2. [Project Structure](#project-structure)
+3. [Naming Conventions](#naming-conventions)
+4. [File Naming](#file-naming)
+5. [Constants](#constants)
+6. [Documentation & Comments](#documentation--comments)
+7. [Events](#events)
+8. [Exports](#exports)
+9. [Communication](#communication)
+10. [Framework Bridge](#framework-bridge)
+11. [ox_lib](#ox_lib)
+12. [Debug Library](#debug-library)
+13. [Server Validation](#server-validation)
+14. [SQL](#sql)
+15. [fxmanifest](#fxmanifest)
+16. [Git & Versioning](#git--versioning)
+17. [Frontend (Next.js / NUI)](#frontend-nextjs--nui)
 
 ---
 
-## 🌳 Git & Versionskontrolle
+## General Principles
+
+- **Clarity over cleverness.** Write code that the next person can read without context.
+- **Single responsibility.** Functions and files do one thing.
+- **Server/client separation.** Server logic in `server/`, client logic in `client/`, shared in `shared/`.
+- **Never trust the client.** Always validate server-side: type, entity, distance, ownership, state.
+- **Use bridges and abstractions.** Never call ESX/QBCore/Qbox APIs directly in feature code.
+
+---
+
+## Project Structure
+
+```
+TG_MDT/
+├── config/                    # All editable config (loaded first)
+│   ├── config.lua             # Main settings (jobs, distances, toggles)
+│   └── commands.lua           # Command names and keybinds
+├── client/                    # Client-side Lua
+├── server/                    # Server-side Lua
+│   └── sql.lua                # OxMySQL wrapper
+├── shared/                    # Shared Lua (constants, exports)
+│   ├── debug.lua              # Structured logging
+│   └── framework/             # Framework bridge
+│       ├── init.lua           # Detection + Framework.name
+│       ├── esx.lua
+│       ├── qbcore.lua
+│       ├── qbox.lua
+│       └── standalone.lua
+├── locales/                   # ox_lib locale files
+├── web/                       # Next.js NUI app
+│   └── dist/                  # Build output — served by FiveM
+└── fxmanifest.lua
+```
+
+---
+
+## Naming Conventions
+
+| Type | Case |
+|------|------|
+| Local variables | `snake_case` |
+| Local functions | `camelCase` |
+| File-local constants | `UPPER_SNAKE_CASE` |
+| Module/global tables | `PascalCase` |
+| Exported functions | `PascalCase` |
+| Event names | `resource:context:action` |
+| File names | `kebab-case` |
+| JSON/config keys | `snake_case` |
+| Convars / command names | `lowercase_with_separators` |
+
+### Variables
+
+Use `snake_case`. Be specific, use singular/plural correctly.
+
+```lua
+-- good
+local player_id = ...
+local vehicle_net_id = ...
+local allowed_class_lookup = {}
+
+-- bad
+local tmp = ...
+local data2 = ...
+local x = ...
+```
+
+### Functions
+
+- `camelCase` for private/local helpers — verb-first.
+- `PascalCase` for public/exported functions — stable and descriptive.
+
+```lua
+-- private
+local function isAllowedVehicleClass(vehicle) end
+local function getVehicleOwner(vehicle) end
+
+-- exported
+exports('GetBalance', function(src) end)
+exports('HasPermission', function(src, perm) end)
+```
+
+### Tables & Modules
+
+Use `PascalCase` noun-based names.
+
+```lua
+Framework = {}
+Config = {}
+Editable = {}
+```
+
+### Booleans
+
+Prefix with `is`, `has`, `can`, `should`, or `was`.
+
+```lua
+local is_player_dead = ...
+local has_license = ...
+```
+
+### Constants
+
+Use `UPPER_SNAKE_CASE`. Define at top of file.
+
+```lua
+local MAX_DISTANCE = 5.0
+local DEFAULT_DURATION_MS = 3000
+local EVENT_PLAYER_JOINED = 'tg_mdt:player:joined'
+```
+
+---
+
+## Config
+
+All editable values live in `config/`. Feature code reads from `Config` — it never hardcodes values.
+
+- `config/config.lua` — main settings: jobs, distances, timers, feature flags.
+- `config/commands.lua` — command names and keybinds.
+- Never put logic in config files. Only data: strings, numbers, booleans, tables.
+- `Config` is a global table. All files extend it with `Config = Config or {}`.
+- Keep keys in `snake_case`.
+- Add a comment above every value explaining what it does and what unit it uses.
+
+```lua
+Config = Config or {}
+
+Config.MDT = {
+    allowed_jobs         = { 'police', 'sheriff' },
+    plate_check_distance = 10.0,   -- metres
+    animation_duration   = 300,    -- ms
+}
+
+Config.Debug = {
+    enabled   = false,
+    sensitive = false,
+}
+```
+
+Load order in `fxmanifest.lua`: `config/*.lua` must come before `shared/*.lua`.
+
+---
+
+## File Naming
+
+- Lowercase only, `kebab-case`, no spaces.
+- Prefix by context:
+  - `cl-*.lua` — client only
+  - `sv-*.lua` — server only
+  - `sh-*.lua` — shared
+
+```
+config/config.lua
+config/commands.lua
+client/cl-vehicles.lua
+server/sv-paychecks.lua
+shared/sh-config.lua
+```
+
+---
+
+## Constants
+
+All event, callback, and convar names must be defined as constants at the top of each file.
+
+```lua
+local EVENT_PLAYER_JOINED   = 'tg_mdt:player:joined'
+local CALLBACK_GET_DATA     = 'tg_mdt:callback:getData'
+local MAX_DISTANCE          = 5.0
+```
+
+---
+
+## Documentation & Comments
+
+Every non-trivial function and every event handler must have an EmmyLua doc comment.
+
+```lua
+--- Checks whether a vehicle belongs to an allowed class list.
+---@param vehicle number Vehicle entity id.
+---@return boolean is_allowed True if vehicle class is allowed.
+local function isAllowedVehicleClass(vehicle)
+    if not next(allowedClassLookup) then return true end
+    return allowedClassLookup[GetVehicleClass(vehicle)] == true
+end
+
+--- Handles player join event.
+---@param player number Player server id.
+RegisterNetEvent(EVENT_PLAYER_JOINED, function(player)
+    -- ...
+end)
+```
+
+Use inline markers for intent:
+
+```lua
+-- TODO:  unfinished or planned work
+-- NOTE:  important explanation
+-- HACK:  temporary or dirty solution
+```
+
+---
+
+## Events
+
+Events are fire-and-forget signals — not function calls.
+
+**Use events when:**
+- Broadcasting an action or state change.
+- Communicating between client and server.
+- Decoupling modules (producer does not need to know the consumer).
+
+**Use exports instead when:**
+- You need a return value.
+- The call is local and tightly coupled.
+
+### Naming
+
+Format: `resource:context:action`
+
+```
+tg_mdt:server:vehicleStored
+tg_mdt:client:openMenu
+tg_mdt:internal:itemAdded
+```
+
+Use `internal` for in-resource events that do not cross the network.
+
+### Rules
+
+- Define handlers inline when registering.
+- Use `RegisterNetEvent` for networked handlers.
+- Use `AddEventHandler` for local/internal handlers.
+- Never expose local-only events as net events.
+- Keep payloads minimal and explicit.
+- Always validate client-sent payloads on the server.
+
+```lua
+RegisterNetEvent('tg_mdt:server:addItem', function(item_name, amount)
+    local source = source
+    if type(item_name) ~= 'string' or type(amount) ~= 'number' then return end
+    -- ...
+end)
+```
+
+---
+
+## Exports
+
+Use exports for function-like APIs called from other resources.
+
+- Register exports in code, not in `fxmanifest.lua`.
+- Keep registrations in `shared/exports.lua`.
+- Use `PascalCase` names.
+
+```lua
+exports('GetPlayerData', function(player_id)
+    -- ...
+end)
+
+exports('HasPermission', function(player_id, permission)
+    -- ...
+end)
+```
+
+---
+
+## Communication
+
+| Need | Use |
+|------|-----|
+| Signal / state change | Event |
+| Return value / sync call | Export |
+
+Patterns:
+
+```lua
+-- Client → Server
+TriggerServerEvent(EVENT_NAME, ...)
+
+-- Server → Client
+TriggerClientEvent(EVENT_NAME, player_id, ...)
+
+-- Local / internal
+TriggerEvent(EVENT_NAME, ...)
+```
+
+All event names must be constants defined at the top of each file.
+
+---
+
+## Framework Bridge
+
+Never call ESX, QBCore, or Qbox APIs directly in feature code. Always go through the bridge.
+
+Bridge lives in `shared/framework/` — auto-loaded by fxmanifest.
+
+Detection order: `esx → qbox → qbcore → standalone`
+
+```lua
+-- good
+Framework.Server.notify(source, 'message', 'success')
+Framework.Client.notify('message', 'error')
+
+-- bad
+ESX.ShowNotification('message')
+QBCore.Functions.Notify('message')
+```
+
+For notifications: use `Framework.Client.notify` / `Framework.Server.notify`. If unavailable, fall back to `lib.notify` from ox_lib.
+
+### Citizen Aliases
+
+Prefer aliases over `Citizen.` prefix:
+
+```lua
+CreateThread(function() end)   -- not Citizen.CreateThread
+Wait(1000)                      -- not Citizen.Wait
+SetTimeout(1000, cb)            -- not Citizen.SetTimeout
+```
+
+---
+
+## ox_lib
+
+- Init in `shared_scripts` with `@ox_lib/init.lua` — must come first.
+- Put locale files in `locales/`, list them in `fxmanifest.lua`.
+- Use ox_lib for UI, notifications, dialogs, progress bars, and locale.
+- Prefer lib helpers over custom implementations.
+
+---
+
+## Debug Library
+
+`shared/debug.lua` — structured logging for all TG resources.
+
+| Level | Always visible | Use for |
+|-------|---------------|---------|
+| `info` | yes | Startup messages, state changes |
+| `warn` | yes | Missing optional config, degraded function |
+| `error` | yes | Failures that break features |
+| `debug` | opt-in | Verbose internals, raw data |
+| `sensitive` | separate opt-in | IDs, payloads — dev only |
+
+Output format: `[TG][resource-name][LEVEL] message`
+
+### Usage
+
+```lua
+Debug.info('Resource started')
+Debug.warn('Missing config value, using default')
+Debug.error('Failed to load player data')
+Debug.debug('Raw payload', payload)
+Debug.sensitive('Player identifiers', ids)
+```
+
+---
+
+## Server Validation
+
+Never trust client input. Always validate on the server.
+
+```lua
+RegisterNetEvent('tg_mdt:server:sellVehicle', function(vehicle_net_id)
+    local src = source
+
+    -- type check
+    if type(vehicle_net_id) ~= 'number' then return end
+
+    -- entity check
+    local vehicle = NetworkGetEntityFromNetworkId(vehicle_net_id)
+    if not DoesEntityExist(vehicle) then return end
+
+    -- ownership check
+    if GetEntityOwner(vehicle) ~= src then return end
+
+    -- distance check
+    local ped = GetPlayerPed(src)
+    if #(GetEntityCoords(ped) - GetEntityCoords(vehicle)) > 5.0 then return end
+
+    -- ...
+end)
+```
+
+---
+
+## SQL
+
+Use `server/sql.lua` — the OxMySQL wrapper. Never make direct DB calls in feature code.
+
+```lua
+-- Select multiple rows
+local rows = SQL.query('SELECT * FROM users WHERE job = ?', { job })
+
+-- Select one row
+local player = SQL.single('SELECT * FROM users WHERE id = ?', { player_id })
+
+-- Select one value
+local count = SQL.scalar('SELECT COUNT(*) FROM users WHERE job = ?', { job })
+
+-- Insert
+local id = SQL.insert('INSERT INTO users (name, job) VALUES (?, ?)', { name, job })
+
+-- Update / Delete
+SQL.execute('UPDATE users SET job = ? WHERE id = ?', { job, player_id })
+```
+
+
+---
 
 ### Pull Requests
 
-**Titel:**
-- Kurz und beschreibend
-- Format: `[Module] Was macht der PR`
-- Beispiel: `[Login] Add two-factor authentication`
+Title format: `[Module] Short description`
+Example: `[MDT] Add vehicle lookup panel`
 
-**Beschreibung:**
-```markdown
-## 📝 Beschreibung
-Kurze Zusammenfassung, was sich ändert.
+PR description template:
 
-## 🎯 Ziel
-Warum ist dieser Change nötig? Welches Problem wird gelöst?
+```
+## What changed
+Short summary.
 
-## ✅ Checkliste
-- [ ] Tests hinzugefügt/aktualisiert
-- [ ] Dokumentation aktualisiert
-- [ ] Code-Standards beachtet
-- [ ] Performance geprüft
-- [ ] Keine Breaking Changes (oder dokumentiert)
+## Why
+What problem does this solve?
 
-## 📸 Screenshots (falls UI-Change)
-Wenn visuell: Before/After Screenshots oder GIF
-
-## 🔗 Bezug zu Issues
-Closes #123
+## Checklist
+- [ ] Follows coding standards
+- [ ] No direct framework calls
+- [ ] Server-side validation added
+- [ ] Debug logging added where useful
+- [ ] Screenshots (if UI change)
 ```
 
 ---
 
-## 💻 Code-Stil
+## Frontend (Next.js / NUI)
 
-### JavaScript/TypeScript
+The NUI is a static Next.js app built to `web/dist/` and served by FiveM.
 
-**Sprache:** Verwende **TypeScript** mit strikter Typ-Prüfung
-```json
-{
-  "strict": true,
-  "noImplicitAny": true,
-  "strictNullChecks": true
-}
-```
 
-**Formatierung:**
-- **Prettier** für automatische Formatierung
-- **ESLint** für Code-Quality
-- 2 Spaces Indentation
-- Semikolons erforderlich
+### Rules
 
----
-
-## 📁 Projektstruktur
-
-```
-src/
-├── assets/
-│   ├── icons/          - SVG Icons
-│   ├── images/         - Bilder, Logos
-│   └── fonts/          - Custom Fonts
-├── components/
-│   ├── common/         - Wiederverwendbare Komponenten (Button, Modal, etc.)
-│   ├── layout/         - Layout-Komponenten (Header, Sidebar, etc.)
-│   └── [module]/       - Modul-spezifische Komponenten
-│       ├── PersonSearch.vue
-│       └── PersonDetails.vue
-├── modules/            - Feature-Module
-│   ├── login/
-│   │   ├── composables/
-│   │   ├── services/
-│   │   ├── views/
-│   │   ├── types.ts
-│   │   └── index.ts
-│   ├── person-records/
-│   └── [modul]/
-├── services/           - API & externe Services
-│   ├── api.ts          - HTTP-Client
-│   ├── auth.ts         - Authentication
-│   └── person.ts       - Person-Service
-├── composables/        - Reusable Vue 3 Composables
-│   ├── useAuth.ts
-│   ├── useFetch.ts
-│   └── [composable].ts
-├── stores/             - Pinia State Management
-│   ├── auth.ts
-│   ├── ui.ts
-│   └── [store].ts
-├── types/              - Globale TypeScript Types
-│   ├── index.ts
-│   ├── models.ts
-│   └── api.ts
-├── utils/              - Utility-Funktionen
-│   ├── formatting.ts   - Datum, Währung, etc.
-│   ├── validation.ts   - Input-Validierung
-│   └── [util].ts
-├── styles/
-│   ├── main.css        - Global Styles
-│   ├── variables.css   - CSS Variables (Farben, Größen)
-│   └── components.css  - Komponenten-Styles (wenn nicht scoped)
-├── router/
-│   └── index.ts        - Vue Router Konfiguration
-├── i18n/               - Internationalisierung
-│   ├── de.json         - Deutsche Texte
-│   ├── en.json         - Englische Texte
-│   └── index.ts
-├── App.vue             - Root Komponente
-└── main.ts             - Entry Point
-```
-
-**Regeln:**
-- Dateinamen: `kebab-case` für Komponenten/Dateien (außer TS-Interfaces → PascalCase)
-- Module sind unabhängig: `modules/[name]/index.ts` exportsiert das Modul
-- Services abstrahieren externe APIs
-- Composables für wiederverwendbare Logik
-- Stores für globalen State (Auth, UI-Einstellungen)
-
----
-
-## 🎨 Komponenten & UI
-
-### Komponenten-Struktur
-
-Jede Komponente sollte:
-1. **Eine klare Aufgabe** haben
-2. **Wiederverwendbar** sein
-3. **Props dokumentiert** haben
-4. **Fallbacks** für Edge-Cases haben
-
-**Beispiel:**
-```vue
-<template>
-  <button 
-    :class="['btn', `btn--${variant}`, { 'btn--loading': isLoading }]"
-    :disabled="isLoading || disabled"
-    @click="$emit('click')"
-  >
-    <span v-if="isLoading" class="btn__spinner" />
-    <slot>{{ label }}</slot>
-  </button>
-</template>
-
-<script setup lang="ts">
-interface Props {
-  /** Visual variant of the button */
-  variant?: 'primary' | 'secondary' | 'danger';
-  /** Button label (alternative: use slot) */
-  label?: string;
-  /** Whether button is disabled */
-  disabled?: boolean;
-  /** Whether button is in loading state */
-  isLoading?: boolean;
-}
-
-withDefaults(defineProps<Props>(), {
-  variant: 'primary',
-  disabled: false,
-  isLoading: false,
-});
-
-defineEmits<{
-  click: [];
-}>();
-</script>
-```
-
-### Component Library
-
-Basis-Komponenten in `components/common/`:
-- `Button.vue` - mit Varianten: primary, secondary, danger, ghost
-- `Modal.vue` - Dialog/Popup
-- `Input.vue` - Textfeld mit Label und Error-State
-- `Select.vue` - Dropdown
-- `Table.vue` - Daten-Tabelle
-- `Card.vue` - Container
-- `Badge.vue` - Status-Indicator
-- `Spinner.vue` - Loading-Animation
-- `Alert.vue` - Benachrichtigungen
-- `Tabs.vue` - Tab-Navigation
-
----
-
-## 🎨 Styling & Design-System
-
-**Regeln:**
-- BEM-Notation für Klassen: `.block`, `.block__element`, `.block--modifier`
-- CSS-Variablen für alles, was wiederverwendet wird
-- Scoped Styles in Vue-Komponenten
-- Media Queries für Responsive Design
-- Mobile-first Approach
-
----
-
-## 🌍 Internationalisierung (i18n)
-
-### Datei-Struktur
-
-```
-i18n/
-├── de.json
-├── en.json
-└── index.ts
-```
-
-### Texte (JSON)
-
-```json
-{
-  "common": {
-    "save": "Speichern",
-    "cancel": "Abbrechen",
-    "delete": "Löschen",
-    "edit": "Bearbeiten",
-    "loading": "Laden...",
-    "error": "Ein Fehler ist aufgetreten"
-  },
-  "login": {
-    "title": "Anmelden",
-    "username": "Benutzername",
-    "password": "Passwort",
-    "loginButton": "Anmelden",
-    "errors": {
-      "invalidCredentials": "Ungültige Anmeldedaten"
-    }
-  },
-  "personRecords": {
-    "title": "Personenakte",
-    "searchPlaceholder": "Nach Name oder ID suchen...",
-    "noResults": "Keine Ergebnisse gefunden"
-  }
-}
-```
-
-### Verwendung in Komponenten
-
-```vue
-<template>
-  <div>
-    <h1>{{ $t('personRecords.title') }}</h1>
-    <input :placeholder="$t('personRecords.searchPlaceholder')" />
-    <p v-if="!results.length">{{ $t('personRecords.noResults') }}</p>
-  </div>
-</template>
-
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n';
-
-const { t } = useI18n();
-</script>
-```
-
-**Regeln:**
-- Alle UI-Texte müssen übersetzt sein (Deutsch + Englisch minimum)
-- Keys: `module.feature.element` (hierarchisch)
-- Platzhalter mit Interpolation: `"hello": "Hallo {{ name }}"`
-- Deutsche Version ist die Referenz, Englisch sollte idiomatisch sein
-
----
-
-## 📚 Dokumentation
-
-### README für Module
-
-Jedes Modul sollte eine `README.md` haben:
-
-```markdown
-# Person Records Module
-
-## Übersicht
-Verwaltung von Personenakten: Suche, Anzeige, Bearbeitung.
-
-## Features
-- Personen-Suche nach Name, ID, Kennzeichen
-- Personenakte mit Foto, Strafregister, Krankenakte
-- Berechtigungssystem
-
-## Verwendung
-\`\`\`vue
-<PersonSearch @select="handleSelect" />
-\`\`\`
-
-## Komponenten
-- `PersonSearch.vue` - Suchformular
-- `PersonDetails.vue` - Akten-Detailansicht
-- `PersonTable.vue` - Tabelle aller Personen
-
-## Types
-Siehe `types.ts`
-
-## Services
-- `personService.ts` - API-Aufrufe
-```
-
-### Kommentar-Standard
-
-```typescript
-/**
- * Sucht Personen nach Name, ID oder Kennzeichen
- * @param query Suchtext (mind. 2 Zeichen)
- * @returns Promise mit Array von gefundenen Personen
- * @throws {ValidationError} Wenn Query zu kurz
- */
-export async function searchPersons(query: string): Promise<Person[]> {
-  if (query.length < 2) {
-    throw new ValidationError('Query must be at least 2 characters');
-  }
-  return api.get(`/persons/search?q=${encodeURIComponent(query)}`);
-}
-```
-
-**Regeln:**
-- JSDoc für alle öffentliche Funktionen/Klassen
-- Inline-Kommentare nur für komplexe Logik (nicht offensichtliches)
-- Warum, nicht Wie: **"Warum macht dieser Code das?"**
-- Deutsche oder englische Dokumentation (konsistent im Modul)
-
----
-
-## 🧪 Testing
-
-### Unit Tests
-
-**Regeln:**
-- Teste Behavior, nicht Implementation
-- Mindestens: Happy Path + Error Cases
-- Mocks für externe APIs
-- 80% Code Coverage anstreben
-
-### Integration Tests
-
-```typescript
-import { describe, it, expect } from 'vitest';
-import { createPinia, setActivePinia } from 'pinia';
-import { useAuthStore } from '@/stores/auth';
-
-describe('Auth Integration', () => {
-  beforeEach(() => {
-    setActivePinia(createPinia());
-  });
-
-  it('logs in user and stores token', async () => {
-    const store = useAuthStore();
-    await store.login('user@example.com', 'password123');
-    
-    expect(store.isAuthenticated).toBe(true);
-    expect(store.user?.email).toBe('user@example.com');
-  });
-});
-```
-
----
-
-## ⚡ Performance
-
-### Code-Level
-
-```typescript
-// ❌ Ineffizient: Neue Array jeden Render
-const filteredResults = results.filter(r => r.active);
-
-// ✅ Effizient: Computed Property (gecacht)
-const filteredResults = computed(() => {
-  return results.value.filter(r => r.active);
-});
-
-// ❌ Speicherleck: Event Listener nicht entfernt
-mounted(() => {
-  window.addEventListener('resize', handleResize);
-});
-
-// ✅ Korrekt: Cleanup
-onMounted(() => {
-  window.addEventListener('resize', handleResize);
-});
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize);
-});
-```
-
-### UI Performance
-
-```vue
-<!-- ❌ Ineffizient: Alle Elemente rendern -->
-<div v-for="item in largeList" :key="item.id">
-  {{ item.name }}
-</div>
-
-<!-- ✅ Effizient: Virtual Scrolling für große Listen -->
-<VirtualScroll :items="largeList">
-  <template #default="{ item }">
-    {{ item.name }}
-  </template>
-</VirtualScroll>
-```
-
-**Richtlinien:**
-- Nutze `v-show` statt `v-if` für häufig wechselnde Elemente
-- Lazy-Loading für große Listen (Virtual Scrolling)
-- Code-Splitting: Jedes Modul eigenes Bundle
-- Bilder optimieren & komprimieren
-- Bundle-Größe monitoren
-
----
-
-## 🔒 Sicherheit
-
-### Authentifizierung
-
-```typescript
-// ❌ Niemals im localStorage speichern
-localStorage.setItem('authToken', token);
-
-// ✅ In HttpOnly Cookie (Server-gesetzt)
-// Server setzt Cookie automatisch, Frontend braucht nicht speichern
-
-// ✅ Oder in Memory (bei Page-Reload verloren)
-let authToken: string | null = null;
-```
-
-### XSS-Prevention
-
-```vue
-<!-- ❌ Unsicher: Raw HTML -->
-<div v-html="userInput"></div>
-
-<!-- ✅ Sicher: Text interpolation (auto-escaped) -->
-<div>{{ userInput }}</div>
-
-<!-- ✅ Wenn HTML nötig: sanitize zuerst -->
-<div v-html="sanitizeHtml(userInput)"></div>
-```
-
-### API-Sicherheit
-
-```typescript
-// Immer HTTPS verwenden
-const API_BASE = 'https://api.example.com';
-
-// CORS-Headers prüfen
-// Rate-Limiting nutzen
-// Input validieren
-if (!isValidEmail(email)) {
-  throw new ValidationError('Invalid email');
-}
-
-// Sensitive Daten nicht in URLs
-// ❌ /users?password=123
-// ✅ POST /login { email, password }
-```
-
-**Richtlinien:**
-- Alle Inputs validieren (Client + Server)
-- HTTPS überall
-- Keine sensitiven Daten in URLs oder LocalStorage
-- CSRF-Tokens für State-changing Requests
-- Security Headers (CSP, etc.)
-
----
-
-## ♿ Accessibility (a11y)
-
-### Semantisches HTML
-
-```vue
-<!-- ❌ Unzugänglich -->
-<div @click="handleClick">Click me</div>
-
-<!-- ✅ Zugänglich -->
-<button @click="handleClick">Click me</button>
-
-<!-- Für Custom Buttons -->
-<div 
-  role="button" 
-  @click="handleClick"
-  @keydown.enter="handleClick"
-  @keydown.space="handleClick"
-  tabindex="0"
->
-  Click me
-</div>
-```
-
-### ARIA Labels
-
-```vue
-<!-- Bilder -->
-<img :src="avatar" :alt="userName" />
-
-<!-- Icons ohne Text -->
-<button :aria-label="$t('common.close')">
-  <Icon name="close" />
-</button>
-
-<!-- Form Labels -->
-<label for="email">Email</label>
-<input id="email" type="email" />
-
-<!-- Live Regions -->
-<div aria-live="polite" aria-atomic="true">
-  {{ notification }}
-</div>
-```
-
-### Tastatur-Navigation
-
-```vue
-<!-- Navigation mit Tab-Order -->
-<button tabindex="0">First</button>
-<button tabindex="0">Second</button>
-<button tabindex="0">Third</button>
-
-<!-- Keyboard Shortcuts dokumentieren -->
-<input @keydown.slash="focusSearch" />
-```
-
-**Richtlinien:**
-- Alle Buttons/Links müssen fokussierbar sein
-- Farbe allein reicht nicht zur Info
-- Kontrast-Verhältnis: mind. 4.5:1
-- Keyboard-Navigation ohne Maus möglich
-- Screenreader-freundliche Labels
-
----
-
-## 📛 Naming Conventions
-
-### Zusammenfassung
-
-| Element | Convention | Beispiel |
-|---------|-----------|----------|
-| **Vue-Komponenten** | PascalCase | `PersonSearch.vue` |
-| **Dateinamen (JS/TS)** | camelCase | `personService.ts` |
-| **Verzeichnisse** | kebab-case | `person-records/` |
-| **Funktionen** | camelCase | `getUserById()` |
-| **Klassen** | PascalCase | `UserService` |
-| **Konstanten** | SCREAMING_SNAKE_CASE | `MAX_LOGIN_ATTEMPTS` |
-| **Boolean-Props** | is/has/can | `isLoading`, `hasPermission` |
-| **Private Eigenschaften** | _prefix | `_secretKey` |
-| **Interfaces/Types** | PascalCase | `UserRecord`, `ApiResponse` |
-| **Stores** | use[Name]Store | `useAuthStore` |
-| **Composables** | use[Name] | `useFetch`, `useAuth` |
-| **Events** | camelCase | `@personSelected` |
-| **CSS-Klassen** | BEM | `.person-card__avatar` |
-| **Branch-Namen** | kebab-case | `feature/login-2fa` |
-| **Commit-Messages** | Conventional Commits | `feat: add 2FA` |
-
----
-
-## ✅ Checkliste vor PR
-
-- [ ] Code folgt diesen Standards
-- [ ] TypeScript: Strikt Mode, keine `any`
-- [ ] Tests geschrieben/aktualisiert
-- [ ] Komponenten-Props dokumentiert (JSDoc)
-- [ ] Alle neuen UI-Texte übersetzt (DE + EN)
-- [ ] CSS-Variablen für Farben/Größen
-- [ ] Accessibility geprüft (ARIA, Tastatur)
-- [ ] Performance überprüft (keine n+1 Queries)
-- [ ] Sicherheit geprüft (XSS, CSRF)
-- [ ] Git-History sauber (gute Commit-Messages)
-- [ ] README aktualisiert (falls neues Modul)
-- [ ] Keine Breaking Changes (oder dokumentiert)
-
----
-
-## 📞 Support & Fragen
-
-**Fragen zu Standards?** → GitHub Issues
-
-**Hast du eine bessere Idee?** → Pull Request mit `docs/` Label
-
-Vielen Dank für die Einhaltung dieser Standards! 💙
-
+- Keep NUI logic in `web/`. No Lua in NUI, no NUI logic in Lua.
+- Use `fetchNui` for all client → NUI communication.
+- Use `useNuiEvent` for all NUI → receives from client.
+- TypeScript only — no plain `.js` files.
+- Use Tailwind for styling. No inline styles.
