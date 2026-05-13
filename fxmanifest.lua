@@ -8,21 +8,30 @@ author 'TG (Lucentix, Tiltann, BillyG, DominikVatoo)'
 
 shared_scripts {
     '@ox_lib/init.lua',
-    'shared/**/*.*'
+    'config/*.lua',
+    'shared/debug.lua',
+    'shared/framework/init.lua',
+    'shared/framework/esx.lua',
+    'shared/framework/qbcore.lua',
+    'shared/framework/qbox.lua',
+    'shared/framework/standalone.lua',
+    'shared/**/*.lua',
 }
 
 client_scripts {
-    'client/**/*.*'
+    'client/**/*.lua',
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/**/*.*'
+    'server/sql.lua',
+    'server/**/*.lua',
 }
 
 ui_page 'web/dist/index.html'
 
 files {
+    'locales/*.json',
     'web/dist/index.html',
     'web/dist/**/*.*'
 }
