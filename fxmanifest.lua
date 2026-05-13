@@ -19,6 +19,8 @@ shared_scripts {
 }
 
 client_scripts {
+    'client/init.lua',
+    'client/nui.lua',
     'client/**/*.lua',
 }
 

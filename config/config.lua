@@ -22,20 +22,23 @@ Config.Debug = {
 
 -- ── MDT ───────────────────────────────────────────────────
 
--- Config.MDT = {
---     -- Jobs that are allowed to access the MDT
---     allowed_jobs = {
---         'police',
---         'sheriff',
---         'fbi',
---     },
+Config.MDT = {
+    -- Jobs that are allowed to access the MDT tablet.
+    allowed_jobs = {
+        'police',
+        'sheriff',
+        'fbi',
+    },
 
---     -- Distance (metres) within which a player can run a plate check on a vehicle
---     plate_check_distance = 10.0,
+    -- Default screen opened by the tablet module.
+    default_screen = 'tablet',
 
---     -- How long (ms) the MDT open/close animation takes
---     animation_duration = 300,
--- }
+    -- If true, players without allowed jobs will get a notify.
+    notify_on_denied = true,
+
+    -- How long (ms) the MDT open/close animation takes.
+    animation_duration = 300,
+}
 
 -- ── BOLO / Warrants ───────────────────────────────────────
 

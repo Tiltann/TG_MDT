@@ -7,7 +7,9 @@
 
 import { useEffect } from "react";
 
-const IS_FIVEM = window.invokeNative !== undefined;
+const IS_FIVEM =
+  typeof window !== "undefined" &&
+  typeof (window as Window & { invokeNative?: unknown }).invokeNative !== "undefined";
 const RESOURCE_NAME =
   // @ts-ignore — injected by FiveM
   typeof GetParentResourceName !== "undefined"
@@ -23,17 +25,30 @@ export async function fetchNui<T = unknown>(
   eventName: string,
   data?: unknown
 ): Promise<T> {
+  if (typeof window === "undefined") {
+    return {} as T;
+  }
+
   const url = IS_FIVEM
     ? `https://${RESOURCE_NAME}/${eventName}`
     : `/nui/${eventName}`;
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json; charset=UTF-8" },
-    body: JSON.stringify(data ?? {}),
-  });
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=UTF-8" },
+      body: JSON.stringify(data ?? {}),
+    });
 
-  return res.json() as Promise<T>;
+    if (!res.ok) {
+      return {} as T;
+    }
+
+    return res.json() as Promise<T>;
+  } catch {
+    // Browser/dev mode without a mock endpoint should not crash the UI.
+    return {} as T;
+  }
 }
 
 /**

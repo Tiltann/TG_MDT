@@ -7,13 +7,13 @@
 
 Config = Config or {}
 
--- Config.Commands = {
---     -- Chat command to open/toggle the MDT
---     open_mdt = 'mdt',
--- }
+Config.Commands = {
+	-- Chat command to open/toggle the MDT
+	open_mdt = 'mdt',
+}
 
--- Config.Keys = {
---     -- Default keybind to toggle the MDT (FiveM key name)
---     -- See: https://docs.fivem.net/docs/game-references/controls/
---     toggle_mdt = 'F6',
--- }
+Config.Keys = {
+	-- Default keybind to toggle the MDT (FiveM key name)
+	-- See: https://docs.fivem.net/docs/game-references/controls/
+	toggle_mdt = 'F6',
+}
