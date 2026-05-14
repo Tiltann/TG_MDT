@@ -19,15 +19,13 @@ shared_scripts {
 }
 
 client_scripts {
-    'client/init.lua',
-    'client/nui.lua',
     'client/**/*.lua',
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/sql.lua',
-    'server/sv-logs.lua',
+    'server/logs.lua',
     'server/**/*.lua',
 }
 

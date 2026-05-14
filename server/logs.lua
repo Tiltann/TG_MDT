@@ -6,6 +6,12 @@
 
 local RESOURCE_NAME = GetCurrentResourceName()
 
+local EVENT_LOG_MDT_ACTION     = 'tg_mdt:internal:logMDTAction'
+local EVENT_LOG_PLAYER_ACTION  = 'tg_mdt:internal:logPlayerAction'
+local EVENT_LOG_VEHICLE_ACTION = 'tg_mdt:internal:logVehicleAction'
+local EVENT_LOG_EVIDENCE       = 'tg_mdt:internal:logEvidence'
+local EVENT_LOG_ADMIN_ACTION   = 'tg_mdt:internal:logAdminAction'
+
 -- ── Fivemanage Logging ────────────────────────────────────
 
 --- Sends a log to Fivemanage.
@@ -83,10 +89,46 @@ local function logAdminAction(admin_id, action, details)
 
 end
 
--- ── Exports ───────────────────────────────────────────────
+-- ── Event Handlers ────────────────────────────────────────
 
-exports('LogMDTAction', logMDTAction)
-exports('LogPlayerAction', logPlayerAction)
-exports('LogVehicleAction', logVehicleAction)
-exports('LogEvidence', logEvidence)
-exports('LogAdminAction', logAdminAction)
+--- Handles MDT action logging event.
+---@param player_id number The player server id.
+---@param action string The action performed.
+---@param details table Additional details about the action.
+AddEventHandler(EVENT_LOG_MDT_ACTION, function(player_id, action, details)
+    logMDTAction(player_id, action, details)
+end)
+
+--- Handles player action logging event.
+---@param officer_id number The officer server id.
+---@param target_id number The target player server id.
+---@param action string The action performed.
+---@param details table Additional details about the action.
+AddEventHandler(EVENT_LOG_PLAYER_ACTION, function(officer_id, target_id, action, details)
+    logPlayerAction(officer_id, target_id, action, details)
+end)
+
+--- Handles vehicle action logging event.
+---@param player_id number The player server id.
+---@param action string The action performed.
+---@param vehicle_data table Vehicle information.
+---@param details table Additional details about the action.
+AddEventHandler(EVENT_LOG_VEHICLE_ACTION, function(player_id, action, vehicle_data, details)
+    logVehicleAction(player_id, action, vehicle_data, details)
+end)
+
+--- Handles evidence logging event.
+---@param player_id number The player server id.
+---@param action string The action performed.
+---@param evidence_data table Evidence information.
+AddEventHandler(EVENT_LOG_EVIDENCE, function(player_id, action, evidence_data)
+    logEvidence(player_id, action, evidence_data)
+end)
+
+--- Handles admin action logging event.
+---@param admin_id number The admin server id.
+---@param action string The action performed.
+---@param details table Additional details about the action.
+AddEventHandler(EVENT_LOG_ADMIN_ACTION, function(admin_id, action, details)
+    logAdminAction(admin_id, action, details)
+end)
