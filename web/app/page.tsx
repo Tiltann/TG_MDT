@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchNui, useNuiEvent } from "@/lib/useNui";
+import { Sidebar } from "./components/sidebar";
+import { Topbar } from "./components/topbar";
+import { DashboardView } from "./components/dashboard-view";
 
 type NuiVisibilityPayload = {
   visible?: boolean;
@@ -59,36 +62,43 @@ export default function Home() {
     }));
   });
 
-  const isTablet = useMemo(() => activeScreen === "tablet", [activeScreen]);
+  // Fallback for browser dev mode to always show UI
+  const is_browser = typeof window !== "undefined" && !("invokeNative" in window);
+  const show_ui = is_browser || (isVisible && activeScreen !== null);
 
-  // Hard requirement: show absolutely nothing until NUI handshake is done.
-  if (!isHandshakeDone) return null;
+  // show absolutely nothing until NUI handshake is done.
+  if (!isHandshakeDone && !is_browser) return null;
+
+  const current_modules = (screenData?.meta as any)?.modules || {};
+  const player_data = screenData?.player || { name: "Mock User", badge: "Badge #1234" };
 
   return (
-    <main className="nui-root" data-visible={isVisible ? "true" : "false"}>
+    <main className="nui-root" data-visible={show_ui ? "true" : "false"}>
       <div className="nui-layer nui-layer-bg" />
 
-      {isVisible && isTablet && (
+      {show_ui && (
         <section className="nui-layer nui-layer-tablet" aria-label="tablet-ui">
-          <div className="tablet-shell">
-            <header className="tablet-topbar">
-              <span className="tablet-title">TG MDT Tablet</span>
-              <button
-                className="tablet-close"
-                onClick={() => {
-                  fetchNui("hideUI", {}).catch(() => undefined);
-                }}
-                type="button"
-              >
-                Close
-              </button>
-            </header>
+          <div className="tablet-shell flex text-sm text-[var(--mdt-text-muted)]">
+            
+            {/* Modular Sidebar Component */}
+            <Sidebar 
+              currentView={activeScreen || "dashboard"} 
+              modules={current_modules}
+              playerData={player_data}
+              onScreenChange={(screen) => setActiveScreen(screen)}
+            />
 
-            <div className="tablet-screen">
-              <h1>Tablet Ready</h1>
-              <p>This layer renders only when Lua sets screen = "tablet".</p>
-              <pre>{JSON.stringify(screenData, null, 2)}</pre>
+            {/* Main Content Area */}
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <Topbar onClose={() => fetchNui("hideUI", {}).catch(() => setVisible(false))} />
+              
+              <div className="flex-1 overflow-auto p-6">
+                {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView />}
+                {activeScreen === "incidents" && <div>Incidents Component</div>}
+                {activeScreen === "dispatch" && <div>Dispatch Component</div>}
+              </div>
             </div>
+
           </div>
         </section>
       )}

@@ -61,7 +61,17 @@ local function canOpenTablet()
     end
 
     local job_name = getLocalJobName()
-    return job_name ~= nil and lookup[job_name] == true
+    if not job_name then
+        Debug.warn(('canOpenTablet: getLocalJobName() returned nil. Details: Framework=%s'):format(Framework and Framework.name or 'nil'))
+        return false
+    end
+
+    local is_allowed = lookup[job_name] == true
+    if not is_allowed then
+        Debug.warn(('canOpenTablet: Job "%s" is not in allowed_jobs'):format(tostring(job_name)))
+    end
+
+    return is_allowed
 end
 
 --- Open/toggle tablet only if player has an allowed job.

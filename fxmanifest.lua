@@ -15,10 +15,12 @@ shared_scripts {
     'shared/framework/qbcore.lua',
     'shared/framework/qbox.lua',
     'shared/framework/standalone.lua',
-    'shared/**/*.lua',
+    'shared/exports.lua',
 }
 
 client_scripts {
+    'client/nui.lua',
+    'client/init.lua',
     'client/**/*.lua',
 }
 

@@ -51,11 +51,31 @@ if IsDuplicityVersion() then
 -- ── client ────────────────────────────────────────────────
 else
     local ESX = nil
+
     CreateThread(function()
+        -- Attempt modern export first
+        local status = GetResourceState('es_extended')
+        if status == 'started' or status == 'starting' then
+            pcall(function() ESX = exports['es_extended']:getSharedObject() end)
+        end
+
+        -- Fallback to legacy event
         while ESX == nil do
             TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
-            if ESX == nil then Wait(100) end
+            Wait(100)
         end
+    end)
+
+    local PlayerData = {}
+
+    RegisterNetEvent('esx:playerLoaded')
+    AddEventHandler('esx:playerLoaded', function(xPlayer)
+        PlayerData = xPlayer
+    end)
+
+    RegisterNetEvent('esx:setJob')
+    AddEventHandler('esx:setJob', function(job)
+        PlayerData.job = job
     end)
 
     Framework.Client = {}
@@ -70,7 +90,20 @@ else
     --- Get the local player's data.
     ---@return table|nil
     function Framework.Client.getPlayerData()
-        return ESX and ESX.GetPlayerData() or nil
+        if not ESX then return PlayerData end
+        
+        local data = nil
+        if type(ESX.GetPlayerData) == 'function' then
+            pcall(function() data = ESX.GetPlayerData() end)
+        end
+        
+        if data and data.job then
+            PlayerData = data
+        elseif ESX.PlayerData and ESX.PlayerData.job then
+            PlayerData = ESX.PlayerData
+        end
+
+        return PlayerData
     end
 
     --- Get the local player's job.

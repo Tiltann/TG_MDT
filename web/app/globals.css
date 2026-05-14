@@ -3,10 +3,22 @@
 :root {
   --background: transparent;
   --foreground: #e7edf5;
-  --tablet-shell: #21262e;
-  --tablet-screen: #0d1219;
-  --tablet-border: #3a4250;
-  --tablet-accent: #7cd3ff;
+  
+  /* Modular Theme Colors */
+  --mdt-bg-base: #11141a;       /* Darkest background */
+  --mdt-bg-panel: #1a1e27;      /* Panel background */
+  --mdt-bg-hover: #262c38;      /* Hover states */
+  --mdt-border: #2c3440;        /* Borders */
+  
+  --mdt-accent-primary: #ff9100; /* Dashboard Accent (Orange/Gold) */
+  --mdt-text-muted: #8a99a8;    /* Muted text */
+  --mdt-text-active: #ffffff;   /* Active text */
+  
+  /* Status Colors */
+  --mdt-status-high: #ef4444;   /* Red */
+  --mdt-status-medium: #f59e0b; /* Orange */
+  --mdt-status-low: #3b82f6;    /* Blue */
+  --mdt-status-success: #22c55e;/* Green */
 }
 
 @theme inline {
@@ -24,7 +36,6 @@
 }
 
 body {
-  background: transparent;
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   overflow: hidden;
@@ -53,9 +64,7 @@ body,
 }
 
 .nui-layer-bg {
-  background:
-    radial-gradient(50rem 28rem at 50% 130%, rgba(18, 31, 44, 0.9), rgba(18, 31, 44, 0.1) 65%, transparent 80%),
-    linear-gradient(180deg, rgba(7, 10, 14, 0.12) 0%, rgba(7, 10, 14, 0.55) 100%);
+  background: rgba(0, 0, 0, 0.6);
   opacity: 0;
   transition: opacity 180ms ease;
 }
@@ -68,17 +77,18 @@ body,
   display: grid;
   place-items: center;
   padding: 2rem;
+  width: 100%;
+  height: 100%;
 }
 
 .tablet-shell {
-  width: min(960px, 100%);
-  height: min(640px, 100%);
-  border-radius: 24px;
-  border: 1px solid var(--tablet-border);
-  background: linear-gradient(180deg, #2b323d 0%, #1d242e 100%);
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55);
-  display: grid;
-  grid-template-rows: auto 1fr;
+  width: min(1280px, 100%);
+  height: min(800px, 100%);
+  border-radius: 20px;
+  border: 1px solid var(--mdt-border);
+  background: var(--mdt-bg-base);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  display: flex;
   overflow: hidden;
   transform: translateY(8px) scale(0.985);
   opacity: 0;
@@ -88,55 +98,4 @@ body,
 .nui-root[data-visible="true"] .tablet-shell {
   transform: translateY(0) scale(1);
   opacity: 1;
-}
-
-.tablet-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--tablet-border);
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.tablet-title {
-  font-size: 0.9rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--tablet-accent);
-}
-
-.tablet-close {
-  border: 1px solid var(--tablet-border);
-  border-radius: 10px;
-  padding: 0.35rem 0.7rem;
-  background: #141a22;
-  color: #f2f6fb;
-  cursor: pointer;
-}
-
-.tablet-screen {
-  background: var(--tablet-screen);
-  padding: 1.25rem;
-  overflow: auto;
-}
-
-.tablet-screen h1 {
-  font-size: 1.3rem;
-  margin: 0;
-}
-
-.tablet-screen p {
-  margin-top: 0.4rem;
-  color: #9fb0c3;
-}
-
-.tablet-screen pre {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  border-radius: 12px;
-  background: #090d12;
-  border: 1px solid #1f2a36;
-  color: #b8d6f2;
-  font-size: 0.8rem;
 }
