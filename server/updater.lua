@@ -8,7 +8,7 @@ local RESOURCE_NAME = GetCurrentResourceName()
 local CURRENT_VERSION = GetResourceMetadata(RESOURCE_NAME, 'version', 0) or '1.0.0'
 local GITHUB_REPO = 'Tiltann/TG_MDT'
 local GITHUB_API_URL = ('https://api.github.com/repos/%s/releases/latest'):format(GITHUB_REPO)
-local CFX_PORTAL_URL = 'https://portal.cfx.re/'
+local GITHUB_DOWNLOAD_URL = ('https://github.com/%s/releases/latest'):format(GITHUB_REPO)
 
 -- ── Helper Functions ──────────────────────────────────────
 
@@ -60,7 +60,7 @@ local function printUpdateMessage(current, latest)
     print(('^3[TG][%s]^7 ========================================'):format(RESOURCE_NAME))
     print(('^3[TG][%s]^7 ⚠️  UPDATE AVAILABLE'):format(RESOURCE_NAME))
     print(('^3[TG][%s]^7 Current: ^1%s^7 → Latest: ^2%s^7'):format(RESOURCE_NAME, current, latest))
-    print(('^3[TG][%s]^7 Download: ^5%s^7'):format(RESOURCE_NAME, CFX_PORTAL_URL))
+    print(('^3[TG][%s]^7 Download: ^5%s^7'):format(RESOURCE_NAME, GITHUB_DOWNLOAD_URL))
     print(('^3[TG][%s]^7 ========================================'):format(RESOURCE_NAME))
 end
 
