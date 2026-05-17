@@ -79,3 +79,16 @@ NUI.onReady(function()
 	})
 	Debug.debug('Client init: sent allowedJobs payload')
 end)
+
+-- ── Map tile missing — NUI → client → server ───────────────
+-- The web UI fires 'mapTilesMissing' via fetchNui when it detects
+-- that tiles are not loading. We relay it to the server once per session.
+local _mapWarningFired = false
+NUI.onCallback('mapTilesMissing', function(_, cb)
+    if not _mapWarningFired then
+        _mapWarningFired = true
+        Debug.warn('Map tiles missing — reported by NUI, notifying server')
+        TriggerServerEvent('TG_MDT:mapTilesMissing')
+    end
+    cb('ok')
+end)

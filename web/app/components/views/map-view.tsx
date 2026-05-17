@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Card } from "../ui/card";
 import type { TFunction } from "../../lib/i18n";
+import { fetchNui } from "../../../lib/useNui";
 
 type LeafletModule = typeof import("leaflet");
 
@@ -108,6 +109,16 @@ export default function MapView({
               });
 
       activeLayer.addTo(map);
+
+      // Detect missing tiles: fire fetchNui once if the first tile errors.
+      let tileErrorReported = false;
+      activeLayer.once("tileerror", () => {
+        if (!tileErrorReported) {
+          tileErrorReported = true;
+          fetchNui("mapTilesMissing", {}).catch(() => {});
+        }
+      });
+
       map.fitBounds(bounds);
 
       markerLayerRef.current = leaflet.layerGroup().addTo(map);

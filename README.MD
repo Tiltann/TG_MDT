@@ -41,6 +41,32 @@ Ein Tablet ingame, das jede Fraktion bekommt. Jede Fraktion sieht nur ihre eigen
 
 Alle Coding- und Design-Standards für dieses Projekt sind in [`STANDARDS.md`](./STANDARDS.md) dokumentiert. **Bitte vor Beiträgen lesen.**
 
+### 🗺️ Live-Map — Karten-Tiles einrichten
+
+Die Karten-Tiles sind **nicht im Repository enthalten** (zu groß für GitHub).  
+Ohne die Tiles zeigt die Live-Map nur eine leere/fehlerhafte Karte — das Script gibt beim Start eine entsprechende Warnung in der Serverkonsole aus.
+
+**So richtest du die Live-Map ein:**
+
+1. Lade die Tiles herunter:  
+   **[https://drive.proton.me/urls/YZE057HH5G#KN3aoWGvPXb8](https://drive.proton.me/urls/YZE057HH5G#KN3aoWGvPXb8)**
+
+2. Entpacke das Archiv so, dass die Ordnerstruktur stimmt:
+   ```
+   web/public/map/styleAtlas/{z}/{x}/{y}.jpg
+   web/public/map/styleGrid/{z}/{x}/{y}.png
+   web/public/map/styleSatelite/{z}/{x}/{y}.jpg
+   ```
+
+3. Baue das Web-UI neu:
+   ```bash
+   cd web && npm run build
+   ```
+   Der Build kopiert `public/` automatisch nach `dist/`. Danach die Resource neu starten.
+
+> Die Karten-Tiles stammen ursprünglich aus dem Projekt  
+> **[RiceaRaul/gta-v-map-leaflet](https://github.com/RiceaRaul/gta-v-map-leaflet)** — alle Credits gehen an RiceaRaul und die Mitwirkenden.
+
 ### Support
 
 Support gibt es aktuell **ausschließlich über GitHub Issues**. Bitte keine Support-Anfragen per Discord, DM oder Mail — Issues sind der einzige Weg.
@@ -81,6 +107,32 @@ An in-game tablet that every faction gets. Each faction only sees its own stuff,
 ### Standards
 
 All coding and design standards for this project are documented in [`STANDARDS.md`](./STANDARDS.md). **Please read before contributing.**
+
+### 🗺️ Live Map — Setting up map tiles
+
+The map tile files are **not included in this repository** (too large for GitHub).  
+Without the tiles the live map will show a blank/broken map — the script will print a warning in the server console on startup.
+
+**How to set up the live map:**
+
+1. Download the tiles:  
+   **[https://drive.proton.me/urls/YZE057HH5G#KN3aoWGvPXb8](https://drive.proton.me/urls/YZE057HH5G#KN3aoWGvPXb8)**
+
+2. Extract and place them so the folder structure looks like this:
+   ```
+   web/public/map/styleAtlas/{z}/{x}/{y}.jpg
+   web/public/map/styleGrid/{z}/{x}/{y}.png
+   web/public/map/styleSatelite/{z}/{x}/{y}.jpg
+   ```
+
+3. Rebuild the web UI:
+   ```bash
+   cd web && npm run build
+   ```
+   The build copies `public/` into `dist/` automatically. Then restart the resource.
+
+> Map tiles originally from  
+> **[RiceaRaul/gta-v-map-leaflet](https://github.com/RiceaRaul/gta-v-map-leaflet)** — all credit goes to RiceaRaul and contributors.
 
 ### Support
 
