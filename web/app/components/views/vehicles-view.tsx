@@ -15,13 +15,15 @@ type VehicleRecord = {
   state?: string | number | null;
 };
 
-type VehicleAkte = {
-  modelName: string;
-  color: string;
-  registrationStatus: string;
-  insuranceStatus: string;
-  stolenStatus: string;
-  notes: string;
+type VehicleAkte = Record<string, string>;
+
+type AkteField = {
+  key: string;
+  label_key?: string;
+  type?: "text" | "textarea" | "select";
+  default?: string;
+  editable?: boolean;
+  options?: Array<{ value: string; label_key?: string; label?: string }>;
 };
 
 type AkteSyncPayload = {
@@ -31,25 +33,59 @@ type AkteSyncPayload = {
   akte?: Record<string, string>;
 };
 
-const DEFAULT_AKTE: VehicleAkte = {
-  modelName: "",
-  color: "",
-  registrationStatus: "valid",
-  insuranceStatus: "active",
-  stolenStatus: "no",
-  notes: "",
-};
+const FALLBACK_FIELDS: AkteField[] = [
+  { key: "modelName", label_key: "tablet.vehicles.field.model", type: "text", default: "", editable: true },
+  { key: "color", label_key: "tablet.vehicles.akte.color", type: "text", default: "", editable: true },
+  {
+    key: "registrationStatus",
+    label_key: "tablet.vehicles.akte.registration",
+    type: "select",
+    default: "valid",
+    editable: true,
+    options: [
+      { value: "valid", label_key: "tablet.vehicles.akte.registration.valid" },
+      { value: "expired", label_key: "tablet.vehicles.akte.registration.expired" },
+      { value: "revoked", label_key: "tablet.vehicles.akte.registration.revoked" },
+    ],
+  },
+  {
+    key: "insuranceStatus",
+    label_key: "tablet.vehicles.akte.insurance",
+    type: "select",
+    default: "active",
+    editable: true,
+    options: [
+      { value: "active", label_key: "tablet.vehicles.akte.insurance.active" },
+      { value: "expired", label_key: "tablet.vehicles.akte.insurance.expired" },
+      { value: "none", label_key: "tablet.vehicles.akte.insurance.none" },
+    ],
+  },
+  {
+    key: "stolenStatus",
+    label_key: "tablet.vehicles.akte.stolen",
+    type: "select",
+    default: "no",
+    editable: true,
+    options: [
+      { value: "no", label_key: "tablet.vehicles.akte.stolen.no" },
+      { value: "yes", label_key: "tablet.vehicles.akte.stolen.yes" },
+      { value: "investigation", label_key: "tablet.vehicles.akte.stolen.investigation" },
+    ],
+  },
+  { key: "notes", label_key: "tablet.vehicles.akte.notes", type: "textarea", default: "", editable: true },
+];
 
-const MODEL_HASH_NAMES: Record<string, string> = {
-  "1663218586": "Sultan RS",
+const defaultsFromFields = (fields: AkteField[]) => {
+  const defaults: VehicleAkte = {};
+  for (const field of fields) {
+    defaults[field.key] = field.default || "";
+  }
+  return defaults;
 };
 
 function normalizeModelName(value?: string | number | null): string {
   if (value === undefined || value === null || value === "") return "Unknown";
-  const key = String(value);
-  if (MODEL_HASH_NAMES[key]) return MODEL_HASH_NAMES[key];
-  if (/^\d+$/.test(key)) return `Unknown (${key})`;
-  return key;
+  return String(value);
 }
 
 export default function VehiclesView({
@@ -58,13 +94,18 @@ export default function VehiclesView({
   globalSearch,
   initialAkten,
   akteSync,
+  akteFields,
 }: {
   t: TFunction;
   vehicles: VehicleRecord[];
   globalSearch: string;
   initialAkten: Record<string, VehicleAkte>;
   akteSync?: AkteSyncPayload;
+  akteFields?: AkteField[];
 }) {
+  const resolvedFields = akteFields && akteFields.length > 0 ? akteFields : FALLBACK_FIELDS;
+  const defaultAkte = useMemo(() => defaultsFromFields(resolvedFields), [resolvedFields]);
+
   const [selectedPlate, setSelectedPlate] = useState<string | null>(null);
   const [aktenByVehicle, setAktenByVehicle] = useState<Record<string, VehicleAkte>>(initialAkten || {});
 
@@ -77,12 +118,12 @@ export default function VehiclesView({
     setAktenByVehicle((prev) => ({
       ...prev,
       [akteSync.plate as string]: {
-        ...DEFAULT_AKTE,
+        ...defaultAkte,
         ...(prev[akteSync.plate as string] || {}),
         ...(akteSync.akte || {}),
       },
     }));
-  }, [akteSync]);
+  }, [akteSync, defaultAkte]);
 
   const normalizedVehicles = useMemo(
     () =>
@@ -127,7 +168,7 @@ export default function VehiclesView({
         setAktenByVehicle((prev) => ({
           ...prev,
           [selectedVehicle.plate]: {
-            ...DEFAULT_AKTE,
+            ...defaultAkte,
             ...(akte || {}),
             modelName: (akte && akte.modelName) || selectedVehicle.modelName,
           },
@@ -136,14 +177,14 @@ export default function VehiclesView({
       .catch(() => {
         // Keep defaults when callback fails.
       });
-  }, [selectedVehicle, aktenByVehicle]);
+  }, [selectedVehicle, aktenByVehicle, defaultAkte]);
 
-  const currentAkte = selectedVehicle
+  const currentAkte: VehicleAkte = selectedVehicle
     ? aktenByVehicle[selectedVehicle.plate] || {
-        ...DEFAULT_AKTE,
+        ...defaultAkte,
         modelName: selectedVehicle.modelName,
       }
-    : DEFAULT_AKTE;
+    : defaultAkte;
 
   const persistAkte = (plate: string, nextAkte: VehicleAkte) => {
     fetchNui<VehicleAkte>("saveVehicleAkte", { plate, akte: nextAkte })
@@ -152,7 +193,7 @@ export default function VehiclesView({
         setAktenByVehicle((prev) => ({
           ...prev,
           [plate]: {
-            ...DEFAULT_AKTE,
+            ...defaultAkte,
             ...(prev[plate] || {}),
             ...(saved || {}),
           },
@@ -163,12 +204,13 @@ export default function VehiclesView({
       });
   };
 
-  const updateAkteField = (field: keyof VehicleAkte, value: string) => {
+  const updateAkteField = (field: string, value: string, editable = true) => {
     if (!selectedVehicle) return;
+    if (!editable) return;
 
     const plate = selectedVehicle.plate;
     const nextAkte: VehicleAkte = {
-      ...DEFAULT_AKTE,
+      ...defaultAkte,
       ...(aktenByVehicle[plate] || { modelName: selectedVehicle.modelName }),
       [field]: value,
     };
@@ -269,69 +311,67 @@ export default function VehiclesView({
           <h4 className="card-title">{t("tablet.vehicles.akte.title")}</h4>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.vehicles.field.model")}</label>
-              <input
-                value={currentAkte.modelName}
-                onChange={(event) => updateAkteField("modelName", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.vehicles.akte.color")}</label>
-              <input
-                value={currentAkte.color}
-                onChange={(event) => updateAkteField("color", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.vehicles.akte.registration")}</label>
-              <select
-                value={currentAkte.registrationStatus}
-                onChange={(event) => updateAkteField("registrationStatus", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              >
-                <option value="valid">{t("tablet.vehicles.akte.registration.valid")}</option>
-                <option value="expired">{t("tablet.vehicles.akte.registration.expired")}</option>
-                <option value="revoked">{t("tablet.vehicles.akte.registration.revoked")}</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.vehicles.akte.insurance")}</label>
-              <select
-                value={currentAkte.insuranceStatus}
-                onChange={(event) => updateAkteField("insuranceStatus", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              >
-                <option value="active">{t("tablet.vehicles.akte.insurance.active")}</option>
-                <option value="expired">{t("tablet.vehicles.akte.insurance.expired")}</option>
-                <option value="none">{t("tablet.vehicles.akte.insurance.none")}</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.vehicles.akte.stolen")}</label>
-              <select
-                value={currentAkte.stolenStatus}
-                onChange={(event) => updateAkteField("stolenStatus", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              >
-                <option value="no">{t("tablet.vehicles.akte.stolen.no")}</option>
-                <option value="yes">{t("tablet.vehicles.akte.stolen.yes")}</option>
-                <option value="investigation">{t("tablet.vehicles.akte.stolen.investigation")}</option>
-              </select>
-            </div>
+            {resolvedFields
+              .filter((field) => field.type !== "textarea")
+              .map((field) => {
+                const label = field.label_key ? t(field.label_key) : field.key;
+                const editable = field.editable !== false;
+                const value = currentAkte[field.key] ?? field.default ?? "";
+
+                if (field.type === "select") {
+                  return (
+                    <div key={field.key}>
+                      <label className="block text-xs mdt-muted mb-1">{label}</label>
+                      <select
+                        value={value}
+                        disabled={!editable}
+                        onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
+                        className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                      >
+                        {(field.options || []).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label_key ? t(option.label_key) : option.label || option.value}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={field.key}>
+                    <label className="block text-xs mdt-muted mb-1">{label}</label>
+                    <input
+                      value={value}
+                      disabled={!editable}
+                      onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
+                      className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                    />
+                  </div>
+                );
+              })}
           </div>
 
-          <div>
-            <label className="block text-xs mdt-muted mb-1">{t("tablet.vehicles.akte.notes")}</label>
-            <textarea
-              value={currentAkte.notes}
-              onChange={(event) => updateAkteField("notes", event.target.value)}
-              rows={6}
-              className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-            />
-          </div>
+          {resolvedFields
+            .filter((field) => field.type === "textarea")
+            .map((field) => {
+              const label = field.label_key ? t(field.label_key) : field.key;
+              const editable = field.editable !== false;
+              const value = currentAkte[field.key] ?? field.default ?? "";
+
+              return (
+                <div key={field.key}>
+                  <label className="block text-xs mdt-muted mb-1">{label}</label>
+                  <textarea
+                    value={value}
+                    disabled={!editable}
+                    onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
+                    rows={6}
+                    className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                  />
+                </div>
+              );
+            })}
         </Card>
       </div>
     </div>

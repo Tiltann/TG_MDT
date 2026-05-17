@@ -69,6 +69,7 @@ NUI.onReady(function()
 			translationsByLocale = translations_by_locale,
 			modules = Config.Modules or {},
 			mdt = Config.MDT or {},
+			akteModels = Config.AkteModels or {},
 		},
 	})
 	Debug.debug('Client init: sent meta payload')

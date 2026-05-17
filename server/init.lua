@@ -77,9 +77,169 @@ local function decodeObject(value)
     return nil
 end
 
-local MODEL_HASH_NAMES = {
-    ['1663218586'] = 'Sultan RS',
-}
+local MODEL_HASH_NAMES = ((Config.AkteModels or {}).vehicle_model_names) or {}
+
+---@param kind string
+---@param key string
+---@param message string
+local function warnAkteDefault(kind, key, message)
+    print(('[TG_MDT] Akte default resolver failed (%s.%s): %s'):format(kind, key, message))
+end
+
+---@param value any
+---@return any, boolean
+local function awaitIfNeeded(value)
+    if not value then
+        return value, true
+    end
+
+    if Citizen and Citizen.Await then
+        local valueType = type(value)
+        if valueType == 'table' or valueType == 'userdata' then
+            local okAwait, awaited = pcall(Citizen.Await, value)
+            if okAwait then
+                return awaited, true
+            end
+            return nil, false
+        end
+    end
+
+    return value, true
+end
+
+---@param descriptor table
+---@param ctx table
+---@return any, string|nil
+local function resolveExportDefault(descriptor, ctx)
+    local resource = descriptor.resource or descriptor.res
+    local exportName = descriptor.export or descriptor.name
+    if type(resource) ~= 'string' or resource == '' then
+        return nil, 'missing export resource'
+    end
+    if type(exportName) ~= 'string' or exportName == '' then
+        return nil, 'missing export name'
+    end
+
+    local exportRoot = exports and exports[resource]
+    if type(exportRoot) ~= 'table' then
+        return nil, ('resource exports not found: %s'):format(resource)
+    end
+
+    local exportFn = exportRoot[exportName]
+    if type(exportFn) ~= 'function' then
+        return nil, ('export not found: %s.%s'):format(resource, exportName)
+    end
+
+    local args = descriptor.args
+    if type(args) ~= 'table' then
+        args = {}
+    end
+
+    if descriptor.pass_context == true then
+        local withCtx = {}
+        for i = 1, #args do
+            withCtx[i] = args[i]
+        end
+        withCtx[#withCtx + 1] = ctx
+        args = withCtx
+    end
+
+    local okCall, result = pcall(exportFn, table.unpack(args))
+    if not okCall then
+        return nil, tostring(result)
+    end
+
+    if descriptor.await == true then
+        local awaited, okAwait = awaitIfNeeded(result)
+        if not okAwait then
+            return nil, 'await failed for export result'
+        end
+        result = awaited
+    end
+
+    return result, nil
+end
+
+---@param kind string
+---@param field table
+---@return string
+local function resolveFieldDefaultValue(kind, field)
+    local key = tostring(field.key or 'unknown')
+    local defaultValue = field.default
+
+    if defaultValue == nil then
+        return ''
+    end
+
+    local ctx = {
+        kind = kind,
+        key = key,
+        field = field,
+    }
+
+    local resolved = defaultValue
+    local defaultType = type(defaultValue)
+
+    if defaultType == 'function' then
+        local okCall, result = pcall(defaultValue, ctx)
+        if not okCall then
+            warnAkteDefault(kind, key, tostring(result))
+            return ''
+        end
+
+        local awaited, okAwait = awaitIfNeeded(result)
+        if not okAwait then
+            warnAkteDefault(kind, key, 'await failed for function default result')
+            return ''
+        end
+        resolved = awaited
+    elseif defaultType == 'table' and (defaultValue.type == 'export' or defaultValue.export ~= nil) then
+        local result, err = resolveExportDefault(defaultValue, ctx)
+        if err then
+            warnAkteDefault(kind, key, err)
+            return tostring(defaultValue.fallback or '')
+        end
+        resolved = result
+    end
+
+    if resolved == nil then
+        return ''
+    end
+
+    return tostring(resolved)
+end
+
+---@param kind string
+---@return table
+local function getAkteModel(kind)
+    return ((Config.AkteModels or {})[kind] or {})
+end
+
+---@param kind string
+---@return table
+local function getAkteFieldMap(kind)
+    local model = getAkteModel(kind)
+    local map = {}
+    for _, field in ipairs((model.fields or {})) do
+        if type(field.key) == 'string' and field.key ~= '' then
+            map[field.key] = field
+        end
+    end
+    return map
+end
+
+---@param kind string
+---@return table
+local function defaultAkteFromModel(kind)
+    local model = getAkteModel(kind)
+    local defaults = {}
+    for _, field in ipairs((model.fields or {})) do
+        if type(field.key) == 'string' and field.key ~= '' then
+            defaults[field.key] = resolveFieldDefaultValue(kind, field)
+        end
+    end
+    return defaults
+end
 
 --- Normalize model value to a human-readable model name.
 ---@param model any
@@ -97,27 +257,41 @@ local function normalizeModelName(model)
 end
 
 local function defaultPersonAkte()
-    return {
-        phone = '',
-        address = '',
-        occupation = '',
-        dangerLevel = 'low',
-        warrantStatus = 'none',
-        driverLicense = 'valid',
-        weaponLicense = 'none',
-        notes = '',
-    }
+    return defaultAkteFromModel('person')
 end
 
 local function defaultVehicleAkte()
-    return {
-        modelName = '',
-        color = '',
-        registrationStatus = 'valid',
-        insuranceStatus = 'active',
-        stolenStatus = 'no',
-        notes = '',
-    }
+    return defaultAkteFromModel('vehicle')
+end
+
+---@param target table
+---@param key string
+---@param value any
+local function setIfDefinedField(target, key, value)
+    if target[key] ~= nil and value ~= nil then
+        target[key] = tostring(value)
+    end
+end
+
+---@param kind 'person'|'vehicle'
+---@param current table
+---@param incoming table
+---@return table
+local function applyEditableAkteFields(kind, current, incoming)
+    local fieldMap = getAkteFieldMap(kind)
+    local merged = current or {}
+    if type(incoming) ~= 'table' then
+        return merged
+    end
+
+    for key, value in pairs(incoming) do
+        local field = fieldMap[key]
+        if field and field.editable ~= false and type(value) == 'string' then
+            merged[key] = value
+        end
+    end
+
+    return merged
 end
 
 --- Ensure Akte tables exist.
@@ -154,8 +328,8 @@ local function buildPersonAkteDefaults(identifier)
         ]], { identifier })
 
         if row then
-            defaults.phone = row.phone_number or ''
-            defaults.occupation = row.job or ''
+            setIfDefinedField(defaults, 'phone', row.phone_number)
+            setIfDefinedField(defaults, 'occupation', row.job)
         end
         return defaults
     end
@@ -170,8 +344,8 @@ local function buildPersonAkteDefaults(identifier)
 
         if row then
             local charinfo = decodeObject(row.charinfo)
-            defaults.phone = (charinfo and (charinfo.phone or charinfo.phone_number)) or ''
-            defaults.address = (charinfo and (charinfo.address or charinfo.street)) or ''
+            setIfDefinedField(defaults, 'phone', charinfo and (charinfo.phone or charinfo.phone_number))
+            setIfDefinedField(defaults, 'address', charinfo and (charinfo.address or charinfo.street))
 
             local jobName = row.job
             if type(row.job) == 'string' and row.job:sub(1, 1) == '{' then
@@ -180,7 +354,7 @@ local function buildPersonAkteDefaults(identifier)
                     jobName = decodedJob.name
                 end
             end
-            defaults.occupation = jobName or ''
+            setIfDefinedField(defaults, 'occupation', jobName)
         end
     end
 
@@ -203,8 +377,8 @@ local function buildVehicleAkteDefaults(plate)
 
         if row then
             local vehicleData = decodeObject(row.vehicle)
-            defaults.modelName = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model))
-            defaults.color = tostring(vehicleData and (vehicleData.color1 or vehicleData.color2) or '')
+            setIfDefinedField(defaults, 'modelName', normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model)))
+            setIfDefinedField(defaults, 'color', vehicleData and (vehicleData.color1 or vehicleData.color2))
         end
         return defaults
     end
@@ -219,11 +393,11 @@ local function buildVehicleAkteDefaults(plate)
 
         if row then
             local vehicleData = decodeObject(row.vehicle)
-            defaults.modelName = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model))
-            defaults.color = tostring(vehicleData and (vehicleData.color1 or vehicleData.color2) or '')
+            setIfDefinedField(defaults, 'modelName', normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model)))
+            setIfDefinedField(defaults, 'color', vehicleData and (vehicleData.color1 or vehicleData.color2))
 
             if row.state ~= nil then
-                defaults.registrationStatus = tonumber(row.state) == 1 and 'valid' or 'expired'
+                setIfDefinedField(defaults, 'registrationStatus', tonumber(row.state) == 1 and 'valid' or 'expired')
             end
         end
     end
@@ -369,7 +543,7 @@ local function getVehiclesFromFramework()
                 plate = row.plate or ('NO-PLATE-%s'):format(i),
                 ownerIdentifier = row.owner,
                 ownerName = buildDisplayName(row.firstname, row.lastname, row.owner),
-                model = vehicleData and (vehicleData.modelName or vehicleData.model) or nil,
+                model = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model) or nil),
                 state = nil,
             }
         end
@@ -399,7 +573,7 @@ local function getVehiclesFromFramework()
                 plate = row.plate or ('NO-PLATE-%s'):format(i),
                 ownerIdentifier = row.citizenid,
                 ownerName = ownerName,
-                model = vehicleData and (vehicleData.modelName or vehicleData.model) or nil,
+                model = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model) or nil),
                 state = row.state,
             }
         end
@@ -481,14 +655,7 @@ lib.callback.register('TG_MDT:savePersonAkte', function(_src, identifier, akte)
         return nil
     end
 
-    local merged = getPersonAkte(identifier)
-    if type(akte) == 'table' then
-        for k, v in pairs(akte) do
-            if type(v) == 'string' then
-                merged[k] = v
-            end
-        end
-    end
+    local merged = applyEditableAkteFields('person', getPersonAkte(identifier), akte)
 
     SQL.execute(
         'INSERT INTO tg_mdt_person_akten (identifier, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',
@@ -516,14 +683,7 @@ lib.callback.register('TG_MDT:saveVehicleAkte', function(_src, plate, akte)
         return nil
     end
 
-    local merged = getVehicleAkte(plate)
-    if type(akte) == 'table' then
-        for k, v in pairs(akte) do
-            if type(v) == 'string' then
-                merged[k] = v
-            end
-        end
-    end
+    local merged = applyEditableAkteFields('vehicle', getVehicleAkte(plate), akte)
 
     SQL.execute(
         'INSERT INTO tg_mdt_vehicle_akten (plate, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',

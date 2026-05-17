@@ -41,6 +41,29 @@ Ein Tablet ingame, das jede Fraktion bekommt. Jede Fraktion sieht nur ihre eigen
 
 Alle Coding- und Design-Standards für dieses Projekt sind in [`STANDARDS.md`](./STANDARDS.md) dokumentiert. **Bitte vor Beiträgen lesen.**
 
+### 🧩 Modulares Akten-Modell (Lua)
+
+Alle Aktenfelder (Personen/Fahrzeuge) und Fahrzeug-Hashnamen werden zentral in `config/akte_models.lua` gepflegt.
+
+- `Config.AkteModels.person.fields` definiert alle Personenakten-Felder
+- `Config.AkteModels.vehicle.fields` definiert alle Fahrzeugakten-Felder
+- `Config.AkteModels.vehicle_model_names` mapped Modell-Hash -> Anzeigename (gegen "Unknown" Modelle)
+
+Jedes Feld unter `fields` unterstützt:
+
+- `key`: eindeutiger Feldname (DB/UI Schlüssel)
+- `label_key`: Locale-Key für UI-Text
+- `type`: `text`, `select` oder `textarea`
+- `default`: Standardwert
+- `editable`: `true/false` (wenn `false`, wird das Feld serverseitig nicht überschrieben)
+- `options`: nur bei `select` (Liste aus `{ value, label_key }`)
+
+Hinweise:
+
+- Neue Felder müssen nur in `config/akte_models.lua` ergänzt werden, die UI rendert sie dynamisch.
+- Beim Speichern akzeptiert der Server nur `editable = true` Felder.
+- Für unbekannte Fahrzeugmodelle einfach den Hash in `vehicle_model_names` ergänzen.
+
 ### 🗺️ Live-Map — Karten-Tiles einrichten
 
 Die Karten-Tiles sind **nicht im Repository enthalten** (zu groß für GitHub).  
@@ -107,6 +130,29 @@ An in-game tablet that every faction gets. Each faction only sees its own stuff,
 ### Standards
 
 All coding and design standards for this project are documented in [`STANDARDS.md`](./STANDARDS.md). **Please read before contributing.**
+
+### 🧩 Modular Akte Model (Lua)
+
+All Akte fields (persons/vehicles) and vehicle hash-name mappings are managed centrally in `config/akte_models.lua`.
+
+- `Config.AkteModels.person.fields` defines person Akte fields
+- `Config.AkteModels.vehicle.fields` defines vehicle Akte fields
+- `Config.AkteModels.vehicle_model_names` maps model hash -> display name (to avoid "Unknown" models)
+
+Each field inside `fields` supports:
+
+- `key`: unique field name (DB/UI key)
+- `label_key`: locale key for UI labels
+- `type`: `text`, `select`, or `textarea`
+- `default`: default value
+- `editable`: `true/false` (if `false`, server-side save ignores changes)
+- `options`: for `select` only (array of `{ value, label_key }`)
+
+Notes:
+
+- To add fields, update `config/akte_models.lua`; the UI renders them dynamically.
+- On save, the server only applies fields with `editable = true`.
+- For unknown vehicle models, add the hash to `vehicle_model_names`.
 
 ### 🗺️ Live Map — Setting up map tiles
 

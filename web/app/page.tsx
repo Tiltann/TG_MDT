@@ -51,6 +51,19 @@ type NuiMetaPayload = {
     allow_map_style_change?: boolean;
     default_map_style?: string;
   };
+  akteModels?: {
+    person?: { fields?: AkteFieldSchema[] };
+    vehicle?: { fields?: AkteFieldSchema[] };
+  };
+};
+
+type AkteFieldSchema = {
+  key: string;
+  label_key?: string;
+  type?: "text" | "textarea" | "select";
+  default?: string;
+  editable?: boolean;
+  options?: Array<{ value: string; label_key?: string; label?: string }>;
 };
 
 type MapStyle = "styleAtlas" | "styleGrid" | "styleSatelite";
@@ -73,31 +86,23 @@ type VehicleRecord = {
   state?: string | number | null;
 };
 
-type PersonAkte = {
-  phone: string;
-  address: string;
-  occupation: string;
-  dangerLevel: string;
-  warrantStatus: string;
-  driverLicense: string;
-  weaponLicense: string;
-  notes: string;
-};
+type PersonAkte = Record<string, string>;
 
-type VehicleAkte = {
-  modelName: string;
-  color: string;
-  registrationStatus: string;
-  insuranceStatus: string;
-  stolenStatus: string;
-  notes: string;
-};
+type VehicleAkte = Record<string, string>;
 
 type AkteSyncPayload = {
   kind?: "person" | "vehicle";
   identifier?: string;
   plate?: string;
   akte?: PersonAkte | VehicleAkte;
+};
+
+type SearchSuggestion = {
+  id: string;
+  label: string;
+  subtitle: string;
+  targetScreen: "persons" | "vehicles";
+  query: string;
 };
 
 const MAP_STYLE_KEY = "tg_mdt_map_style";
@@ -286,9 +291,84 @@ export default function Home() {
   const akteSyncData = (screenData?.akteSync as AkteSyncPayload | undefined) || undefined;
   const personAkteSync = akteSyncData?.kind === "person" ? akteSyncData : undefined;
   const vehicleAkteSync = akteSyncData?.kind === "vehicle" ? akteSyncData : undefined;
+  const personAkteFields = typedMeta.akteModels?.person?.fields || [];
+  const vehicleAkteFields = typedMeta.akteModels?.vehicle?.fields || [];
   const rootStyle = {
     "--mdt-accent-primary": branding.accent || defaultMockupBranding.accent || "#ff9100",
   } as CSSProperties;
+
+  const searchSuggestions = useMemo<SearchSuggestion[]>(() => {
+    const query = globalSearch.trim().toLowerCase();
+    if (!query) return [];
+
+    const score = (value: string): number => {
+      const text = value.toLowerCase();
+      if (text.startsWith(query)) return 120;
+      if (text.includes(query)) return 70;
+      return 0;
+    };
+
+    const personResults = personsData
+      .map((person) => {
+        const name = person.name || [person.firstname, person.lastname].filter(Boolean).join(" ") || t("tablet.player.unknown_user");
+        const totalScore = Math.max(score(name), score(person.job || ""));
+        return totalScore > 0
+          ? {
+              id: `person:${person.identifier}`,
+              label: name,
+              subtitle: `${t("tablet.sidebar.persons")} - ${person.job || t("tablet.persons.not_available")}`,
+              targetScreen: "persons" as const,
+              query: name,
+              rank: totalScore,
+            }
+          : null;
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+
+    const vehicleResults = vehiclesData
+      .map((vehicle) => {
+        const plate = (vehicle.plate || "").toUpperCase();
+        const model = String(vehicle.model || "");
+        const owner = vehicle.ownerName || "";
+        const totalScore = Math.max(score(plate), score(model), score(owner));
+        return totalScore > 0
+          ? {
+              id: `vehicle:${plate}`,
+              label: plate,
+              subtitle: `${t("tablet.sidebar.vehicles")} - ${model || t("tablet.vehicles.not_available")}`,
+              targetScreen: "vehicles" as const,
+              query: plate,
+              rank: totalScore,
+            }
+          : null;
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+
+    return [...personResults, ...vehicleResults]
+      .sort((a, b) => b.rank - a.rank)
+      .slice(0, 2)
+      .map(({ id, label, subtitle, targetScreen, query: nextQuery }) => ({
+        id,
+        label,
+        subtitle,
+        targetScreen,
+        query: nextQuery,
+      }));
+  }, [globalSearch, personsData, t, vehiclesData]);
+
+  const handleSearchSelect = (id: string) => {
+    const selected = searchSuggestions.find((entry) => entry.id === id);
+    if (!selected) return;
+    setGlobalSearch(selected.query);
+    setActiveScreen(selected.targetScreen);
+  };
+
+  const handleSearchSubmit = () => {
+    if (searchSuggestions.length === 0) return;
+    const best = searchSuggestions[0];
+    setGlobalSearch(best.query);
+    setActiveScreen(best.targetScreen);
+  };
 
   // show absolutely nothing until NUI handshake is done.
   if (!isHandshakeDone && !is_browser) return null;
@@ -318,6 +398,9 @@ export default function Home() {
                 t={t}
                 searchValue={globalSearch}
                 onSearchChange={setGlobalSearch}
+                searchSuggestions={searchSuggestions}
+                onSearchSelect={handleSearchSelect}
+                onSearchSubmit={handleSearchSubmit}
                 onOpenSettings={() => setActiveScreen("settings")}
                 onClose={() => fetchNui("hideUI", {}).catch(() => setVisible(false))}
               />
@@ -333,6 +416,7 @@ export default function Home() {
                     globalSearch={globalSearch}
                     initialAkten={personAktenData}
                     akteSync={personAkteSync}
+                    akteFields={personAkteFields}
                   />
                 )}
                 {activeScreen === "vehicles" && (
@@ -342,6 +426,7 @@ export default function Home() {
                     globalSearch={globalSearch}
                     initialAkten={vehicleAktenData}
                     akteSync={vehicleAkteSync}
+                    akteFields={vehicleAkteFields}
                   />
                 )}
                 {activeScreen === "reports" && <ReportsView t={t} />}

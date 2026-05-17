@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, RadioReceiver, Users, Car, FileText, Briefcase, MessageSquare, CalendarDays, Scale, Bell, Plus, LayoutDashboard } from "lucide-react";
+import { Home, RadioReceiver, Users, Car, FileText, Briefcase, MessageSquare, CalendarDays, Scale, Bell, LayoutDashboard } from "lucide-react";
 import type { TFunction } from "../lib/i18n";
 
 type Branding = {
@@ -105,15 +105,6 @@ export function Sidebar({
           </div>
         </div>
 
-        <div className="mt-4">
-          <p className="text-xs text-[var(--mdt-text-muted)] font-semibold uppercase tracking-wider mb-2 px-2">{t("tablet.sidebar.quick_actions")}</p>
-          <div className="space-y-1">
-            <button className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[var(--mdt-bg-hover)] text-[var(--mdt-text-muted)] hover:text-white transition-colors">
-              <Plus className="w-4 h-4" style={{ color: accent }} />
-              <span className="font-medium" style={{ color: accent }}>{t("tablet.sidebar.new_record")}</span>
-            </button>
-          </div>
-        </div>
       </div>
     </aside>
   );

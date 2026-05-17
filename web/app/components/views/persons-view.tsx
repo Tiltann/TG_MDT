@@ -17,15 +17,15 @@ type PersonRecord = {
   job?: string | null;
 };
 
-type PersonAkte = {
-  phone: string;
-  address: string;
-  occupation: string;
-  dangerLevel: string;
-  warrantStatus: string;
-  driverLicense: string;
-  weaponLicense: string;
-  notes: string;
+type PersonAkte = Record<string, string>;
+
+type AkteField = {
+  key: string;
+  label_key?: string;
+  type?: "text" | "textarea" | "select";
+  default?: string;
+  editable?: boolean;
+  options?: Array<{ value: string; label_key?: string; label?: string }>;
 };
 
 type AkteSyncPayload = {
@@ -35,15 +35,67 @@ type AkteSyncPayload = {
   akte?: Record<string, string>;
 };
 
-const DEFAULT_AKTE: PersonAkte = {
-  phone: "",
-  address: "",
-  occupation: "",
-  dangerLevel: "low",
-  warrantStatus: "none",
-  driverLicense: "valid",
-  weaponLicense: "none",
-  notes: "",
+const FALLBACK_FIELDS: AkteField[] = [
+  { key: "phone", label_key: "tablet.persons.akte.phone", type: "text", default: "", editable: true },
+  { key: "address", label_key: "tablet.persons.akte.address", type: "text", default: "", editable: true },
+  { key: "occupation", label_key: "tablet.persons.akte.occupation", type: "text", default: "", editable: true },
+  {
+    key: "warrantStatus",
+    label_key: "tablet.persons.akte.warrant",
+    type: "select",
+    default: "none",
+    editable: true,
+    options: [
+      { value: "none", label_key: "tablet.persons.akte.warrant.none" },
+      { value: "active", label_key: "tablet.persons.akte.warrant.active" },
+      { value: "served", label_key: "tablet.persons.akte.warrant.served" },
+    ],
+  },
+  {
+    key: "dangerLevel",
+    label_key: "tablet.persons.akte.danger",
+    type: "select",
+    default: "low",
+    editable: true,
+    options: [
+      { value: "low", label_key: "tablet.persons.akte.danger.low" },
+      { value: "medium", label_key: "tablet.persons.akte.danger.medium" },
+      { value: "high", label_key: "tablet.persons.akte.danger.high" },
+    ],
+  },
+  {
+    key: "driverLicense",
+    label_key: "tablet.persons.akte.driver_license",
+    type: "select",
+    default: "valid",
+    editable: true,
+    options: [
+      { value: "valid", label_key: "tablet.persons.akte.license.valid" },
+      { value: "suspended", label_key: "tablet.persons.akte.license.suspended" },
+      { value: "revoked", label_key: "tablet.persons.akte.license.revoked" },
+    ],
+  },
+  {
+    key: "weaponLicense",
+    label_key: "tablet.persons.akte.weapon_license",
+    type: "select",
+    default: "none",
+    editable: true,
+    options: [
+      { value: "none", label_key: "tablet.persons.akte.weapon.none" },
+      { value: "valid", label_key: "tablet.persons.akte.weapon.valid" },
+      { value: "revoked", label_key: "tablet.persons.akte.weapon.revoked" },
+    ],
+  },
+  { key: "notes", label_key: "tablet.persons.akte.notes", type: "textarea", default: "", editable: true },
+];
+
+const defaultsFromFields = (fields: AkteField[]) => {
+  const defaults: PersonAkte = {};
+  for (const field of fields) {
+    defaults[field.key] = field.default || "";
+  }
+  return defaults;
 };
 
 function normalizeGender(value?: string | number | null): string {
@@ -59,13 +111,18 @@ export default function PersonsView({
   globalSearch,
   initialAkten,
   akteSync,
+  akteFields,
 }: {
   t: TFunction;
   persons: PersonRecord[];
   globalSearch: string;
   initialAkten: Record<string, PersonAkte>;
   akteSync?: AkteSyncPayload;
+  akteFields?: AkteField[];
 }) {
+  const resolvedFields = akteFields && akteFields.length > 0 ? akteFields : FALLBACK_FIELDS;
+  const defaultAkte = useMemo(() => defaultsFromFields(resolvedFields), [resolvedFields]);
+
   const [selectedIdentifier, setSelectedIdentifier] = useState<string | null>(null);
   const [aktenByPerson, setAktenByPerson] = useState<Record<string, PersonAkte>>(initialAkten || {});
 
@@ -78,12 +135,12 @@ export default function PersonsView({
     setAktenByPerson((prev) => ({
       ...prev,
       [akteSync.identifier as string]: {
-        ...DEFAULT_AKTE,
+        ...defaultAkte,
         ...(prev[akteSync.identifier as string] || {}),
         ...(akteSync.akte || {}),
       },
     }));
-  }, [akteSync]);
+  }, [akteSync, defaultAkte]);
 
   const normalizedPersons = useMemo(
     () =>
@@ -135,7 +192,7 @@ export default function PersonsView({
         setAktenByPerson((prev) => ({
           ...prev,
           [selectedPerson.identifier]: {
-            ...DEFAULT_AKTE,
+            ...defaultAkte,
             ...(akte || {}),
             occupation: (akte && akte.occupation) || selectedPerson.job || "",
           },
@@ -144,14 +201,14 @@ export default function PersonsView({
       .catch(() => {
         // Keep defaults when callback fails.
       });
-  }, [selectedPerson, aktenByPerson]);
+  }, [selectedPerson, aktenByPerson, defaultAkte]);
 
-  const currentAkte = selectedPerson
+  const currentAkte: PersonAkte = selectedPerson
     ? aktenByPerson[selectedPerson.identifier] || {
-        ...DEFAULT_AKTE,
+        ...defaultAkte,
         occupation: selectedPerson.job || "",
       }
-    : DEFAULT_AKTE;
+    : defaultAkte;
 
   const persistAkte = (identifier: string, nextAkte: PersonAkte) => {
     fetchNui<PersonAkte>("savePersonAkte", { identifier, akte: nextAkte })
@@ -160,7 +217,7 @@ export default function PersonsView({
         setAktenByPerson((prev) => ({
           ...prev,
           [identifier]: {
-            ...DEFAULT_AKTE,
+            ...defaultAkte,
             ...(prev[identifier] || {}),
             ...(saved || {}),
           },
@@ -171,12 +228,13 @@ export default function PersonsView({
       });
   };
 
-  const updateAkteField = (field: keyof PersonAkte, value: string) => {
+  const updateAkteField = (field: string, value: string, editable = true) => {
     if (!selectedPerson) return;
+    if (!editable) return;
 
     const identifier = selectedPerson.identifier;
     const nextAkte: PersonAkte = {
-      ...DEFAULT_AKTE,
+      ...defaultAkte,
       ...(aktenByPerson[identifier] || { occupation: selectedPerson.job || "" }),
       [field]: value,
     };
@@ -280,89 +338,67 @@ export default function PersonsView({
           <h4 className="card-title">{t("tablet.persons.akte.title")}</h4>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.phone")}</label>
-              <input
-                value={currentAkte.phone}
-                onChange={(event) => updateAkteField("phone", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.address")}</label>
-              <input
-                value={currentAkte.address}
-                onChange={(event) => updateAkteField("address", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.occupation")}</label>
-              <input
-                value={currentAkte.occupation}
-                onChange={(event) => updateAkteField("occupation", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.warrant")}</label>
-              <select
-                value={currentAkte.warrantStatus}
-                onChange={(event) => updateAkteField("warrantStatus", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              >
-                <option value="none">{t("tablet.persons.akte.warrant.none")}</option>
-                <option value="active">{t("tablet.persons.akte.warrant.active")}</option>
-                <option value="served">{t("tablet.persons.akte.warrant.served")}</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.danger")}</label>
-              <select
-                value={currentAkte.dangerLevel}
-                onChange={(event) => updateAkteField("dangerLevel", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              >
-                <option value="low">{t("tablet.persons.akte.danger.low")}</option>
-                <option value="medium">{t("tablet.persons.akte.danger.medium")}</option>
-                <option value="high">{t("tablet.persons.akte.danger.high")}</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.driver_license")}</label>
-              <select
-                value={currentAkte.driverLicense}
-                onChange={(event) => updateAkteField("driverLicense", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              >
-                <option value="valid">{t("tablet.persons.akte.license.valid")}</option>
-                <option value="suspended">{t("tablet.persons.akte.license.suspended")}</option>
-                <option value="revoked">{t("tablet.persons.akte.license.revoked")}</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.weapon_license")}</label>
-              <select
-                value={currentAkte.weaponLicense}
-                onChange={(event) => updateAkteField("weaponLicense", event.target.value)}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-              >
-                <option value="none">{t("tablet.persons.akte.weapon.none")}</option>
-                <option value="valid">{t("tablet.persons.akte.weapon.valid")}</option>
-                <option value="revoked">{t("tablet.persons.akte.weapon.revoked")}</option>
-              </select>
-            </div>
+            {resolvedFields
+              .filter((field) => field.type !== "textarea")
+              .map((field) => {
+                const label = field.label_key ? t(field.label_key) : field.key;
+                const editable = field.editable !== false;
+                const value = currentAkte[field.key] ?? field.default ?? "";
+
+                if (field.type === "select") {
+                  return (
+                    <div key={field.key}>
+                      <label className="block text-xs mdt-muted mb-1">{label}</label>
+                      <select
+                        value={value}
+                        disabled={!editable}
+                        onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
+                        className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                      >
+                        {(field.options || []).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label_key ? t(option.label_key) : option.label || option.value}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={field.key}>
+                    <label className="block text-xs mdt-muted mb-1">{label}</label>
+                    <input
+                      value={value}
+                      disabled={!editable}
+                      onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
+                      className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                    />
+                  </div>
+                );
+              })}
           </div>
 
-          <div>
-            <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.notes")}</label>
-            <textarea
-              value={currentAkte.notes}
-              onChange={(event) => updateAkteField("notes", event.target.value)}
-              rows={6}
-              className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-            />
-          </div>
+          {resolvedFields
+            .filter((field) => field.type === "textarea")
+            .map((field) => {
+              const label = field.label_key ? t(field.label_key) : field.key;
+              const editable = field.editable !== false;
+              const value = currentAkte[field.key] ?? field.default ?? "";
+
+              return (
+                <div key={field.key}>
+                  <label className="block text-xs mdt-muted mb-1">{label}</label>
+                  <textarea
+                    value={value}
+                    disabled={!editable}
+                    onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
+                    rows={6}
+                    className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                  />
+                </div>
+              );
+            })}
         </Card>
       </div>
     </div>
