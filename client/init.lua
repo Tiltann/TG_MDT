@@ -2,7 +2,7 @@
 --  TG_MDT | client/init.lua
 --  Client-side startup and initialization.
 -- ============================================================
-print("hey")
+
 
 -- ── Startup ────────────────────────────────────────────
 Debug.debug('Client started')

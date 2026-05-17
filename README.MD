@@ -35,7 +35,7 @@ Ein Tablet ingame, das jede Fraktion bekommt. Jede Fraktion sieht nur ihre eigen
 - **Modular** — Module lassen sich pro Fraktion ein- und ausblenden
 - **Sauberes, modernes UI**
 - **Dark Mode** als Standard
-- **„Eine Familie"** über alle Fraktionen, aber jede mit eigener Identität (Akzentfarbe, Logo, ggf. Schriftart)
+- **Eine Familie"** über alle Fraktionen, aber jede mit eigener Identität (Akzentfarbe, Logo, ggf. Schriftart)
 
 ### Standards
 
