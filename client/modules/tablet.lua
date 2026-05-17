@@ -11,6 +11,23 @@ if module_cfg.enabled == false then
     return
 end
 
+--- Best-effort user notification that works even when framework notify is unavailable.
+---@param message string
+---@param level string|nil
+local function notifyUser(message, level)
+    if Framework and Framework.Client and Framework.Client.notify then
+        local ok = pcall(Framework.Client.notify, message, level or 'error')
+        if ok then return end
+    end
+
+    if lib and lib.notify then
+        lib.notify({ description = message, type = level or 'error' })
+        return
+    end
+
+    Debug.warn(('notifyUser fallback: %s'):format(message))
+end
+
 --- Return the local job name in lowercase, if available.
 ---@return string|nil
 local function getLocalJobName()
@@ -52,38 +69,44 @@ end
 
 --- Whether current player can use the tablet.
 ---@return boolean
+---@return string|nil
 local function canOpenTablet()
     local lookup = buildAllowedJobLookup()
 
     -- Empty allowed_jobs means allow everybody.
     if next(lookup) == nil then
-        return true
+        return true, nil
     end
 
     local job_name = getLocalJobName()
     if not job_name then
         Debug.warn(('canOpenTablet: getLocalJobName() returned nil. Details: Framework=%s'):format(Framework and Framework.name or 'nil'))
-        return false
+        return false, 'no_job_detected'
     end
 
     local is_allowed = lookup[job_name] == true
     if not is_allowed then
         Debug.warn(('canOpenTablet: Job "%s" is not in allowed_jobs'):format(tostring(job_name)))
+        return false, ('job_not_allowed:%s'):format(job_name)
     end
 
-    return is_allowed
+    return true, nil
 end
 
 --- Open/toggle tablet only if player has an allowed job.
 local function toggleTablet()
-    if not canOpenTablet() then
+    local allowed, deny_reason = canOpenTablet()
+    if not allowed then
         if Config.MDT and Config.MDT.notify_on_denied ~= false then
             local denied = 'You are not allowed to use this tablet.'
-            if Framework and Framework.Client and Framework.Client.notify then
-                Framework.Client.notify(denied, 'error')
-            else
-                lib.notify({ description = denied, type = 'error' })
+            if deny_reason == 'no_job_detected' then
+                denied = 'MDT unavailable: your job data was not detected.'
+            elseif type(deny_reason) == 'string' and deny_reason:sub(1, 16) == 'job_not_allowed:' then
+                local job_name = deny_reason:sub(17)
+                denied = ('MDT denied for job "%s". Check Config.MDT.allowed_jobs.'):format(job_name)
             end
+
+            notifyUser(denied, 'error')
         end
         return
     end
@@ -104,5 +127,10 @@ end
 
 local OPEN_COMMAND = (Config.Commands and Config.Commands.open_mdt) or 'mdt'
 RegisterCommand(OPEN_COMMAND, toggleTablet)
+
+-- Keep /mdt as a stable alias so admins can rely on it even if Config.Commands.open_mdt changes.
+if OPEN_COMMAND ~= 'mdt' then
+    RegisterCommand('mdt', toggleTablet)
+end
 
 Debug.info(('Tablet module loaded. Command: /%s'):format(OPEN_COMMAND))

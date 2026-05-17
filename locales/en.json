@@ -105,5 +105,11 @@
   "tablet.settings.accent_label": "Accent",
   "tablet.settings.accent_reset": "Reset",
   "tablet.settings.accent_hint": "Current accent: {color}",
-  "tablet.settings.accent_default": "Default accent: {color}"
+  "tablet.settings.accent_default": "Default accent: {color}",
+  "tablet.map.title": "Live Map",
+  "tablet.map.subtitle": "Leaflet + GTA V tiles",
+  "tablet.map.layer.atlas": "Atlas",
+  "tablet.map.layer.satellite": "Satellite",
+  "tablet.map.marker.default_label": "Unit marker",
+  "tablet.map.marker.player": "You"
 }

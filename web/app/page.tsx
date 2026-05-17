@@ -14,6 +14,7 @@ import WarrantsView from "./components/views/warrants-view";
 import EvidenceView from "./components/views/evidence-view";
 import BoloView from "./components/views/bolo-view";
 import SettingsView from "./components/views/settings-view";
+import MapView from "./components/views/map-view";
 import { defaultMockupBranding, defaultMockupModules } from "./lib/mockup-config";
 import { createTranslator, normalizeLocale, type SupportedLocale } from "./lib/i18n";
 
@@ -126,6 +127,12 @@ export default function Home() {
   );
   const player_data =
     screenData?.player || { name: t("tablet.player.mock_user"), badge: branding.badge };
+  const mapData = (screenData?.map as Record<string, unknown> | undefined) || {};
+  const mapMarkers = Array.isArray(mapData.markers)
+    ? (mapData.markers as Array<{ x: number; y: number; label?: string }>)
+    : [];
+  const playerPosition =
+    (mapData.playerPosition as { x: number; y: number } | undefined) || undefined;
   const rootStyle = {
     "--mdt-accent-primary": branding.accent || defaultMockupBranding.accent || "#ff9100",
   } as CSSProperties;
@@ -170,6 +177,14 @@ export default function Home() {
                 {activeScreen === "warrants" && <WarrantsView t={t} />}
                 {activeScreen === "evidence" && <EvidenceView t={t} />}
                 {activeScreen === "bolo" && <BoloView t={t} />}
+                {activeScreen === "map" && (
+                  <MapView
+                    t={t}
+                    accent={branding.accent || defaultMockupBranding.accent || "#ff9100"}
+                    markers={mapMarkers}
+                    playerPosition={playerPosition}
+                  />
+                )}
                 {activeScreen === "settings" && (
                   <SettingsView
                     t={t}

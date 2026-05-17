@@ -105,5 +105,11 @@
   "tablet.settings.accent_label": "Akzent",
   "tablet.settings.accent_reset": "Zurücksetzen",
   "tablet.settings.accent_hint": "Aktueller Akzent: {color}",
-  "tablet.settings.accent_default": "Standard-Akzent: {color}"
+  "tablet.settings.accent_default": "Standard-Akzent: {color}",
+  "tablet.map.title": "Live-Karte",
+  "tablet.map.subtitle": "Leaflet + GTA V Kacheln",
+  "tablet.map.layer.atlas": "Atlas",
+  "tablet.map.layer.satellite": "Satellit",
+  "tablet.map.marker.default_label": "Einheiten-Marker",
+  "tablet.map.marker.player": "Du"
 }
