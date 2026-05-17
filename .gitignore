@@ -112,5 +112,12 @@ dist
 # TernJS port file
 .tern-port
 
+# Map tile data (too large for git - generate/download separately)
+web/map/styleAtlas/
+web/map/styleGrid/
+web/map/styleSatelite/
+web/map/mapStyles.rar
+web/public/map/
+
 
 bun.lock
