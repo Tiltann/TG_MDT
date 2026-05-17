@@ -52,8 +52,8 @@ type NuiMetaPayload = {
     default_map_style?: string;
   };
   akteModels?: {
-    person?: { fields?: AkteFieldSchema[] };
-    vehicle?: { fields?: AkteFieldSchema[] };
+    person?: { fields?: AkteFieldSchema[]; data_fields?: DataFieldSchema[] };
+    vehicle?: { fields?: AkteFieldSchema[]; data_fields?: DataFieldSchema[] };
   };
 };
 
@@ -64,6 +64,12 @@ type AkteFieldSchema = {
   default?: string;
   editable?: boolean;
   options?: Array<{ value: string; label_key?: string; label?: string }>;
+};
+
+type DataFieldSchema = {
+  key: string;
+  label_key?: string;
+  fallback?: string;
 };
 
 type MapStyle = "styleAtlas" | "styleGrid" | "styleSatelite";
@@ -293,6 +299,8 @@ export default function Home() {
   const vehicleAkteSync = akteSyncData?.kind === "vehicle" ? akteSyncData : undefined;
   const personAkteFields = typedMeta.akteModels?.person?.fields || [];
   const vehicleAkteFields = typedMeta.akteModels?.vehicle?.fields || [];
+  const personDataFields = typedMeta.akteModels?.person?.data_fields || [];
+  const vehicleDataFields = typedMeta.akteModels?.vehicle?.data_fields || [];
   const rootStyle = {
     "--mdt-accent-primary": branding.accent || defaultMockupBranding.accent || "#ff9100",
   } as CSSProperties;
@@ -417,6 +425,7 @@ export default function Home() {
                     initialAkten={personAktenData}
                     akteSync={personAkteSync}
                     akteFields={personAkteFields}
+                    dataFields={personDataFields}
                   />
                 )}
                 {activeScreen === "vehicles" && (
@@ -427,6 +436,7 @@ export default function Home() {
                     initialAkten={vehicleAktenData}
                     akteSync={vehicleAkteSync}
                     akteFields={vehicleAkteFields}
+                    dataFields={vehicleDataFields}
                   />
                 )}
                 {activeScreen === "reports" && <ReportsView t={t} />}

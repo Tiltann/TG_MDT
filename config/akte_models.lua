@@ -4,6 +4,8 @@
 --
 --  You can add/edit fields here without touching UI/server logic.
 --  Supported field types: text, textarea, select
+--  data_fields are shown in the left profile/data panel.
+--  fields are the editable Akte section on the right.
 --
 --  default supports:
 --    1) static value: default = 'none'
@@ -22,6 +24,23 @@
 --    ctx.kind  -> 'person' or 'vehicle'
 --    ctx.key   -> field key
 --    ctx.field -> full field table
+--
+--  data_fields source supports:
+--    1) source = 'recordKey'
+--    2) source = function(ctx) return ctx.record.some_value end
+--    3) source = {
+--         type = 'export',
+--         resource = 'my_resource',
+--         export = 'resolveValue',
+--         args = {},
+--         await = true,
+--         fallback = '-',
+--       }
+--  ctx for source function/export:
+--    ctx.kind   -> 'person' or 'vehicle'
+--    ctx.key    -> field key
+--    ctx.field  -> full field table
+--    ctx.record -> current framework record
 -- ============================================================
 
 Config = Config or {}
@@ -34,24 +53,32 @@ Config.AkteModels = Config.AkteModels or {
     },
 
     person = {
+        data_fields = {
+            { key = 'name', label_key = 'tablet.persons.field.name', source = 'name' },
+            { key = 'dob', label_key = 'tablet.persons.field.dob', source = 'dob', fallback = '-' },
+            { key = 'gender', label_key = 'tablet.persons.field.gender', source = 'gender', fallback = '-' },
+            { key = 'job', label_key = 'tablet.persons.akte.occupation', source = 'job', fallback = '-' },
+            { key = 'address', label_key = 'tablet.persons.akte.address', source = 'address', fallback = '-' },
+            -- Example export-based data field:
+            -- {
+            --     key = 'rank',
+            --     label_key = 'tablet.persons.field.rank',
+            --     source = {
+            --         type = 'export',
+            --         resource = 'my_resource',
+            --         export = 'getPersonRank',
+            --         args = {},
+            --         pass_context = true,
+            --         await = true,
+            --         fallback = '-',
+            --     },
+            -- },
+        },
+
         fields = {
             {
                 key = 'phone',
                 label_key = 'tablet.persons.akte.phone',
-                type = 'text',
-                default = '',
-                editable = true,
-            },
-            {
-                key = 'address',
-                label_key = 'tablet.persons.akte.address',
-                type = 'text',
-                default = '',
-                editable = true,
-            },
-            {
-                key = 'occupation',
-                label_key = 'tablet.persons.akte.occupation',
                 type = 'text',
                 default = '',
                 editable = true,
@@ -128,14 +155,21 @@ Config.AkteModels = Config.AkteModels or {
     },
 
     vehicle = {
+        data_fields = {
+            { key = 'model', label_key = 'tablet.vehicles.field.model', source = 'model', fallback = '-' },
+            { key = 'ownerName', label_key = 'tablet.vehicles.field.owner', source = 'ownerName', fallback = '-' },
+            { key = 'state', label_key = 'tablet.vehicles.field.state', source = 'state', fallback = '-' },
+            -- Example function-based data field:
+            -- {
+            --     key = 'garage',
+            --     label_key = 'tablet.vehicles.field.garage',
+            --     source = function(ctx)
+            --         return ctx.record.garage or '-'
+            --     end,
+            -- },
+        },
+
         fields = {
-            {
-                key = 'modelName',
-                label_key = 'tablet.vehicles.field.model',
-                type = 'text',
-                default = '',
-                editable = true,
-            },
             {
                 key = 'color',
                 label_key = 'tablet.vehicles.akte.color',

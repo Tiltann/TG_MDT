@@ -79,6 +79,39 @@ end
 
 local MODEL_HASH_NAMES = ((Config.AkteModels or {}).vehicle_model_names) or {}
 
+---@param jobLabel any
+---@param gradeLabel any
+---@param gradeNumber any
+---@return string
+local function formatJobDisplay(jobLabel, gradeLabel, gradeNumber)
+    local base = tostring(jobLabel or '')
+    local gLabel = tostring(gradeLabel or '')
+    local gNumber = gradeNumber ~= nil and tostring(gradeNumber) or ''
+
+    if base == '' and gLabel == '' and gNumber == '' then
+        return ''
+    end
+
+    local suffix = ''
+    if gLabel ~= '' and gNumber ~= '' then
+        suffix = ('%s - %s'):format(gLabel, gNumber)
+    elseif gLabel ~= '' then
+        suffix = gLabel
+    elseif gNumber ~= '' then
+        suffix = gNumber
+    end
+
+    if base ~= '' and suffix ~= '' then
+        return ('%s - %s'):format(base, suffix)
+    end
+
+    if base ~= '' then
+        return base
+    end
+
+    return suffix
+end
+
 ---@param kind string
 ---@param key string
 ---@param message string
@@ -245,15 +278,90 @@ end
 ---@param model any
 ---@return string
 local function normalizeModelName(model)
-    if model == nil then return 'Unknown' end
+    if model == nil then return '' end
     local key = tostring(model)
+    if key == '' then return '' end
     if MODEL_HASH_NAMES[key] then
         return MODEL_HASH_NAMES[key]
     end
-    if key:match('^%d+$') then
-        return ('Unknown (%s)'):format(key)
-    end
     return key
+end
+
+---@param kind string
+---@return table
+local function getAkteDataFields(kind)
+    local model = getAkteModel(kind)
+    return model.data_fields or {}
+end
+
+---@param kind string
+---@param field table
+---@param record table
+---@return string
+local function resolveDataFieldValue(kind, field, record)
+    local key = tostring(field.key or 'unknown')
+    local fallback = tostring(field.fallback or '')
+    local source = field.source
+
+    local ctx = {
+        kind = kind,
+        key = key,
+        field = field,
+        record = record or {},
+    }
+
+    local resolved = nil
+    local sourceType = type(source)
+
+    if sourceType == 'nil' then
+        resolved = record and record[key]
+    elseif sourceType == 'string' then
+        resolved = record and record[source]
+    elseif sourceType == 'function' then
+        local okCall, result = pcall(source, ctx)
+        if not okCall then
+            warnAkteDefault(kind, key, tostring(result))
+            return fallback
+        end
+
+        local awaited, okAwait = awaitIfNeeded(result)
+        if not okAwait then
+            warnAkteDefault(kind, key, 'await failed for data source function result')
+            return fallback
+        end
+        resolved = awaited
+    elseif sourceType == 'table' and (source.type == 'export' or source.export ~= nil) then
+        local result, err = resolveExportDefault(source, ctx)
+        if err then
+            warnAkteDefault(kind, key, err)
+            return tostring(source.fallback or fallback)
+        end
+        resolved = result
+    end
+
+    if resolved == nil then
+        return fallback
+    end
+
+    local str = tostring(resolved)
+    if str == '' then
+        return fallback
+    end
+
+    return str
+end
+
+---@param kind 'person'|'vehicle'
+---@param record table
+---@return table
+local function applyDataFields(kind, record)
+    local output = record or {}
+    for _, field in ipairs(getAkteDataFields(kind)) do
+        if type(field.key) == 'string' and field.key ~= '' then
+            output[field.key] = resolveDataFieldValue(kind, field, output)
+        end
+    end
+    return output
 end
 
 local function defaultPersonAkte()
@@ -292,6 +400,35 @@ local function applyEditableAkteFields(kind, current, incoming)
     end
 
     return merged
+end
+
+---@param kind 'person'|'vehicle'
+---@param decoded table|nil
+---@param defaults table
+---@return table
+local function normalizeAkteToSchema(kind, decoded, defaults)
+    local result = {}
+    local fieldMap = getAkteFieldMap(kind)
+
+    for key, defaultValue in pairs(defaults or {}) do
+        local value = decoded and decoded[key] or nil
+        if type(value) == 'string' and value ~= '' then
+            result[key] = value
+        else
+            result[key] = defaultValue
+        end
+    end
+
+    -- Keep compatibility with future schema changes only for known field keys.
+    if type(decoded) == 'table' then
+        for key, value in pairs(decoded) do
+            if result[key] == nil and fieldMap[key] and type(value) == 'string' then
+                result[key] = value
+            end
+        end
+    end
+
+    return result
 end
 
 --- Ensure Akte tables exist.
@@ -411,15 +548,7 @@ local function getPersonAkte(identifier)
     local defaults = buildPersonAkteDefaults(identifier)
     local row = SQL.single('SELECT data FROM tg_mdt_person_akten WHERE identifier = ? LIMIT 1', { identifier })
     local decoded = row and decodeObject(row.data) or nil
-    if not decoded then return defaults end
-
-    for key, value in pairs(defaults) do
-        if decoded[key] == nil or decoded[key] == '' then
-            decoded[key] = value
-        end
-    end
-
-    return decoded
+    return normalizeAkteToSchema('person', decoded, defaults)
 end
 
 ---@param plate string
@@ -428,15 +557,7 @@ local function getVehicleAkte(plate)
     local defaults = buildVehicleAkteDefaults(plate)
     local row = SQL.single('SELECT data FROM tg_mdt_vehicle_akten WHERE plate = ? LIMIT 1', { plate })
     local decoded = row and decodeObject(row.data) or nil
-    if not decoded then return defaults end
-
-    for key, value in pairs(defaults) do
-        if decoded[key] == nil or decoded[key] == '' then
-            decoded[key] = value
-        end
-    end
-
-    return decoded
+    return normalizeAkteToSchema('vehicle', decoded, defaults)
 end
 
 --- Fetch persons from active framework data source.
@@ -444,8 +565,12 @@ end
 local function getPersonsFromFramework()
     if Framework.name == 'esx' then
         local rows = SQL.query([[ 
-            SELECT identifier, firstname, lastname, dateofbirth, sex
-            FROM users
+            SELECT u.identifier, u.firstname, u.lastname, u.dateofbirth, u.sex, u.job, u.job_grade,
+                   j.label AS job_label,
+                   jg.label AS job_grade_label
+            FROM users u
+            LEFT JOIN jobs j ON j.name = u.job
+            LEFT JOIN job_grades jg ON jg.job_name = u.job AND jg.grade = u.job_grade
             ORDER BY lastname ASC, firstname ASC
         ]], {})
 
@@ -462,8 +587,10 @@ local function getPersonsFromFramework()
                 name = buildDisplayName(firstname, lastname, identifier),
                 dob = row.dateofbirth,
                 gender = row.sex,
-                job = nil,
+                job = formatJobDisplay(row.job_label or row.job, row.job_grade_label, row.job_grade),
+                address = nil,
             }
+            persons[#persons] = applyDataFields('person', persons[#persons])
         end
         return persons
     end
@@ -484,10 +611,28 @@ local function getPersonsFromFramework()
             local lastname = charinfo and charinfo.lastname or ''
             local identifier = row.citizenid or ('qb_%s'):format(i)
             local jobName = row.job
+            local jobLabel = row.job
+            local gradeLabel = nil
+            local gradeNumber = nil
             if type(row.job) == 'string' and row.job:sub(1, 1) == '{' then
                 local ok, decodedJob = pcall(json.decode, row.job)
-                if ok and type(decodedJob) == 'table' and decodedJob.name then
-                    jobName = decodedJob.name
+                if ok and type(decodedJob) == 'table' then
+                    if decodedJob.name then
+                        jobName = decodedJob.name
+                    end
+                    if decodedJob.label then
+                        jobLabel = decodedJob.label
+                    else
+                        jobLabel = jobName
+                    end
+
+                    local grade = decodedJob.grade
+                    if type(grade) == 'table' then
+                        gradeLabel = grade.name or grade.label or nil
+                        gradeNumber = grade.level or grade.grade or grade.value or nil
+                    elseif type(grade) == 'number' or type(grade) == 'string' then
+                        gradeNumber = grade
+                    end
                 end
             end
 
@@ -498,8 +643,10 @@ local function getPersonsFromFramework()
                 name = buildDisplayName(firstname, lastname, identifier),
                 dob = charinfo and (charinfo.birthdate or charinfo.dob) or nil,
                 gender = charinfo and charinfo.gender or nil,
-                job = jobName,
+                job = formatJobDisplay(jobLabel, gradeLabel, gradeNumber),
+                address = charinfo and (charinfo.address or charinfo.street) or nil,
             }
+            persons[#persons] = applyDataFields('person', persons[#persons])
         end
         return persons
     end
@@ -518,7 +665,9 @@ local function getPersonsFromFramework()
                 dob = nil,
                 gender = nil,
                 job = Framework.Server.getJob(src),
+                address = nil,
             }
+            persons[#persons] = applyDataFields('person', persons[#persons])
         end
     end
     return persons
@@ -546,6 +695,7 @@ local function getVehiclesFromFramework()
                 model = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model) or nil),
                 state = nil,
             }
+            vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles])
         end
         return vehicles
     end
@@ -576,6 +726,7 @@ local function getVehiclesFromFramework()
                 model = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model) or nil),
                 state = row.state,
             }
+            vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles])
         end
         return vehicles
     end
@@ -628,13 +779,13 @@ lib.callback.register('TG_MDT:getAkteBootstrap', function(_src)
     local personAkten = {}
     for i = 1, #personRows do
         local row = personRows[i]
-        personAkten[row.identifier] = decodeObject(row.data) or defaultPersonAkte()
+        personAkten[row.identifier] = normalizeAkteToSchema('person', decodeObject(row.data), defaultPersonAkte())
     end
 
     local vehicleAkten = {}
     for i = 1, #vehicleRows do
         local row = vehicleRows[i]
-        vehicleAkten[row.plate] = decodeObject(row.data) or defaultVehicleAkte()
+        vehicleAkten[row.plate] = normalizeAkteToSchema('vehicle', decodeObject(row.data), defaultVehicleAkte())
     end
 
     return {

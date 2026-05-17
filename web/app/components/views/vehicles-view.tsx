@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CarFront, UserRound } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { fetchNui } from "../../../lib/useNui";
@@ -13,6 +13,7 @@ type VehicleRecord = {
   ownerName?: string | null;
   model?: string | number | null;
   state?: string | number | null;
+  [key: string]: string | number | null | undefined;
 };
 
 type VehicleAkte = Record<string, string>;
@@ -26,6 +27,12 @@ type AkteField = {
   options?: Array<{ value: string; label_key?: string; label?: string }>;
 };
 
+type DataField = {
+  key: string;
+  label_key?: string;
+  fallback?: string;
+};
+
 type AkteSyncPayload = {
   kind?: "person" | "vehicle";
   identifier?: string;
@@ -34,7 +41,6 @@ type AkteSyncPayload = {
 };
 
 const FALLBACK_FIELDS: AkteField[] = [
-  { key: "modelName", label_key: "tablet.vehicles.field.model", type: "text", default: "", editable: true },
   { key: "color", label_key: "tablet.vehicles.akte.color", type: "text", default: "", editable: true },
   {
     key: "registrationStatus",
@@ -75,6 +81,12 @@ const FALLBACK_FIELDS: AkteField[] = [
   { key: "notes", label_key: "tablet.vehicles.akte.notes", type: "textarea", default: "", editable: true },
 ];
 
+const FALLBACK_DATA_FIELDS: DataField[] = [
+  { key: "model", label_key: "tablet.vehicles.field.model", fallback: "-" },
+  { key: "ownerName", label_key: "tablet.vehicles.field.owner", fallback: "-" },
+  { key: "state", label_key: "tablet.vehicles.field.state", fallback: "-" },
+];
+
 const defaultsFromFields = (fields: AkteField[]) => {
   const defaults: VehicleAkte = {};
   for (const field of fields) {
@@ -83,11 +95,6 @@ const defaultsFromFields = (fields: AkteField[]) => {
   return defaults;
 };
 
-function normalizeModelName(value?: string | number | null): string {
-  if (value === undefined || value === null || value === "") return "Unknown";
-  return String(value);
-}
-
 export default function VehiclesView({
   t,
   vehicles,
@@ -95,6 +102,7 @@ export default function VehiclesView({
   initialAkten,
   akteSync,
   akteFields,
+  dataFields,
 }: {
   t: TFunction;
   vehicles: VehicleRecord[];
@@ -102,8 +110,10 @@ export default function VehiclesView({
   initialAkten: Record<string, VehicleAkte>;
   akteSync?: AkteSyncPayload;
   akteFields?: AkteField[];
+  dataFields?: DataField[];
 }) {
   const resolvedFields = akteFields && akteFields.length > 0 ? akteFields : FALLBACK_FIELDS;
+  const resolvedDataFields = dataFields && dataFields.length > 0 ? dataFields : FALLBACK_DATA_FIELDS;
   const defaultAkte = useMemo(() => defaultsFromFields(resolvedFields), [resolvedFields]);
 
   const [selectedPlate, setSelectedPlate] = useState<string | null>(null);
@@ -130,7 +140,7 @@ export default function VehiclesView({
       (vehicles || []).map((vehicle) => ({
         ...vehicle,
         plate: (vehicle.plate || "UNKNOWN").toUpperCase(),
-        modelName: normalizeModelName(vehicle.model),
+        model: vehicle.model == null || vehicle.model === "" ? "-" : String(vehicle.model),
       })),
     [vehicles]
   );
@@ -140,7 +150,7 @@ export default function VehiclesView({
     if (!term) return normalizedVehicles;
 
     return normalizedVehicles.filter((vehicle) => {
-      const haystack = [vehicle.plate, vehicle.ownerName, vehicle.modelName, vehicle.state]
+      const haystack = [vehicle.plate, vehicle.ownerName, vehicle.model, vehicle.state]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -170,7 +180,6 @@ export default function VehiclesView({
           [selectedVehicle.plate]: {
             ...defaultAkte,
             ...(akte || {}),
-            modelName: (akte && akte.modelName) || selectedVehicle.modelName,
           },
         }));
       })
@@ -182,7 +191,6 @@ export default function VehiclesView({
   const currentAkte: VehicleAkte = selectedVehicle
     ? aktenByVehicle[selectedVehicle.plate] || {
         ...defaultAkte,
-        modelName: selectedVehicle.modelName,
       }
     : defaultAkte;
 
@@ -211,7 +219,7 @@ export default function VehiclesView({
     const plate = selectedVehicle.plate;
     const nextAkte: VehicleAkte = {
       ...defaultAkte,
-      ...(aktenByVehicle[plate] || { modelName: selectedVehicle.modelName }),
+      ...(aktenByVehicle[plate] || {}),
       [field]: value,
     };
 
@@ -257,7 +265,7 @@ export default function VehiclesView({
                 >
                   <p className="text-sm text-white font-medium">{vehicle.plate}</p>
                   <p className="text-xs text-[var(--mdt-text-muted)] mt-1">
-                    {vehicle.modelName} - {vehicle.ownerName || t("tablet.vehicles.not_available")}
+                    {String(vehicle.model || "-")} - {vehicle.ownerName || t("tablet.vehicles.not_available")}
                   </p>
                 </button>
               ))}
@@ -285,26 +293,18 @@ export default function VehiclesView({
             <h4 className="text-2xl text-white font-semibold mt-1">{selectedVehicle.plate}</h4>
           </div>
 
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-            <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2">
-              <CarFront className="w-4 h-4" />
-              {t("tablet.vehicles.field.model")}
-            </p>
-            <p className="text-sm text-white mt-1">{selectedVehicle.modelName}</p>
-          </div>
+          {resolvedDataFields.map((field) => {
+            const label = field.label_key ? t(field.label_key) : field.key;
+            const rawValue = (selectedVehicle as Record<string, unknown>)[field.key];
+            const value = String(rawValue ?? field.fallback ?? t("tablet.vehicles.not_available"));
 
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-            <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2">
-              <UserRound className="w-4 h-4" />
-              {t("tablet.vehicles.field.owner")}
-            </p>
-            <p className="text-sm text-white mt-1">{selectedVehicle.ownerName || t("tablet.vehicles.not_available")}</p>
-          </div>
-
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-            <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.vehicles.field.state")}</p>
-            <p className="text-sm text-white mt-1">{String(selectedVehicle.state || t("tablet.vehicles.not_available"))}</p>
-          </div>
+            return (
+              <div key={field.key} className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
+                <p className="text-xs text-[var(--mdt-text-muted)]">{label}</p>
+                <p className="text-sm text-white mt-1">{value}</p>
+              </div>
+            );
+          })}
         </Card>
 
         <Card className="col-span-7 p-4 overflow-auto space-y-3">

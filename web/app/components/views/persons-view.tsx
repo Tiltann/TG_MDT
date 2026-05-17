@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Calendar, ShieldAlert, UserRound } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { fetchNui } from "../../../lib/useNui";
@@ -15,6 +15,8 @@ type PersonRecord = {
   dob?: string | null;
   gender?: string | number | null;
   job?: string | null;
+  address?: string | null;
+  [key: string]: string | number | null | undefined;
 };
 
 type PersonAkte = Record<string, string>;
@@ -28,6 +30,12 @@ type AkteField = {
   options?: Array<{ value: string; label_key?: string; label?: string }>;
 };
 
+type DataField = {
+  key: string;
+  label_key?: string;
+  fallback?: string;
+};
+
 type AkteSyncPayload = {
   kind?: "person" | "vehicle";
   identifier?: string;
@@ -37,8 +45,6 @@ type AkteSyncPayload = {
 
 const FALLBACK_FIELDS: AkteField[] = [
   { key: "phone", label_key: "tablet.persons.akte.phone", type: "text", default: "", editable: true },
-  { key: "address", label_key: "tablet.persons.akte.address", type: "text", default: "", editable: true },
-  { key: "occupation", label_key: "tablet.persons.akte.occupation", type: "text", default: "", editable: true },
   {
     key: "warrantStatus",
     label_key: "tablet.persons.akte.warrant",
@@ -90,6 +96,14 @@ const FALLBACK_FIELDS: AkteField[] = [
   { key: "notes", label_key: "tablet.persons.akte.notes", type: "textarea", default: "", editable: true },
 ];
 
+const FALLBACK_DATA_FIELDS: DataField[] = [
+  { key: "name", label_key: "tablet.persons.field.name", fallback: "-" },
+  { key: "dob", label_key: "tablet.persons.field.dob", fallback: "-" },
+  { key: "gender", label_key: "tablet.persons.field.gender", fallback: "-" },
+  { key: "job", label_key: "tablet.persons.akte.occupation", fallback: "-" },
+  { key: "address", label_key: "tablet.persons.akte.address", fallback: "-" },
+];
+
 const defaultsFromFields = (fields: AkteField[]) => {
   const defaults: PersonAkte = {};
   for (const field of fields) {
@@ -112,6 +126,7 @@ export default function PersonsView({
   initialAkten,
   akteSync,
   akteFields,
+  dataFields,
 }: {
   t: TFunction;
   persons: PersonRecord[];
@@ -119,8 +134,10 @@ export default function PersonsView({
   initialAkten: Record<string, PersonAkte>;
   akteSync?: AkteSyncPayload;
   akteFields?: AkteField[];
+  dataFields?: DataField[];
 }) {
   const resolvedFields = akteFields && akteFields.length > 0 ? akteFields : FALLBACK_FIELDS;
+  const resolvedDataFields = dataFields && dataFields.length > 0 ? dataFields : FALLBACK_DATA_FIELDS;
   const defaultAkte = useMemo(() => defaultsFromFields(resolvedFields), [resolvedFields]);
 
   const [selectedIdentifier, setSelectedIdentifier] = useState<string | null>(null);
@@ -194,7 +211,6 @@ export default function PersonsView({
           [selectedPerson.identifier]: {
             ...defaultAkte,
             ...(akte || {}),
-            occupation: (akte && akte.occupation) || selectedPerson.job || "",
           },
         }));
       })
@@ -206,7 +222,6 @@ export default function PersonsView({
   const currentAkte: PersonAkte = selectedPerson
     ? aktenByPerson[selectedPerson.identifier] || {
         ...defaultAkte,
-        occupation: selectedPerson.job || "",
       }
     : defaultAkte;
 
@@ -235,7 +250,7 @@ export default function PersonsView({
     const identifier = selectedPerson.identifier;
     const nextAkte: PersonAkte = {
       ...defaultAkte,
-      ...(aktenByPerson[identifier] || { occupation: selectedPerson.job || "" }),
+      ...(aktenByPerson[identifier] || {}),
       [field]: value,
     };
 
@@ -309,29 +324,20 @@ export default function PersonsView({
             <h4 className="text-2xl text-white font-semibold mt-1">{selectedPerson.name}</h4>
           </div>
 
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-            <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2">
-              <UserRound className="w-4 h-4" />
-              {t("tablet.persons.field.name")}
-            </p>
-            <p className="text-sm text-white mt-1">{selectedPerson.name}</p>
-          </div>
+          {resolvedDataFields.map((field) => {
+            const label = field.label_key ? t(field.label_key) : field.key;
+            const rawValue = (selectedPerson as Record<string, unknown>)[field.key];
+            const value = field.key === "gender"
+              ? normalizeGender(rawValue as string | number | null | undefined)
+              : String(rawValue ?? field.fallback ?? t("tablet.persons.not_available"));
 
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-            <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              {t("tablet.persons.field.dob")}
-            </p>
-            <p className="text-sm text-white mt-1">{selectedPerson.dob || t("tablet.persons.not_available")}</p>
-          </div>
-
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-            <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4" />
-              {t("tablet.persons.field.gender")}
-            </p>
-            <p className="text-sm text-white mt-1">{normalizeGender(selectedPerson.gender)}</p>
-          </div>
+            return (
+              <div key={field.key} className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
+                <p className="text-xs text-[var(--mdt-text-muted)]">{label}</p>
+                <p className="text-sm text-white mt-1">{value}</p>
+              </div>
+            );
+          })}
         </Card>
 
         <Card className="col-span-7 p-4 overflow-auto space-y-3">
