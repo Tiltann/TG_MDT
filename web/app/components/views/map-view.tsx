@@ -20,6 +20,10 @@ type PlayerPosition = {
 
 type MapStyle = "styleAtlas" | "styleGrid" | "styleSatelite";
 
+type TileErrorEvent = {
+  tile: HTMLImageElement;
+};
+
 type MapViewProps = {
   t: TFunction;
   accent: string;
@@ -110,13 +114,38 @@ export default function MapView({
 
       activeLayer.addTo(map);
 
-      // Detect missing tiles: fire fetchNui once if the first tile errors.
+        // If a tile pack uses a different extension, retry once with the alternate extension.
+        const retryAltExtension = (tile: HTMLImageElement) => {
+          const currentSrc = tile.getAttribute("src") || "";
+          if (!currentSrc || tile.dataset.altRetried === "1") {
+            return false;
+          }
+
+          if (currentSrc.endsWith(".jpg")) {
+            tile.dataset.altRetried = "1";
+            tile.src = `${currentSrc.slice(0, -4)}.png`;
+            return true;
+          }
+
+          if (currentSrc.endsWith(".png")) {
+            tile.dataset.altRetried = "1";
+            tile.src = `${currentSrc.slice(0, -4)}.jpg`;
+            return true;
+          }
+
+          return false;
+        };
+
+        // Detect missing tiles: fire fetchNui once when neither extension can be loaded.
       let tileErrorReported = false;
-      activeLayer.once("tileerror", () => {
-        if (!tileErrorReported) {
+        activeLayer.on("tileerror", (event: TileErrorEvent) => {
+          const recovered = retryAltExtension(event.tile);
+          if (recovered || tileErrorReported) {
+            return;
+          }
+
           tileErrorReported = true;
           fetchNui("mapTilesMissing", {}).catch(() => {});
-        }
       });
 
       map.fitBounds(bounds);
