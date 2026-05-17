@@ -4,7 +4,7 @@
 --  Exposes a global `Debug` table loaded by every context.
 --
 --  Levels:
---    Debug.info      – always printed, normal flow
+--    Debug.info      – debug only, normal flow
 --    Debug.warn      – always printed, something is off
 --    Debug.error     – always printed, something broke
 --    Debug.debug     – opt-in verbose output
@@ -65,9 +65,11 @@ end
 -- ── public API ────────────────────────────────────────────
 Debug = {}
 
---- Always visible. Use for startup messages and normal state changes.
+--- Debug-only. Use for startup messages and normal state changes.
 ---@param ... any
 function Debug.info(...)
+    local enabled, _ = resolveFlags()
+    if not enabled then return end
     log('INFO', 6, ...)
 end
 

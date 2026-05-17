@@ -49,6 +49,7 @@ NUI.onReady(function()
 			translations = locale_dictionary,
 			translationsByLocale = translations_by_locale,
 			modules = Config.Modules or {},
+			mdt = Config.MDT or {},
 		},
 	})
 

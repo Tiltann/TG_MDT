@@ -16,7 +16,7 @@ Config.Locale = 'en'                  -- locale file to load from locales/
 -- table        = granular control (see debug.lua)
 
 Config.Debug = {
-    enabled   = false,
+    enabled   = true,
     sensitive = false,
 }
 
@@ -38,6 +38,12 @@ Config.MDT = {
 
     -- How long (ms) the MDT open/close animation takes.
     animation_duration = 300,
+
+    -- Allow users to switch the live map tile style from the settings page.
+    allow_map_style_change = true,
+
+    -- Default live map tile style. Supported values: styleAtlas, styleGrid, styleSatelite.
+    default_map_style = 'styleAtlas',
 }
 
 -- ── BOLO / Warrants ───────────────────────────────────────

@@ -47,7 +47,23 @@ type NuiMetaPayload = {
   branding?: NuiBrandingPayload;
   translations?: Record<string, string>;
   translationsByLocale?: Record<string, Record<string, string>>;
+  mdt?: {
+    allow_map_style_change?: boolean;
+    default_map_style?: string;
+  };
 };
+
+type MapStyle = "styleAtlas" | "styleGrid" | "styleSatelite";
+
+const MAP_STYLE_KEY = "tg_mdt_map_style";
+
+function normalizeMapStyle(value?: string): MapStyle {
+  return value === "styleGrid" || value === "styleSatelite" ? value : "styleAtlas";
+}
+
+function isMapStyle(value?: string | null): value is MapStyle {
+  return value === "styleAtlas" || value === "styleGrid" || value === "styleSatelite";
+}
 
 export default function Home() {
   const [isHandshakeDone, setHandshakeDone] = useState(false);
@@ -56,6 +72,9 @@ export default function Home() {
   const [screenData, setScreenData] = useState<Record<string, unknown>>({});
   const [localeOverride, setLocaleOverride] = useState<SupportedLocale | null>(null);
   const [accentOverride, setAccentOverride] = useState<string | null>(null);
+  const [isLocaleReady, setLocaleReady] = useState(false);
+  const [mapStyleOverride, setMapStyleOverride] = useState<MapStyle | null>(null);
+  const [isMapStyleReady, setMapStyleReady] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -100,8 +119,11 @@ export default function Home() {
   const meta = (screenData?.meta as any) || {};
   const typedMeta = meta as NuiMetaPayload;
   const current_modules = typedMeta.modules || defaultMockupModules;
+  const allowMapStyleChange = Boolean(typedMeta.mdt?.allow_map_style_change);
+  const baseMapStyle = normalizeMapStyle(typedMeta.mdt?.default_map_style);
   const baseLocale = normalizeLocale(typedMeta.locale);
   const activeLocale = localeOverride || baseLocale;
+  const activeMapStyle = allowMapStyleChange ? (mapStyleOverride || baseMapStyle) : baseMapStyle;
   const translationsByLocale = typedMeta.translationsByLocale || {};
   const activeTranslations =
     translationsByLocale[activeLocale] ||
@@ -116,10 +138,84 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!localeOverride) {
-      setLocaleOverride(baseLocale);
+    if (typeof window === "undefined") {
+      return;
     }
-  }, [baseLocale, localeOverride]);
+
+    try {
+      const savedLocale = window.localStorage.getItem("tg_mdt_locale");
+      const normalizedLocale = savedLocale === "de" ? "de" : savedLocale === "en" ? "en" : null;
+      setLocaleOverride(normalizedLocale || baseLocale);
+    } catch {
+      setLocaleOverride(baseLocale);
+    } finally {
+      setLocaleReady(true);
+    }
+  }, [baseLocale]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!allowMapStyleChange) {
+      setMapStyleOverride(baseMapStyle);
+      setMapStyleReady(true);
+      try {
+        window.localStorage.setItem(MAP_STYLE_KEY, baseMapStyle);
+      } catch {
+        // Ignore storage failures in restricted browser contexts.
+      }
+      return;
+    }
+
+    try {
+      const savedMapStyle = window.localStorage.getItem(MAP_STYLE_KEY);
+      const normalizedMapStyle = isMapStyle(savedMapStyle) ? savedMapStyle : baseMapStyle;
+      setMapStyleOverride(normalizedMapStyle);
+    } catch {
+      setMapStyleOverride(baseMapStyle);
+    } finally {
+      setMapStyleReady(true);
+    }
+  }, [allowMapStyleChange, baseMapStyle]);
+
+  useEffect(() => {
+    if (!isLocaleReady || typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      if (localeOverride) {
+        window.localStorage.setItem("tg_mdt_locale", localeOverride);
+      } else {
+        window.localStorage.removeItem("tg_mdt_locale");
+      }
+    } catch {
+      // Ignore storage failures in restricted browser contexts.
+    }
+  }, [isLocaleReady, localeOverride]);
+
+  useEffect(() => {
+    if (!isMapStyleReady || typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      if (!allowMapStyleChange) {
+        window.localStorage.setItem(MAP_STYLE_KEY, baseMapStyle);
+        return;
+      }
+
+      if (mapStyleOverride) {
+        window.localStorage.setItem(MAP_STYLE_KEY, mapStyleOverride);
+      } else {
+        window.localStorage.setItem(MAP_STYLE_KEY, baseMapStyle);
+      }
+    } catch {
+      // Ignore storage failures in restricted browser contexts.
+    }
+  }, [allowMapStyleChange, baseMapStyle, isMapStyleReady, mapStyleOverride]);
 
   const t = useMemo(
     () => createTranslator(activeLocale, activeTranslations),
@@ -181,6 +277,7 @@ export default function Home() {
                   <MapView
                     t={t}
                     accent={branding.accent || defaultMockupBranding.accent || "#ff9100"}
+                    mapStyle={activeMapStyle}
                     markers={mapMarkers}
                     playerPosition={playerPosition}
                   />
@@ -190,6 +287,9 @@ export default function Home() {
                     t={t}
                     locale={activeLocale}
                     onLocaleChange={(nextLocale) => setLocaleOverride(nextLocale)}
+                    allowMapStyleChange={allowMapStyleChange}
+                    mapStyle={activeMapStyle}
+                    onMapStyleChange={(nextStyle) => setMapStyleOverride(nextStyle)}
                     accentColor={branding.accent || defaultMockupBranding.accent || "#ff9100"}
                     defaultAccent={typedMeta.branding?.accent || defaultMockupBranding.accent || "#ff9100"}
                     onAccentColorChange={(accent) => setAccentOverride(accent)}

@@ -4,10 +4,15 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import type { SupportedLocale, TFunction } from "../../lib/i18n";
 
+type MapStyle = "styleAtlas" | "styleGrid" | "styleSatelite";
+
 type SettingsViewProps = {
   t: TFunction;
   locale: SupportedLocale;
   onLocaleChange: (locale: SupportedLocale) => void;
+  allowMapStyleChange: boolean;
+  mapStyle: MapStyle;
+  onMapStyleChange: (style: MapStyle) => void;
   accentColor: string;
   defaultAccent: string;
   onAccentColorChange: (accent: string) => void;
@@ -18,6 +23,9 @@ export default function SettingsView({
   t,
   locale,
   onLocaleChange,
+  allowMapStyleChange,
+  mapStyle,
+  onMapStyleChange,
   accentColor,
   defaultAccent,
   onAccentColorChange,
@@ -47,6 +55,30 @@ export default function SettingsView({
             </select>
           </div>
         </div>
+
+        {allowMapStyleChange && (
+          <div>
+            <p className="card-sub">{t("tablet.settings.map_style_section")}</p>
+            <div className="mt-3 flex items-center gap-3">
+              <label className="text-sm text-white" htmlFor="map-style-select">
+                {t("tablet.settings.map_style_label")}
+              </label>
+              <select
+                id="map-style-select"
+                value={mapStyle}
+                onChange={(event) => onMapStyleChange(event.target.value as MapStyle)}
+                className="bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md px-3 py-2 text-sm text-white"
+              >
+                <option value="styleAtlas">{t("tablet.map.style.atlas")}</option>
+                <option value="styleGrid">{t("tablet.map.style.grid")}</option>
+                <option value="styleSatelite">{t("tablet.map.style.satellite")}</option>
+              </select>
+            </div>
+            <p className="mt-2 text-xs text-[var(--mdt-text-muted)]">
+              {t("tablet.settings.map_style_hint")}
+            </p>
+          </div>
+        )}
 
         <div>
           <p className="card-sub">{t("tablet.settings.accent_section")}</p>

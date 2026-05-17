@@ -17,9 +17,12 @@ type PlayerPosition = {
   y: number;
 };
 
+type MapStyle = "styleAtlas" | "styleGrid" | "styleSatelite";
+
 type MapViewProps = {
   t: TFunction;
   accent: string;
+  mapStyle: MapStyle;
   markers?: MapMarker[];
   playerPosition?: PlayerPosition | null;
 };
@@ -29,7 +32,6 @@ const MIN_ZOOM = 2;
 const MAX_ZOOM = 5;
 
 function gtaCoordsToLatLng(x: number, y: number): [number, number] {
-  // GTA world coords are centered around 0,0 while CRS.Simple starts at top-left.
   const center = WORLD_SIZE / 2;
   return [center - y, center + x];
 }
@@ -37,6 +39,7 @@ function gtaCoordsToLatLng(x: number, y: number): [number, number] {
 export default function MapView({
   t,
   accent,
+  mapStyle,
   markers = [],
   playerPosition,
 }: MapViewProps) {
@@ -76,35 +79,35 @@ export default function MapView({
         maxBoundsViscosity: 1,
       });
 
-      const atlasLayer = leaflet.tileLayer("./map/tiles/{z}/{x}/{y}.png", {
-        tileSize: 256,
-        minZoom: 0,
-        maxZoom: MAX_ZOOM,
-        noWrap: true,
-        bounds,
-        errorTileUrl: "./map/empty.jpg",
-      });
+      const activeLayer =
+        mapStyle === "styleGrid"
+          ? leaflet.tileLayer("./map/styleGrid/{z}/{x}/{y}.png", {
+              tileSize: 256,
+              minZoom: 0,
+              maxZoom: MAX_ZOOM,
+              noWrap: true,
+              bounds,
+              errorTileUrl: "./map/styleGrid/empty.png",
+            })
+          : mapStyle === "styleSatelite"
+            ? leaflet.tileLayer("./map/styleSatelite/{z}/{x}/{y}.jpg", {
+                tileSize: 256,
+                minZoom: 0,
+                maxZoom: MAX_ZOOM,
+                noWrap: true,
+                bounds,
+                errorTileUrl: "./map/styleSatelite/empty.jpg",
+              })
+            : leaflet.tileLayer("./map/styleAtlas/{z}/{x}/{y}.jpg", {
+                tileSize: 256,
+                minZoom: 0,
+                maxZoom: MAX_ZOOM,
+                noWrap: true,
+                bounds,
+                errorTileUrl: "./map/styleAtlas/empty.jpg",
+              });
 
-      const satelliteLayer = leaflet.tileLayer("./map/satellite-tiles/{z}/{x}/{y}.png", {
-        tileSize: 256,
-        minZoom: 0,
-        maxZoom: MAX_ZOOM,
-        noWrap: true,
-        bounds,
-        errorTileUrl: "./map/empty_satel.jpg",
-      });
-
-      atlasLayer.addTo(map);
-      leaflet.control
-        .layers(
-          {
-            [t("tablet.map.layer.atlas")]: atlasLayer,
-            [t("tablet.map.layer.satellite")]: satelliteLayer,
-          },
-          {}
-        )
-        .addTo(map);
-
+      activeLayer.addTo(map);
       map.fitBounds(bounds);
 
       markerLayerRef.current = leaflet.layerGroup().addTo(map);
@@ -124,7 +127,7 @@ export default function MapView({
       markerLayerRef.current = null;
       mapInstanceRef.current = null;
     };
-  }, [t]);
+  }, [mapStyle]);
 
   useEffect(() => {
     const leaflet = leafletRef.current;

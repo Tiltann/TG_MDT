@@ -101,6 +101,9 @@
   "tablet.settings.title": "Settings",
   "tablet.settings.locale_section": "Language",
   "tablet.settings.locale_label": "Locale",
+  "tablet.settings.map_style_section": "Map",
+  "tablet.settings.map_style_label": "Tile style",
+  "tablet.settings.map_style_hint": "This changes the live map tile set used in the MDT.",
   "tablet.settings.accent_section": "Theme Color",
   "tablet.settings.accent_label": "Accent",
   "tablet.settings.accent_reset": "Reset",
@@ -108,8 +111,9 @@
   "tablet.settings.accent_default": "Default accent: {color}",
   "tablet.map.title": "Live Map",
   "tablet.map.subtitle": "Leaflet + GTA V tiles",
-  "tablet.map.layer.atlas": "Atlas",
-  "tablet.map.layer.satellite": "Satellite",
+  "tablet.map.style.atlas": "Atlas",
+  "tablet.map.style.grid": "Grid",
+  "tablet.map.style.satellite": "Satellite",
   "tablet.map.marker.default_label": "Unit marker",
   "tablet.map.marker.player": "You"
 }

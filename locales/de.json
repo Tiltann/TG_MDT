@@ -101,6 +101,9 @@
   "tablet.settings.title": "Einstellungen",
   "tablet.settings.locale_section": "Sprache",
   "tablet.settings.locale_label": "Lokalisierung",
+  "tablet.settings.map_style_section": "Karte",
+  "tablet.settings.map_style_label": "Kachelstil",
+  "tablet.settings.map_style_hint": "Damit wird das Live-Karten-Kachelsystem im MDT geändert.",
   "tablet.settings.accent_section": "Themenfarbe",
   "tablet.settings.accent_label": "Akzent",
   "tablet.settings.accent_reset": "Zurücksetzen",
@@ -108,8 +111,9 @@
   "tablet.settings.accent_default": "Standard-Akzent: {color}",
   "tablet.map.title": "Live-Karte",
   "tablet.map.subtitle": "Leaflet + GTA V Kacheln",
-  "tablet.map.layer.atlas": "Atlas",
-  "tablet.map.layer.satellite": "Satellit",
+  "tablet.map.style.atlas": "Atlas",
+  "tablet.map.style.grid": "Raster",
+  "tablet.map.style.satellite": "Satellit",
   "tablet.map.marker.default_label": "Einheiten-Marker",
   "tablet.map.marker.player": "Du"
 }
