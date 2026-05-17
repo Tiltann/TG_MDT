@@ -136,8 +136,8 @@ export default function PersonsView({
           ...prev,
           [selectedPerson.identifier]: {
             ...DEFAULT_AKTE,
-            occupation: selectedPerson.job || "",
             ...(akte || {}),
+            occupation: (akte && akte.occupation) || selectedPerson.job || "",
           },
         }));
       })

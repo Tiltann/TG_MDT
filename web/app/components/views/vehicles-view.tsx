@@ -128,8 +128,8 @@ export default function VehiclesView({
           ...prev,
           [selectedVehicle.plate]: {
             ...DEFAULT_AKTE,
-            modelName: selectedVehicle.modelName,
             ...(akte || {}),
+            modelName: (akte && akte.modelName) || selectedVehicle.modelName,
           },
         }));
       })

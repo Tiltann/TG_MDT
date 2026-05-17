@@ -74,23 +74,23 @@ type VehicleRecord = {
 };
 
 type PersonAkte = {
-  phone?: string;
-  address?: string;
-  occupation?: string;
-  dangerLevel?: string;
-  warrantStatus?: string;
-  driverLicense?: string;
-  weaponLicense?: string;
-  notes?: string;
+  phone: string;
+  address: string;
+  occupation: string;
+  dangerLevel: string;
+  warrantStatus: string;
+  driverLicense: string;
+  weaponLicense: string;
+  notes: string;
 };
 
 type VehicleAkte = {
-  modelName?: string;
-  color?: string;
-  registrationStatus?: string;
-  insuranceStatus?: string;
-  stolenStatus?: string;
-  notes?: string;
+  modelName: string;
+  color: string;
+  registrationStatus: string;
+  insuranceStatus: string;
+  stolenStatus: string;
+  notes: string;
 };
 
 type AkteSyncPayload = {
