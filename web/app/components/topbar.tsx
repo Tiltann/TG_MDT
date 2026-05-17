@@ -2,9 +2,15 @@
 
 import { Search, Bell, X } from "lucide-react";
 
-export function Topbar({ onClose }: { onClose: () => void }) {
+type Branding = {
+  accent?: string;
+  dateLabel?: string;
+};
+
+export function Topbar({ branding, onClose }: { branding: Branding; onClose: () => void }) {
+  const accent = branding.accent || "#ff9100";
   return (
-    <header className="h-16 flex items-center justify-between px-6 border-b border-[var(--mdt-border)] bg-[var(--mdt-bg-base)]">
+    <header className="h-16 flex items-center justify-between px-6 bg-transparent">
       
       {/* Global Search */}
       <div className="relative w-96">
@@ -20,14 +26,14 @@ export function Topbar({ onClose }: { onClose: () => void }) {
       <div className="flex items-center gap-6">
         <button className="relative text-[var(--mdt-text-muted)] hover:text-white transition-colors">
           <Bell className="w-5 h-5" />
-          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--mdt-accent-primary)] text-white text-[10px] flex items-center justify-center font-bold">
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[10px] flex items-center justify-center font-bold" style={{ backgroundColor: accent }}>
             3
           </span>
         </button>
 
         <div className="text-right">
           <p className="text-white font-medium">10:25</p>
-          <p className="text-xs text-[var(--mdt-text-muted)] uppercase tracking-wider">May 12, 2026</p>
+          <p className="text-xs text-[var(--mdt-text-muted)] uppercase tracking-wider">{branding.dateLabel || "May 12, 2026"}</p>
         </div>
 
         <button 

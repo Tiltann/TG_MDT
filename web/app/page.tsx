@@ -4,7 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchNui, useNuiEvent } from "@/lib/useNui";
 import { Sidebar } from "./components/sidebar";
 import { Topbar } from "./components/topbar";
-import { DashboardView } from "./components/dashboard-view";
+import DashboardView from "./components/dashboard-view";
+import IncidentsView from "./components/views/incidents-view";
+import DispatchView from "./components/views/dispatch-view";
+import PersonsView from "./components/views/persons-view";
+import VehiclesView from "./components/views/vehicles-view";
+import ReportsView from "./components/views/reports-view";
+import WarrantsView from "./components/views/warrants-view";
+import EvidenceView from "./components/views/evidence-view";
+import BoloView from "./components/views/bolo-view";
+import { defaultMockupBranding, defaultMockupModules } from "./lib/mockup-config";
 
 type NuiVisibilityPayload = {
   visible?: boolean;
@@ -18,6 +27,15 @@ type NuiScreenPayload = {
 type NuiDataPayload = {
   key?: string;
   value?: unknown;
+};
+
+type NuiBrandingPayload = {
+  name?: string;
+  subtitle?: string;
+  accent?: string;
+  badge?: string;
+  greeting?: string;
+  dateLabel?: string;
 };
 
 export default function Home() {
@@ -69,8 +87,13 @@ export default function Home() {
   // show absolutely nothing until NUI handshake is done.
   if (!isHandshakeDone && !is_browser) return null;
 
-  const current_modules = (screenData?.meta as any)?.modules || {};
-  const player_data = screenData?.player || { name: "Mock User", badge: "Badge #1234" };
+  const meta = (screenData?.meta as any) || {};
+  const current_modules = meta.modules || defaultMockupModules;
+  const branding = {
+    ...defaultMockupBranding,
+    ...(meta.branding as NuiBrandingPayload | undefined),
+  };
+  const player_data = screenData?.player || { name: "Mock User", badge: branding.badge };
 
   return (
     <main className="nui-root" data-visible={show_ui ? "true" : "false"}>
@@ -85,17 +108,24 @@ export default function Home() {
               currentView={activeScreen || "dashboard"} 
               modules={current_modules}
               playerData={player_data}
+              branding={branding}
               onScreenChange={(screen) => setActiveScreen(screen)}
             />
 
             {/* Main Content Area */}
             <div className="flex flex-col flex-1 overflow-hidden">
-              <Topbar onClose={() => fetchNui("hideUI", {}).catch(() => setVisible(false))} />
+              <Topbar branding={branding} onClose={() => fetchNui("hideUI", {}).catch(() => setVisible(false))} />
               
-              <div className="flex-1 overflow-auto p-6">
-                {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView />}
-                {activeScreen === "incidents" && <div>Incidents Component</div>}
-                {activeScreen === "dispatch" && <div>Dispatch Component</div>}
+              <div className="flex-1 overflow-hidden p-6">
+                {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView branding={branding} modules={current_modules} />}
+                {activeScreen === "incidents" && <IncidentsView />}
+                {activeScreen === "dispatch" && <DispatchView />}
+                {activeScreen === "persons" && <PersonsView />}
+                {activeScreen === "vehicles" && <VehiclesView />}
+                {activeScreen === "reports" && <ReportsView />}
+                {activeScreen === "warrants" && <WarrantsView />}
+                {activeScreen === "evidence" && <EvidenceView />}
+                {activeScreen === "bolo" && <BoloView />}
               </div>
             </div>
 

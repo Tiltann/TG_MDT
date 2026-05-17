@@ -19,6 +19,8 @@
   --mdt-status-medium: #f59e0b; /* Orange */
   --mdt-status-low: #3b82f6;    /* Blue */
   --mdt-status-success: #22c55e;/* Green */
+  --mdt-elevation-1: 0 6px 18px rgba(2,6,23,0.6);
+  --mdt-elevation-2: 0 10px 30px rgba(2,6,23,0.7);
 }
 
 @theme inline {
@@ -64,9 +66,9 @@ body,
 }
 
 .nui-layer-bg {
-  background: rgba(0, 0, 0, 0.6);
+  background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.75));
   opacity: 0;
-  transition: opacity 180ms ease;
+  transition: opacity 220ms cubic-bezier(.2,.9,.2,1);
 }
 
 .nui-root[data-visible="true"] .nui-layer-bg {
@@ -82,8 +84,8 @@ body,
 }
 
 .tablet-shell {
-  width: min(1280px, 100%);
-  height: min(800px, 100%);
+  width: min(1700px, 95vw);
+  height: min(950px, 95vh);
   border-radius: 20px;
   border: 1px solid var(--mdt-border);
   background: var(--mdt-bg-base);
@@ -99,3 +101,40 @@ body,
   transform: translateY(0) scale(1);
   opacity: 1;
 }
+
+/* Reusable UI helpers */
+.mdt-card {
+  background: linear-gradient(180deg, var(--mdt-bg-panel), rgba(26,30,39,0.95));
+  border: 1px solid var(--mdt-border);
+  border-radius: 14px;
+  box-shadow: var(--mdt-elevation-1);
+}
+
+.mdt-card-quiet { opacity: 0.95 }
+
+.mdt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+}
+
+.mdt-btn-primary {
+  background: linear-gradient(90deg, var(--mdt-accent-primary), #ff6a00);
+  color: #081018;
+  box-shadow: 0 6px 18px rgba(255,145,0,0.12);
+}
+
+.mdt-btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.04);
+  color: var(--mdt-text-active);
+}
+
+.mdt-muted { color: var(--mdt-text-muted) }
+
+.card-title { font-size: 0.95rem; font-weight:700; color:var(--mdt-text-active) }
+.card-sub { font-size: 0.8rem; color:var(--mdt-text-muted) }
