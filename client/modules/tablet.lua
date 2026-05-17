@@ -3,11 +3,12 @@
 --  Tablet module: permission gate + open/toggle entrypoint.
 -- ============================================================
 
+
 local MODULE_NAME = 'tablet'
 local module_cfg = (Config.Modules and Config.Modules.tablet) or { enabled = true }
 
 if module_cfg.enabled == false then
-    Debug.info('Tablet module disabled by Config.Modules.tablet.enabled')
+    Debug.debug('Tablet module disabled by Config.Modules.tablet.enabled')
     return
 end
 
@@ -72,9 +73,13 @@ end
 ---@return string|nil
 local function canOpenTablet()
     local lookup = buildAllowedJobLookup()
+    Debug.debug('canOpenTablet: evaluating access', {
+        allowed_jobs = (Config.MDT and Config.MDT.allowed_jobs) or {},
+    })
 
     -- Empty allowed_jobs means allow everybody.
     if next(lookup) == nil then
+        Debug.debug('canOpenTablet: allowed_jobs empty, allowing access')
         return true, nil
     end
 
@@ -85,6 +90,7 @@ local function canOpenTablet()
     end
 
     local is_allowed = lookup[job_name] == true
+    Debug.debug(('canOpenTablet: job="%s" allowed=%s'):format(tostring(job_name), tostring(is_allowed)))
     if not is_allowed then
         Debug.warn(('canOpenTablet: Job "%s" is not in allowed_jobs'):format(tostring(job_name)))
         return false, ('job_not_allowed:%s'):format(job_name)
@@ -95,8 +101,17 @@ end
 
 --- Open/toggle tablet only if player has an allowed job.
 local function toggleTablet()
+
+    print("what?")
+    Debug.debug(('toggleTablet: invoked | command=%s | visible=%s | activeScreen=%s'):format(
+        tostring(Config.Commands and Config.Commands.open_mdt or 'mdt'),
+        tostring(NUI.isVisible()),
+        tostring(NUI.getActiveScreen())
+    ))
+
     local allowed, deny_reason = canOpenTablet()
     if not allowed then
+        Debug.debug(('toggleTablet: access denied | reason=%s'):format(tostring(deny_reason)))
         if Config.MDT and Config.MDT.notify_on_denied ~= false then
             local denied = 'You are not allowed to use this tablet.'
             if deny_reason == 'no_job_detected' then
@@ -112,8 +127,13 @@ local function toggleTablet()
     end
 
     local screen = (Config.MDT and Config.MDT.default_screen) or MODULE_NAME
+    Debug.debug(('toggleTablet: opening screen "%s"'):format(screen))
 
     NUI.toggle(screen)
+    Debug.debug(('toggleTablet: after NUI.toggle | visible=%s | activeScreen=%s'):format(
+        tostring(NUI.isVisible()),
+        tostring(NUI.getActiveScreen())
+    ))
 
     NUI.send('setData', {
         key = 'session',
@@ -123,14 +143,13 @@ local function toggleTablet()
             job = getLocalJobName(),
         },
     })
+    Debug.debug('toggleTablet: session payload sent to NUI')
 end
 
-local OPEN_COMMAND = (Config.Commands and Config.Commands.open_mdt) or 'mdt'
+local OPEN_COMMAND = (Config.Commands and Config.Commands.open_mdt)
 RegisterCommand(OPEN_COMMAND, toggleTablet)
+Debug.debug(('Tablet command registered: /%s'):format(OPEN_COMMAND))
 
--- Keep /mdt as a stable alias so admins can rely on it even if Config.Commands.open_mdt changes.
-if OPEN_COMMAND ~= 'mdt' then
-    RegisterCommand('mdt', toggleTablet)
-end
 
-Debug.info(('Tablet module loaded. Command: /%s'):format(OPEN_COMMAND))
+
+Debug.debug(('Tablet module loaded. Command: /%s'):format(OPEN_COMMAND))

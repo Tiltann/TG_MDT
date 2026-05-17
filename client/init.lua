@@ -2,16 +2,17 @@
 --  TG_MDT | client/init.lua
 --  Client-side startup and initialization.
 -- ============================================================
-
+print("hey")
 
 -- ── Startup ────────────────────────────────────────────
-Debug.info('Client started')
-Debug.info(('Locale set to: %s'):format(Config.Locale))
+Debug.debug('Client started')
+Debug.debug(('Locale set to: %s'):format(Config.Locale))
 Debug.debug(('Framework: %s'):format(Framework.name))
 
 local function loadLocaleDictionary(locale)
 	local resource = GetCurrentResourceName()
 	local path = ('locales/%s.json'):format(locale or 'en')
+	Debug.debug(('Loading locale dictionary: %s'):format(path))
 	local raw = LoadResourceFile(resource, path)
 
 	if not raw and locale ~= 'en' then
@@ -29,7 +30,16 @@ local function loadLocaleDictionary(locale)
 		return {}
 	end
 
+	Debug.debug(('Loaded locale dictionary: %s | keys=%s'):format(path, tostring(#decoded)))
 	return decoded
+end
+
+local function countKeys(value)
+	local total = 0
+	for _ in pairs(value or {}) do
+		total = total + 1
+	end
+	return total
 end
 
 local locale_dictionary = loadLocaleDictionary(Config.Locale)
@@ -38,8 +48,17 @@ local translations_by_locale = {
 	de = loadLocaleDictionary('de'),
 }
 
+Debug.debug('Client init: locale dictionaries loaded', {
+	active_locale = Config.Locale,
+	default_screen = (Config.MDT and Config.MDT.default_screen) or 'tablet',
+	active_locale_keys = countKeys(locale_dictionary),
+	locale_cache_keys = countKeys(translations_by_locale),
+})
+
 NUI.onReady(function()
+	Debug.debug('NUI.onReady: preparing initial UI payloads')
 	NUI.send('setScreen', { screen = (Config.MDT and Config.MDT.default_screen) or 'tablet' })
+	Debug.debug('Client init: sent initial screen')
 	NUI.send('setData', {
 		key = 'meta',
 		value = {
@@ -52,9 +71,11 @@ NUI.onReady(function()
 			mdt = Config.MDT or {},
 		},
 	})
+	Debug.debug('Client init: sent meta payload')
 
 	NUI.send('setData', {
 		key = 'allowedJobs',
 		value = (Config.MDT and Config.MDT.allowed_jobs) or {},
 	})
+	Debug.debug('Client init: sent allowedJobs payload')
 end)

@@ -21,7 +21,7 @@ shared_scripts {
 client_scripts {
     'client/nui.lua',
     'client/init.lua',
-    'client/**/*.lua',
+    'client/modules/*.lua',
 }
 
 server_scripts {
@@ -30,7 +30,6 @@ server_scripts {
     'server/logs.lua',
     'server/updater.lua',
     'server/init.lua',
-    'server/**/*.lua',
 }
 
 ui_page 'web/dist/index.html'

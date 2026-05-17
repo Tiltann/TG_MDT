@@ -40,6 +40,7 @@ end
 ---@param state boolean
 ---@param screen string|nil
 local function setState(state, screen)
+    Debug.debug(('NUI.setState: requested state=%s screen=%s'):format(tostring(state), tostring(screen)))
     if state then
         _active_screen = resolveScreen(screen)
     else
@@ -66,18 +67,21 @@ end
 ---@param screen string|nil
 function NUI.show(screen)
     if _visible then return end
+    Debug.debug(('NUI.show: screen=%s'):format(tostring(screen)))
     setState(true, screen)
 end
 
 --- Close the tablet and return focus to the game.
 function NUI.hide()
     if not _visible then return end
+    Debug.debug('NUI.hide: closing UI')
     setState(false)
 end
 
 --- Toggle the tablet open/closed.
 ---@param screen string|nil
 function NUI.toggle(screen)
+    Debug.debug(('NUI.toggle: visible=%s requestedScreen=%s'):format(tostring(_visible), tostring(screen)))
     if _visible then NUI.hide() else NUI.show(screen) end
 end
 
@@ -112,11 +116,11 @@ end
 ---@param type string Message type the UI listens for.
 ---@param data table|nil Payload (optional).
 function NUI.send(type, data)
+    Debug.debug(('NUI.send: type=%s payload=%s'):format(type, json.encode(data or {})))
     SendNUIMessage({
         type = type,
         data = data or {},
     })
-    Debug.debug(('NUI.send -> %s'):format(type), data)
 end
 
 --- Register a callback handler for fetchNui() calls from the UI.
@@ -137,8 +141,9 @@ end
 ---@param handler fun()
 function NUI.onReady(handler)
     NUI.onCallback('nuiReady', function(_, cb)
-        Debug.info('NUI ready signal received')
+        Debug.debug('NUI ready signal received')
         handler()
+        Debug.debug('NUI.onReady: initial payload handler finished')
         cb('ok')
     end)
 end
