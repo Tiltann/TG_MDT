@@ -78,6 +78,40 @@ NUI.onReady(function()
 		value = (Config.MDT and Config.MDT.allowed_jobs) or {},
 	})
 	Debug.debug('Client init: sent allowedJobs payload')
+
+	local persons = {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:getPersons', false)
+	end)
+
+	if ok and type(result) == 'table' then
+		persons = result
+	else
+		Debug.warn('Client init: failed to fetch persons from server callback')
+	end
+
+	NUI.send('setData', {
+		key = 'persons',
+		value = persons,
+	})
+	Debug.debug(('Client init: sent persons payload (%s records)'):format(#persons))
+
+	local vehicles = {}
+	local okVehicles, resultVehicles = pcall(function()
+		return lib.callback.await('TG_MDT:getVehicles', false)
+	end)
+
+	if okVehicles and type(resultVehicles) == 'table' then
+		vehicles = resultVehicles
+	else
+		Debug.warn('Client init: failed to fetch vehicles from server callback')
+	end
+
+	NUI.send('setData', {
+		key = 'vehicles',
+		value = vehicles,
+	})
+	Debug.debug(('Client init: sent vehicles payload (%s records)'):format(#vehicles))
 end)
 
 -- ── Map tile missing — NUI → client → server ───────────────

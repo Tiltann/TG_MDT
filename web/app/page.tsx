@@ -11,7 +11,7 @@ import PersonsView from "./components/views/persons-view";
 import VehiclesView from "./components/views/vehicles-view";
 import ReportsView from "./components/views/reports-view";
 import WarrantsView from "./components/views/warrants-view";
-import EvidenceView from "./components/views/evidence-view";
+import PenaltiesView from "./components/views/penalties-view";
 import BoloView from "./components/views/bolo-view";
 import SettingsView from "./components/views/settings-view";
 import MapView from "./components/views/map-view";
@@ -54,6 +54,24 @@ type NuiMetaPayload = {
 };
 
 type MapStyle = "styleAtlas" | "styleGrid" | "styleSatelite";
+
+type PersonRecord = {
+  identifier: string;
+  firstname?: string | null;
+  lastname?: string | null;
+  name?: string | null;
+  dob?: string | null;
+  gender?: string | number | null;
+  job?: string | null;
+};
+
+type VehicleRecord = {
+  plate: string;
+  ownerIdentifier?: string | null;
+  ownerName?: string | null;
+  model?: string | number | null;
+  state?: string | number | null;
+};
 
 const MAP_STYLE_KEY = "tg_mdt_map_style";
 
@@ -229,6 +247,12 @@ export default function Home() {
     : [];
   const playerPosition =
     (mapData.playerPosition as { x: number; y: number } | undefined) || undefined;
+  const personsData = Array.isArray(screenData?.persons)
+    ? (screenData.persons as PersonRecord[])
+    : [];
+  const vehiclesData = Array.isArray(screenData?.vehicles)
+    ? (screenData.vehicles as VehicleRecord[])
+    : [];
   const rootStyle = {
     "--mdt-accent-primary": branding.accent || defaultMockupBranding.accent || "#ff9100",
   } as CSSProperties;
@@ -267,11 +291,11 @@ export default function Home() {
                 {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView branding={branding} modules={current_modules} t={t} />}
                 {activeScreen === "incidents" && <IncidentsView t={t} />}
                 {activeScreen === "dispatch" && <DispatchView t={t} />}
-                {activeScreen === "persons" && <PersonsView t={t} />}
-                {activeScreen === "vehicles" && <VehiclesView t={t} />}
+                {activeScreen === "persons" && <PersonsView t={t} persons={personsData} />}
+                {activeScreen === "vehicles" && <VehiclesView t={t} vehicles={vehiclesData} />}
                 {activeScreen === "reports" && <ReportsView t={t} />}
                 {activeScreen === "warrants" && <WarrantsView t={t} />}
-                {activeScreen === "evidence" && <EvidenceView t={t} />}
+                {activeScreen === "penalties" && <PenaltiesView t={t} />}
                 {activeScreen === "bolo" && <BoloView t={t} />}
                 {activeScreen === "map" && (
                   <MapView

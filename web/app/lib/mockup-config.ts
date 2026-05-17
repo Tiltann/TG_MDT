@@ -23,7 +23,7 @@ export const defaultMockupModules: Record<string, boolean> = {
   vehicles: true,
   reports: true,
   incidents: true,
-  evidence: true,
+  penalties: true,
   map: true,
   chat: true,
   shifts: true,

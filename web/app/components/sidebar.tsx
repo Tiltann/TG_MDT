@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, RadioReceiver, Users, Car, FileText, Briefcase, MessageSquare, CalendarDays, ShieldCheck, Bell, Plus, Search, LayoutDashboard } from "lucide-react";
+import { Home, RadioReceiver, Users, Car, FileText, Briefcase, MessageSquare, CalendarDays, Scale, Bell, Plus, Search, LayoutDashboard } from "lucide-react";
 import type { TFunction } from "../lib/i18n";
 
 type Branding = {
@@ -32,7 +32,7 @@ export function Sidebar({
     { id: "vehicles", label: t("tablet.sidebar.vehicles"), icon: Car },
     { id: "reports", label: t("tablet.sidebar.reports"), icon: FileText },
     { id: "incidents", label: t("tablet.sidebar.incidents"), icon: Briefcase },
-    { id: "evidence", label: t("tablet.sidebar.evidence"), icon: ShieldCheck },
+    { id: "penalties", label: t("tablet.sidebar.penalties"), icon: Scale },
     { id: "map", label: t("tablet.sidebar.map"), icon: LayoutDashboard },
     { id: "chat", label: t("tablet.sidebar.chat"), icon: MessageSquare },
     { id: "shifts", label: t("tablet.sidebar.shifts"), icon: CalendarDays },
