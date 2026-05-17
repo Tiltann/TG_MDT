@@ -1,8 +1,10 @@
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
-import { Search, UserRound, Briefcase, Calendar, Fingerprint } from "lucide-react";
+import { ArrowLeft, Calendar, ShieldAlert, UserRound } from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
+import { fetchNui } from "../../../lib/useNui";
 import type { TFunction } from "../../lib/i18n";
 
 type PersonRecord = {
@@ -15,6 +17,35 @@ type PersonRecord = {
   job?: string | null;
 };
 
+type PersonAkte = {
+  phone: string;
+  address: string;
+  occupation: string;
+  dangerLevel: string;
+  warrantStatus: string;
+  driverLicense: string;
+  weaponLicense: string;
+  notes: string;
+};
+
+type AkteSyncPayload = {
+  kind?: "person" | "vehicle";
+  identifier?: string;
+  plate?: string;
+  akte?: PersonAkte;
+};
+
+const DEFAULT_AKTE: PersonAkte = {
+  phone: "",
+  address: "",
+  occupation: "",
+  dangerLevel: "low",
+  warrantStatus: "none",
+  driverLicense: "valid",
+  weaponLicense: "none",
+  notes: "",
+};
+
 function normalizeGender(value?: string | number | null): string {
   if (value === undefined || value === null || value === "") return "-";
   if (value === 0 || value === "0" || value === "m" || value === "M" || value === "male") return "M";
@@ -22,10 +53,37 @@ function normalizeGender(value?: string | number | null): string {
   return String(value).toUpperCase();
 }
 
-export default function PersonsView({ t, persons }: { t: TFunction; persons: PersonRecord[] }) {
-  const [search, setSearch] = useState("");
+export default function PersonsView({
+  t,
+  persons,
+  globalSearch,
+  initialAkten,
+  akteSync,
+}: {
+  t: TFunction;
+  persons: PersonRecord[];
+  globalSearch: string;
+  initialAkten: Record<string, PersonAkte>;
+  akteSync?: AkteSyncPayload;
+}) {
   const [selectedIdentifier, setSelectedIdentifier] = useState<string | null>(null);
-  const [aktenByPerson, setAktenByPerson] = useState<Record<string, boolean>>({});
+  const [aktenByPerson, setAktenByPerson] = useState<Record<string, PersonAkte>>(initialAkten || {});
+
+  useEffect(() => {
+    setAktenByPerson((prev) => ({ ...initialAkten, ...prev }));
+  }, [initialAkten]);
+
+  useEffect(() => {
+    if (!akteSync || akteSync.kind !== "person" || !akteSync.identifier || !akteSync.akte) return;
+    setAktenByPerson((prev) => ({
+      ...prev,
+      [akteSync.identifier as string]: {
+        ...DEFAULT_AKTE,
+        ...(prev[akteSync.identifier as string] || {}),
+        ...(akteSync.akte || {}),
+      },
+    }));
+  }, [akteSync]);
 
   const normalizedPersons = useMemo(
     () =>
@@ -33,7 +91,6 @@ export default function PersonsView({ t, persons }: { t: TFunction; persons: Per
         const displayName =
           person.name ||
           [person.firstname, person.lastname].filter(Boolean).join(" ") ||
-          person.identifier ||
           t("tablet.player.unknown_user");
 
         return {
@@ -45,209 +102,267 @@ export default function PersonsView({ t, persons }: { t: TFunction; persons: Per
   );
 
   const filteredPersons = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = globalSearch.trim().toLowerCase();
     if (!term) return normalizedPersons;
 
     return normalizedPersons.filter((person) => {
-      const haystack = [
-        person.name,
-        person.firstname,
-        person.lastname,
-        person.identifier,
-        person.job,
-        person.dob,
-      ]
+      const haystack = [person.name, person.firstname, person.lastname, person.job, person.dob]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
       return haystack.includes(term);
     });
-  }, [normalizedPersons, search]);
+  }, [normalizedPersons, globalSearch]);
 
   useEffect(() => {
-    if (filteredPersons.length === 0) {
+    if (!selectedIdentifier) return;
+    const exists = filteredPersons.some((person) => person.identifier === selectedIdentifier);
+    if (!exists) {
       setSelectedIdentifier(null);
-      return;
-    }
-
-    const stillVisible = filteredPersons.some((person) => person.identifier === selectedIdentifier);
-    if (!stillVisible) {
-      setSelectedIdentifier(filteredPersons[0].identifier);
     }
   }, [filteredPersons, selectedIdentifier]);
 
   const selectedPerson =
-    filteredPersons.find((person) => person.identifier === selectedIdentifier) || filteredPersons[0] || null;
+    filteredPersons.find((person) => person.identifier === selectedIdentifier) || null;
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem("tg_mdt_person_akten");
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Record<string, boolean>;
-      if (parsed && typeof parsed === "object") {
-        setAktenByPerson(parsed);
-      }
-    } catch {
-      // Ignore malformed localStorage data.
-    }
-  }, []);
+    if (!selectedPerson) return;
+    if (aktenByPerson[selectedPerson.identifier]) return;
 
-  const setPersonAkte = (identifier: string) => {
-    setAktenByPerson((prev) => {
-      const next = { ...prev, [identifier]: true };
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem("tg_mdt_person_akten", JSON.stringify(next));
-        } catch {
-          // Ignore storage errors in restricted contexts.
-        }
+    fetchNui<PersonAkte>("getPersonAkte", { identifier: selectedPerson.identifier })
+      .then((akte) => {
+        setAktenByPerson((prev) => ({
+          ...prev,
+          [selectedPerson.identifier]: {
+            ...DEFAULT_AKTE,
+            occupation: selectedPerson.job || "",
+            ...(akte || {}),
+          },
+        }));
+      })
+      .catch(() => {
+        // Keep defaults when callback fails.
+      });
+  }, [selectedPerson, aktenByPerson]);
+
+  const currentAkte = selectedPerson
+    ? aktenByPerson[selectedPerson.identifier] || {
+        ...DEFAULT_AKTE,
+        occupation: selectedPerson.job || "",
       }
-      return next;
-    });
+    : DEFAULT_AKTE;
+
+  const persistAkte = (identifier: string, nextAkte: PersonAkte) => {
+    fetchNui<PersonAkte>("savePersonAkte", { identifier, akte: nextAkte })
+      .then((saved) => {
+        if (!saved) return;
+        setAktenByPerson((prev) => ({
+          ...prev,
+          [identifier]: {
+            ...DEFAULT_AKTE,
+            ...(prev[identifier] || {}),
+            ...(saved || {}),
+          },
+        }));
+      })
+      .catch(() => {
+        // Ignore save errors for now; local view state remains.
+      });
   };
+
+  const updateAkteField = (field: keyof PersonAkte, value: string) => {
+    if (!selectedPerson) return;
+
+    const identifier = selectedPerson.identifier;
+    const nextAkte: PersonAkte = {
+      ...DEFAULT_AKTE,
+      ...(aktenByPerson[identifier] || { occupation: selectedPerson.job || "" }),
+      [field]: value,
+    };
+
+    setAktenByPerson((prev) => ({
+      ...prev,
+      [identifier]: nextAkte,
+    }));
+
+    persistAkte(identifier, nextAkte);
+  };
+
+  const saveAkte = () => {
+    if (!selectedPerson) return;
+    persistAkte(selectedPerson.identifier, currentAkte);
+  };
+
+  if (!selectedPerson) {
+    return (
+      <div className="h-full flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl card-title">{t("tablet.sidebar.persons")}</h3>
+            <p className="card-sub mt-1">{t("tablet.persons.subtitle")}</p>
+          </div>
+          <div className="px-3 py-1 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] text-xs text-[var(--mdt-text-muted)]">
+            {filteredPersons.length} / {normalizedPersons.length}
+          </div>
+        </div>
+
+        <Card className="p-4 flex-1 overflow-auto">
+          {filteredPersons.length === 0 ? (
+            <div className="h-full min-h-28 flex items-center justify-center text-sm text-[var(--mdt-text-muted)]">
+              {t("tablet.persons.no_match")}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredPersons.map((person) => (
+                <button
+                  key={person.identifier}
+                  type="button"
+                  onClick={() => setSelectedIdentifier(person.identifier)}
+                  className="w-full p-3 text-left rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] hover:bg-[rgba(255,255,255,0.03)] transition-colors"
+                >
+                  <p className="text-sm text-white font-medium">{person.name}</p>
+                  <p className="text-xs text-[var(--mdt-text-muted)] mt-1">
+                    {person.job || t("tablet.persons.not_available")}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-xl card-title">{t("tablet.sidebar.persons")}</h3>
-          <p className="card-sub mt-1">{t("tablet.persons.subtitle")}</p>
-        </div>
-        <div className="px-3 py-1 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] text-xs text-[var(--mdt-text-muted)]">
-          {t("tablet.persons.total")}: <span className="text-white font-semibold">{normalizedPersons.length}</span>
-        </div>
+        <Button variant="ghost" onClick={() => setSelectedIdentifier(null)} className="inline-flex items-center gap-2">
+          <ArrowLeft className="w-4 h-4" />
+          {t("tablet.actions.back")}
+        </Button>
+        <Button onClick={saveAkte}>{t("tablet.form.save_akte")}</Button>
       </div>
 
       <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
-        <Card className="col-span-5 p-3 flex flex-col gap-3 min-h-0">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--mdt-text-muted)]" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t("tablet.persons.search_placeholder")}
-              className="w-full pl-9 pr-3 py-2 rounded-md bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] text-sm text-white"
-            />
+        <Card className="col-span-5 p-4 space-y-3 overflow-auto">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-[var(--mdt-text-muted)]">{t("tablet.persons.detail_title")}</p>
+            <h4 className="text-2xl text-white font-semibold mt-1">{selectedPerson.name}</h4>
           </div>
 
-          <div className="text-xs text-[var(--mdt-text-muted)] px-1">
-            {filteredPersons.length === normalizedPersons.length
-              ? `${normalizedPersons.length} ${t("tablet.sidebar.persons")}`
-              : `${filteredPersons.length} / ${normalizedPersons.length}`}
+          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
+            <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2">
+              <UserRound className="w-4 h-4" />
+              {t("tablet.persons.field.name")}
+            </p>
+            <p className="text-sm text-white mt-1">{selectedPerson.name}</p>
           </div>
 
-          <div className="flex-1 overflow-auto space-y-2 pr-1">
-            {filteredPersons.length === 0 ? (
-              <div className="h-full min-h-24 flex items-center justify-center text-sm text-[var(--mdt-text-muted)]">
-                {normalizedPersons.length > 0 ? t("tablet.persons.no_match") : t("tablet.persons.empty")}
-              </div>
-            ) : (
-              filteredPersons.map((person) => {
-                const isActive = selectedPerson?.identifier === person.identifier;
-                return (
-                  <button
-                    key={person.identifier}
-                    type="button"
-                    onClick={() => setSelectedIdentifier(person.identifier)}
-                    className={`w-full text-left p-3 rounded-md border transition-colors ${
-                      isActive
-                        ? "border-[var(--mdt-accent-primary)] bg-[rgba(255,145,0,0.12)]"
-                        : "border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] hover:bg-[rgba(255,255,255,0.03)]"
-                    }`}
-                  >
-                    <p className="text-sm text-white font-medium truncate">{person.name}</p>
-                    <div className="flex items-center justify-between mt-1 gap-2">
-                      <p className="text-xs text-[var(--mdt-text-muted)] truncate">{person.identifier}</p>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded border ${
-                          aktenByPerson[person.identifier]
-                            ? "border-[var(--mdt-status-success)] text-[var(--mdt-status-success)]"
-                            : "border-[var(--mdt-border)] text-[var(--mdt-text-muted)]"
-                        }`}
-                      >
-                        {aktenByPerson[person.identifier]
-                          ? t("tablet.persons.akte.exists")
-                          : t("tablet.persons.akte.missing")}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })
-            )}
+          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
+            <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              {t("tablet.persons.field.dob")}
+            </p>
+            <p className="text-sm text-white mt-1">{selectedPerson.dob || t("tablet.persons.not_available")}</p>
+          </div>
+
+          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
+            <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4" />
+              {t("tablet.persons.field.gender")}
+            </p>
+            <p className="text-sm text-white mt-1">{normalizeGender(selectedPerson.gender)}</p>
           </div>
         </Card>
 
-        <Card className="col-span-7 p-4 min-h-0 overflow-auto">
-          {!selectedPerson ? (
-            <div className="h-full min-h-24 flex items-center justify-center text-sm text-[var(--mdt-text-muted)]">
-              {t("tablet.persons.empty")}
+        <Card className="col-span-7 p-4 overflow-auto space-y-3">
+          <h4 className="card-title">{t("tablet.persons.akte.title")}</h4>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.phone")}</label>
+              <input
+                value={currentAkte.phone}
+                onChange={(event) => updateAkteField("phone", event.target.value)}
+                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+              />
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-[var(--mdt-text-muted)]">{t("tablet.persons.detail_title")}</p>
-                <h4 className="text-2xl text-white font-semibold mt-1">{selectedPerson.name}</h4>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-                  <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2"><Fingerprint className="w-4 h-4" />{t("tablet.persons.field.identifier")}</p>
-                  <p className="text-sm text-white mt-1 break-all">{selectedPerson.identifier || t("tablet.persons.not_available")}</p>
-                </div>
-
-                <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-                  <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2"><UserRound className="w-4 h-4" />{t("tablet.persons.field.name")}</p>
-                  <p className="text-sm text-white mt-1">{selectedPerson.name || t("tablet.persons.not_available")}</p>
-                </div>
-
-                <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.persons.field.firstname")}</p>
-                  <p className="text-sm text-white mt-1">{selectedPerson.firstname || t("tablet.persons.not_available")}</p>
-                </div>
-
-                <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.persons.field.lastname")}</p>
-                  <p className="text-sm text-white mt-1">{selectedPerson.lastname || t("tablet.persons.not_available")}</p>
-                </div>
-
-                <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-                  <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2"><Briefcase className="w-4 h-4" />{t("tablet.persons.field.job")}</p>
-                  <p className="text-sm text-white mt-1">{selectedPerson.job || t("tablet.persons.not_available")}</p>
-                </div>
-
-                <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-                  <p className="text-xs text-[var(--mdt-text-muted)] flex items-center gap-2"><Calendar className="w-4 h-4" />{t("tablet.persons.field.dob")}</p>
-                  <p className="text-sm text-white mt-1">{selectedPerson.dob || t("tablet.persons.not_available")}</p>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
-                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.persons.field.gender")}</p>
-                <p className="text-sm text-white mt-1">{normalizeGender(selectedPerson.gender)}</p>
-              </div>
-
-              <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.persons.akte.title")}</p>
-                  <p className="text-sm text-white mt-1">
-                    {aktenByPerson[selectedPerson.identifier]
-                      ? t("tablet.persons.akte.exists")
-                      : t("tablet.persons.akte.missing")}
-                  </p>
-                </div>
-                <Button
-                  variant={aktenByPerson[selectedPerson.identifier] ? "ghost" : "primary"}
-                  onClick={() => setPersonAkte(selectedPerson.identifier)}
-                >
-                  {aktenByPerson[selectedPerson.identifier]
-                    ? t("tablet.persons.akte.open")
-                    : t("tablet.persons.akte.create")}
-                </Button>
-              </div>
+            <div>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.address")}</label>
+              <input
+                value={currentAkte.address}
+                onChange={(event) => updateAkteField("address", event.target.value)}
+                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+              />
             </div>
-          )}
+            <div>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.occupation")}</label>
+              <input
+                value={currentAkte.occupation}
+                onChange={(event) => updateAkteField("occupation", event.target.value)}
+                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.warrant")}</label>
+              <select
+                value={currentAkte.warrantStatus}
+                onChange={(event) => updateAkteField("warrantStatus", event.target.value)}
+                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+              >
+                <option value="none">{t("tablet.persons.akte.warrant.none")}</option>
+                <option value="active">{t("tablet.persons.akte.warrant.active")}</option>
+                <option value="served">{t("tablet.persons.akte.warrant.served")}</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.danger")}</label>
+              <select
+                value={currentAkte.dangerLevel}
+                onChange={(event) => updateAkteField("dangerLevel", event.target.value)}
+                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+              >
+                <option value="low">{t("tablet.persons.akte.danger.low")}</option>
+                <option value="medium">{t("tablet.persons.akte.danger.medium")}</option>
+                <option value="high">{t("tablet.persons.akte.danger.high")}</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.driver_license")}</label>
+              <select
+                value={currentAkte.driverLicense}
+                onChange={(event) => updateAkteField("driverLicense", event.target.value)}
+                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+              >
+                <option value="valid">{t("tablet.persons.akte.license.valid")}</option>
+                <option value="suspended">{t("tablet.persons.akte.license.suspended")}</option>
+                <option value="revoked">{t("tablet.persons.akte.license.revoked")}</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.weapon_license")}</label>
+              <select
+                value={currentAkte.weaponLicense}
+                onChange={(event) => updateAkteField("weaponLicense", event.target.value)}
+                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+              >
+                <option value="none">{t("tablet.persons.akte.weapon.none")}</option>
+                <option value="valid">{t("tablet.persons.akte.weapon.valid")}</option>
+                <option value="revoked">{t("tablet.persons.akte.weapon.revoked")}</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs mdt-muted mb-1">{t("tablet.persons.akte.notes")}</label>
+            <textarea
+              value={currentAkte.notes}
+              onChange={(event) => updateAkteField("notes", event.target.value)}
+              rows={6}
+              className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+            />
+          </div>
         </Card>
       </div>
     </div>

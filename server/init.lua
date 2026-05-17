@@ -77,6 +77,194 @@ local function decodeObject(value)
     return nil
 end
 
+local MODEL_HASH_NAMES = {
+    ['1663218586'] = 'Sultan RS',
+}
+
+--- Normalize model value to a human-readable model name.
+---@param model any
+---@return string
+local function normalizeModelName(model)
+    if model == nil then return 'Unknown' end
+    local key = tostring(model)
+    if MODEL_HASH_NAMES[key] then
+        return MODEL_HASH_NAMES[key]
+    end
+    if key:match('^%d+$') then
+        return ('Unknown (%s)'):format(key)
+    end
+    return key
+end
+
+local function defaultPersonAkte()
+    return {
+        phone = '',
+        address = '',
+        occupation = '',
+        dangerLevel = 'low',
+        warrantStatus = 'none',
+        driverLicense = 'valid',
+        weaponLicense = 'none',
+        notes = '',
+    }
+end
+
+local function defaultVehicleAkte()
+    return {
+        modelName = '',
+        color = '',
+        registrationStatus = 'valid',
+        insuranceStatus = 'active',
+        stolenStatus = 'no',
+        notes = '',
+    }
+end
+
+--- Ensure Akte tables exist.
+local function ensureAkteTables()
+    SQL.execute([[
+        CREATE TABLE IF NOT EXISTS tg_mdt_person_akten (
+            identifier VARCHAR(80) NOT NULL PRIMARY KEY,
+            data LONGTEXT NOT NULL,
+            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    ]], {})
+
+    SQL.execute([[
+        CREATE TABLE IF NOT EXISTS tg_mdt_vehicle_akten (
+            plate VARCHAR(20) NOT NULL PRIMARY KEY,
+            data LONGTEXT NOT NULL,
+            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    ]], {})
+end
+
+--- Build framework defaults for a person Akte.
+---@param identifier string
+---@return table
+local function buildPersonAkteDefaults(identifier)
+    local defaults = defaultPersonAkte()
+
+    if Framework.name == 'esx' then
+        local row = SQL.single([[
+            SELECT phone_number, job
+            FROM users
+            WHERE identifier = ?
+            LIMIT 1
+        ]], { identifier })
+
+        if row then
+            defaults.phone = row.phone_number or ''
+            defaults.occupation = row.job or ''
+        end
+        return defaults
+    end
+
+    if Framework.name == 'qbcore' or Framework.name == 'qbox' then
+        local row = SQL.single([[
+            SELECT charinfo, job
+            FROM players
+            WHERE citizenid = ?
+            LIMIT 1
+        ]], { identifier })
+
+        if row then
+            local charinfo = decodeObject(row.charinfo)
+            defaults.phone = (charinfo and (charinfo.phone or charinfo.phone_number)) or ''
+            defaults.address = (charinfo and (charinfo.address or charinfo.street)) or ''
+
+            local jobName = row.job
+            if type(row.job) == 'string' and row.job:sub(1, 1) == '{' then
+                local ok, decodedJob = pcall(json.decode, row.job)
+                if ok and type(decodedJob) == 'table' and decodedJob.name then
+                    jobName = decodedJob.name
+                end
+            end
+            defaults.occupation = jobName or ''
+        end
+    end
+
+    return defaults
+end
+
+--- Build framework defaults for a vehicle Akte.
+---@param plate string
+---@return table
+local function buildVehicleAkteDefaults(plate)
+    local defaults = defaultVehicleAkte()
+
+    if Framework.name == 'esx' then
+        local row = SQL.single([[
+            SELECT vehicle
+            FROM owned_vehicles
+            WHERE plate = ?
+            LIMIT 1
+        ]], { plate })
+
+        if row then
+            local vehicleData = decodeObject(row.vehicle)
+            defaults.modelName = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model))
+            defaults.color = tostring(vehicleData and (vehicleData.color1 or vehicleData.color2) or '')
+        end
+        return defaults
+    end
+
+    if Framework.name == 'qbcore' or Framework.name == 'qbox' then
+        local row = SQL.single([[
+            SELECT vehicle, state
+            FROM player_vehicles
+            WHERE plate = ?
+            LIMIT 1
+        ]], { plate })
+
+        if row then
+            local vehicleData = decodeObject(row.vehicle)
+            defaults.modelName = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model))
+            defaults.color = tostring(vehicleData and (vehicleData.color1 or vehicleData.color2) or '')
+
+            if row.state ~= nil then
+                defaults.registrationStatus = tonumber(row.state) == 1 and 'valid' or 'expired'
+            end
+        end
+    end
+
+    return defaults
+end
+
+---@param identifier string
+---@return table
+local function getPersonAkte(identifier)
+    local defaults = buildPersonAkteDefaults(identifier)
+    local row = SQL.single('SELECT data FROM tg_mdt_person_akten WHERE identifier = ? LIMIT 1', { identifier })
+    local decoded = row and decodeObject(row.data) or nil
+    if not decoded then return defaults end
+
+    for key, value in pairs(defaults) do
+        if decoded[key] == nil or decoded[key] == '' then
+            decoded[key] = value
+        end
+    end
+
+    return decoded
+end
+
+---@param plate string
+---@return table
+local function getVehicleAkte(plate)
+    local defaults = buildVehicleAkteDefaults(plate)
+    local row = SQL.single('SELECT data FROM tg_mdt_vehicle_akten WHERE plate = ? LIMIT 1', { plate })
+    local decoded = row and decodeObject(row.data) or nil
+    if not decoded then return defaults end
+
+    for key, value in pairs(defaults) do
+        if decoded[key] == nil or decoded[key] == '' then
+            decoded[key] = value
+        end
+    end
+
+    return decoded
+end
+
 --- Fetch persons from active framework data source.
 ---@return table
 local function getPersonsFromFramework()
@@ -227,6 +415,7 @@ Debug.debug(('Framework: %s'):format(Framework.name))
 -- Check database availability
 if checkDatabase() then
     Debug.info('Database connection OK')
+    ensureAkteTables()
 else
     Debug.warn('Database connection failed — some features may not work')
 end
@@ -255,4 +444,97 @@ lib.callback.register('TG_MDT:getVehicles', function(_src)
     local vehicles = getVehiclesFromFramework()
     Debug.debug(('Vehicles callback: returned %s records'):format(#vehicles))
     return vehicles
+end)
+
+-- ── Akte callbacks (db-backed + live sync) ────────────────
+lib.callback.register('TG_MDT:getAkteBootstrap', function(_src)
+    local personRows = SQL.query('SELECT identifier, data FROM tg_mdt_person_akten', {})
+    local vehicleRows = SQL.query('SELECT plate, data FROM tg_mdt_vehicle_akten', {})
+
+    local personAkten = {}
+    for i = 1, #personRows do
+        local row = personRows[i]
+        personAkten[row.identifier] = decodeObject(row.data) or defaultPersonAkte()
+    end
+
+    local vehicleAkten = {}
+    for i = 1, #vehicleRows do
+        local row = vehicleRows[i]
+        vehicleAkten[row.plate] = decodeObject(row.data) or defaultVehicleAkte()
+    end
+
+    return {
+        personAkten = personAkten,
+        vehicleAkten = vehicleAkten,
+    }
+end)
+
+lib.callback.register('TG_MDT:getPersonAkte', function(_src, identifier)
+    if type(identifier) ~= 'string' or identifier == '' then
+        return defaultPersonAkte()
+    end
+    return getPersonAkte(identifier)
+end)
+
+lib.callback.register('TG_MDT:savePersonAkte', function(_src, identifier, akte)
+    if type(identifier) ~= 'string' or identifier == '' then
+        return nil
+    end
+
+    local merged = getPersonAkte(identifier)
+    if type(akte) == 'table' then
+        for k, v in pairs(akte) do
+            if type(v) == 'string' then
+                merged[k] = v
+            end
+        end
+    end
+
+    SQL.execute(
+        'INSERT INTO tg_mdt_person_akten (identifier, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',
+        { identifier, json.encode(merged) }
+    )
+
+    TriggerClientEvent('TG_MDT:akteUpdated', -1, {
+        kind = 'person',
+        identifier = identifier,
+        akte = merged,
+    })
+
+    return merged
+end)
+
+lib.callback.register('TG_MDT:getVehicleAkte', function(_src, plate)
+    if type(plate) ~= 'string' or plate == '' then
+        return defaultVehicleAkte()
+    end
+    return getVehicleAkte(plate)
+end)
+
+lib.callback.register('TG_MDT:saveVehicleAkte', function(_src, plate, akte)
+    if type(plate) ~= 'string' or plate == '' then
+        return nil
+    end
+
+    local merged = getVehicleAkte(plate)
+    if type(akte) == 'table' then
+        for k, v in pairs(akte) do
+            if type(v) == 'string' then
+                merged[k] = v
+            end
+        end
+    end
+
+    SQL.execute(
+        'INSERT INTO tg_mdt_vehicle_akten (plate, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',
+        { plate, json.encode(merged) }
+    )
+
+    TriggerClientEvent('TG_MDT:akteUpdated', -1, {
+        kind = 'vehicle',
+        plate = plate,
+        akte = merged,
+    })
+
+    return merged
 end)

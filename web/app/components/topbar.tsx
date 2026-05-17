@@ -11,11 +11,15 @@ type Branding = {
 export function Topbar({
   branding,
   t,
+  searchValue,
+  onSearchChange,
   onOpenSettings,
   onClose,
 }: {
   branding: Branding;
   t: TFunction;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
   onOpenSettings: () => void;
   onClose: () => void;
 }) {
@@ -27,6 +31,8 @@ export function Topbar({
         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--mdt-text-muted)]" />
         <input 
           type="text" 
+          value={searchValue}
+          onChange={(event) => onSearchChange(event.target.value)}
           placeholder={t("tablet.topbar.search_placeholder")}
           className="w-full bg-[var(--mdt-bg-panel)] border border-[var(--mdt-border)] rounded-full py-2 pl-10 pr-4 text-sm text-[var(--mdt-text-active)] placeholder-[var(--mdt-text-muted)] focus:outline-none focus:border-[var(--mdt-text-muted)] transition-colors"
         />

@@ -112,6 +112,28 @@ NUI.onReady(function()
 		value = vehicles,
 	})
 	Debug.debug(('Client init: sent vehicles payload (%s records)'):format(#vehicles))
+
+	local bootstrap = {}
+	local okBootstrap, resultBootstrap = pcall(function()
+		return lib.callback.await('TG_MDT:getAkteBootstrap', false)
+	end)
+
+	if okBootstrap and type(resultBootstrap) == 'table' then
+		bootstrap = resultBootstrap
+	else
+		Debug.warn('Client init: failed to fetch Akte bootstrap')
+	end
+
+	NUI.send('setData', {
+		key = 'personAkten',
+		value = bootstrap.personAkten or {},
+	})
+
+	NUI.send('setData', {
+		key = 'vehicleAkten',
+		value = bootstrap.vehicleAkten or {},
+	})
+	Debug.debug('Client init: sent Akte bootstrap payload')
 end)
 
 -- ── Map tile missing — NUI → client → server ───────────────
@@ -125,4 +147,47 @@ NUI.onCallback('mapTilesMissing', function(_, cb)
         TriggerServerEvent('TG_MDT:mapTilesMissing')
     end
     cb('ok')
+end)
+
+-- ── Akte bridge (NUI <-> client <-> server) ───────────────
+NUI.onCallback('getPersonAkte', function(body, cb)
+	local identifier = body and body.identifier or nil
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:getPersonAkte', false, identifier)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('savePersonAkte', function(body, cb)
+	local identifier = body and body.identifier or nil
+	local akte = body and body.akte or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:savePersonAkte', false, identifier, akte)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('getVehicleAkte', function(body, cb)
+	local plate = body and body.plate or nil
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:getVehicleAkte', false, plate)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('saveVehicleAkte', function(body, cb)
+	local plate = body and body.plate or nil
+	local akte = body and body.akte or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:saveVehicleAkte', false, plate, akte)
+	end)
+	cb(ok and result or {})
+end)
+
+RegisterNetEvent('TG_MDT:akteUpdated', function(payload)
+	if type(payload) ~= 'table' then return end
+	NUI.send('setData', {
+		key = 'akteSync',
+		value = payload,
+	})
 end)

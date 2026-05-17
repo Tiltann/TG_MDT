@@ -73,6 +73,33 @@ type VehicleRecord = {
   state?: string | number | null;
 };
 
+type PersonAkte = {
+  phone?: string;
+  address?: string;
+  occupation?: string;
+  dangerLevel?: string;
+  warrantStatus?: string;
+  driverLicense?: string;
+  weaponLicense?: string;
+  notes?: string;
+};
+
+type VehicleAkte = {
+  modelName?: string;
+  color?: string;
+  registrationStatus?: string;
+  insuranceStatus?: string;
+  stolenStatus?: string;
+  notes?: string;
+};
+
+type AkteSyncPayload = {
+  kind?: "person" | "vehicle";
+  identifier?: string;
+  plate?: string;
+  akte?: PersonAkte | VehicleAkte;
+};
+
 const MAP_STYLE_KEY = "tg_mdt_map_style";
 
 function normalizeMapStyle(value?: string): MapStyle {
@@ -93,6 +120,7 @@ export default function Home() {
   const [isLocaleReady, setLocaleReady] = useState(false);
   const [mapStyleOverride, setMapStyleOverride] = useState<MapStyle | null>(null);
   const [isMapStyleReady, setMapStyleReady] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -253,6 +281,9 @@ export default function Home() {
   const vehiclesData = Array.isArray(screenData?.vehicles)
     ? (screenData.vehicles as VehicleRecord[])
     : [];
+  const personAktenData = ((screenData?.personAkten as Record<string, PersonAkte>) || {});
+  const vehicleAktenData = ((screenData?.vehicleAkten as Record<string, VehicleAkte>) || {});
+  const akteSyncData = (screenData?.akteSync as AkteSyncPayload | undefined) || undefined;
   const rootStyle = {
     "--mdt-accent-primary": branding.accent || defaultMockupBranding.accent || "#ff9100",
   } as CSSProperties;
@@ -283,6 +314,8 @@ export default function Home() {
               <Topbar
                 branding={branding}
                 t={t}
+                searchValue={globalSearch}
+                onSearchChange={setGlobalSearch}
                 onOpenSettings={() => setActiveScreen("settings")}
                 onClose={() => fetchNui("hideUI", {}).catch(() => setVisible(false))}
               />
@@ -291,8 +324,24 @@ export default function Home() {
                 {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView branding={branding} modules={current_modules} t={t} />}
                 {activeScreen === "incidents" && <IncidentsView t={t} />}
                 {activeScreen === "dispatch" && <DispatchView t={t} />}
-                {activeScreen === "persons" && <PersonsView t={t} persons={personsData} />}
-                {activeScreen === "vehicles" && <VehiclesView t={t} vehicles={vehiclesData} />}
+                {activeScreen === "persons" && (
+                  <PersonsView
+                    t={t}
+                    persons={personsData}
+                    globalSearch={globalSearch}
+                    initialAkten={personAktenData}
+                    akteSync={akteSyncData}
+                  />
+                )}
+                {activeScreen === "vehicles" && (
+                  <VehiclesView
+                    t={t}
+                    vehicles={vehiclesData}
+                    globalSearch={globalSearch}
+                    initialAkten={vehicleAktenData}
+                    akteSync={akteSyncData}
+                  />
+                )}
                 {activeScreen === "reports" && <ReportsView t={t} />}
                 {activeScreen === "warrants" && <WarrantsView t={t} />}
                 {activeScreen === "penalties" && <PenaltiesView t={t} />}
