@@ -25,7 +25,7 @@ Ein Tablet ingame, das jede Fraktion bekommt. Jede Fraktion sieht nur ihre eigen
 - 📝 **Berichte** schreiben und abrufen (Einsatz, Strafanzeige, Behandlung — je nach Fraktion)
 - ⚖️ **Strafkatalog / Bußgeldkatalog** mit direkter Ausstellung
 - 🗺️ **Live-Map** mit Kollegen und Markern (Einsatzorte, POIs)
-- 📡 **Funk / interner Chat** zwischen Mitgliedern
+- 📡 **Funk** zwischen Mitgliedern
 - 📅 **Dienstplan & Schichten**
 - 🛠️ **Admin- / Leitungsbereich** — Mitglieder, Ränge, Rechte verwalten
 - 🔔 **Benachrichtigungen** (neuer Einsatz, neue Akte, etc.)
