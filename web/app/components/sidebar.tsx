@@ -109,14 +109,6 @@ export function Sidebar({
               <Plus className="w-4 h-4" style={{ color: accent }} />
               <span className="font-medium" style={{ color: accent }}>Neue Akte</span>
             </button>
-            <button className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[var(--mdt-bg-hover)] text-[var(--mdt-text-muted)] hover:text-white transition-colors">
-              <Search className="w-4 h-4" />
-              <span>Schnellsuche</span>
-            </button>
-            <button className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[var(--mdt-bg-hover)] text-[var(--mdt-text-muted)] hover:text-white transition-colors">
-              <MessageSquare className="w-4 h-4" />
-              <span>Interner Chat</span>
-            </button>
           </div>
         </div>
       </div>
