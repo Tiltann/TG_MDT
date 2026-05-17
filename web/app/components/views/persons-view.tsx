@@ -32,7 +32,7 @@ type AkteSyncPayload = {
   kind?: "person" | "vehicle";
   identifier?: string;
   plate?: string;
-  akte?: PersonAkte;
+  akte?: Record<string, string>;
 };
 
 const DEFAULT_AKTE: PersonAkte = {

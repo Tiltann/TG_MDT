@@ -284,6 +284,8 @@ export default function Home() {
   const personAktenData = ((screenData?.personAkten as Record<string, PersonAkte>) || {});
   const vehicleAktenData = ((screenData?.vehicleAkten as Record<string, VehicleAkte>) || {});
   const akteSyncData = (screenData?.akteSync as AkteSyncPayload | undefined) || undefined;
+  const personAkteSync = akteSyncData?.kind === "person" ? akteSyncData : undefined;
+  const vehicleAkteSync = akteSyncData?.kind === "vehicle" ? akteSyncData : undefined;
   const rootStyle = {
     "--mdt-accent-primary": branding.accent || defaultMockupBranding.accent || "#ff9100",
   } as CSSProperties;
@@ -330,7 +332,7 @@ export default function Home() {
                     persons={personsData}
                     globalSearch={globalSearch}
                     initialAkten={personAktenData}
-                    akteSync={akteSyncData}
+                    akteSync={personAkteSync}
                   />
                 )}
                 {activeScreen === "vehicles" && (
@@ -339,7 +341,7 @@ export default function Home() {
                     vehicles={vehiclesData}
                     globalSearch={globalSearch}
                     initialAkten={vehicleAktenData}
-                    akteSync={akteSyncData}
+                    akteSync={vehicleAkteSync}
                   />
                 )}
                 {activeScreen === "reports" && <ReportsView t={t} />}
