@@ -14,12 +14,40 @@
 
 SQL = {}
 
+---@param result any
+---@return any
+local function awaitResult(result)
+    if result == nil then return nil end
+    if Citizen and Citizen.Await and (type(result) == 'table' or type(result) == 'userdata') then
+        local ok, awaited = pcall(Citizen.Await, result)
+        if ok then
+            return awaited
+        end
+    end
+    return result
+end
+
+---@param method string
+---@return any
+local function callMySQL(method, ...)
+    local fn = MySQL[method]
+    if type(fn) == 'table' and type(fn.await) == 'function' then
+        return fn.await(...)
+    end
+
+    if type(fn) == 'function' then
+        return awaitResult(fn(...))
+    end
+
+    return nil
+end
+
 --- Run a SELECT and return all matching rows.
 ---@param query string SQL query string with ? placeholders.
 ---@param params table Parameter values in order.
 ---@return table rows Empty table if no results.
 function SQL.query(query, params)
-    local result = MySQL.query.await(query, params or {})
+    local result = callMySQL('query', query, params or {})
     return result or {}
 end
 
@@ -28,7 +56,7 @@ end
 ---@param params table
 ---@return table|nil row Nil if not found.
 function SQL.single(query, params)
-    local result = MySQL.single.await(query, params or {})
+    local result = callMySQL('single', query, params or {})
     return result or nil
 end
 
@@ -37,7 +65,7 @@ end
 ---@param params table
 ---@return any|nil value
 function SQL.scalar(query, params)
-    local result = MySQL.scalar.await(query, params or {})
+    local result = callMySQL('scalar', query, params or {})
     return result
 end
 
@@ -46,7 +74,7 @@ end
 ---@param params table
 ---@return number|nil id The inserted row id, or nil on failure.
 function SQL.insert(query, params)
-    local id = MySQL.insert.await(query, params or {})
+    local id = callMySQL('insert', query, params or {})
     return id
 end
 
@@ -56,7 +84,11 @@ end
 ---@param params table
 ---@return number affected_rows
 function SQL.execute(query, params)
-    local affected = MySQL.execute.await(query, params or {})
+    local sqlParams = params or {}
+    local affected = callMySQL('update', query, sqlParams)
+    if affected == nil then
+        affected = callMySQL('execute', query, sqlParams)
+    end
     return affected or 0
 end
 
@@ -65,7 +97,7 @@ end
 ---@param queries table Array of { query = string, params = table }
 ---@return boolean success
 function SQL.transaction(queries)
-    local ok = MySQL.transaction.await(queries)
+    local ok = callMySQL('transaction', queries)
     if not ok then
         Debug.error('SQL.transaction failed', json.encode(queries))
     end
