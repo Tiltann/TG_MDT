@@ -120,6 +120,63 @@ function encodeImages(items: string[]): string {
   return JSON.stringify(items.filter((item) => item.trim().length > 0));
 }
 
+const MAX_IMAGE_DATA_URL_LENGTH = 50000;
+
+function isDataImageUrl(value: string): boolean {
+  return /^data:image\//i.test(value);
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+async function optimizeAkteImageUrl(raw: string): Promise<string> {
+  const value = raw.trim();
+  if (value === "" || !isDataImageUrl(value)) return value;
+  if (value.length <= MAX_IMAGE_DATA_URL_LENGTH) return value;
+
+  try {
+    const image = await loadImage(value);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return value;
+
+    const maxWidths = [1920, 1600, 1280, 1024, 896, 768, 640];
+    const qualities = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.6];
+    let best = value;
+
+    for (const maxWidth of maxWidths) {
+      const scale = Math.min(1, maxWidth / Math.max(1, image.width));
+      const width = Math.max(1, Math.floor(image.width * scale));
+      const height = Math.max(1, Math.floor(image.height * scale));
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(image, 0, 0, width, height);
+
+      for (const quality of qualities) {
+        const candidate = canvas.toDataURL("image/jpeg", quality);
+        if (candidate.length < best.length) {
+          best = candidate;
+        }
+        if (candidate.length <= MAX_IMAGE_DATA_URL_LENGTH) {
+          return candidate;
+        }
+      }
+    }
+
+    return best;
+  } catch {
+    return value;
+  }
+}
+
 export default function VehiclesView({
   t,
   vehicles,
@@ -147,6 +204,7 @@ export default function VehiclesView({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [manualImageUrl, setManualImageUrl] = useState("");
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [fullscreenZoom, setFullscreenZoom] = useState(1);
 
   const imageFieldKey = useMemo(() => {
     const candidates = ["vehicleImage", "image", "imageUrl", "photo", "photoUrl"];
@@ -282,18 +340,21 @@ export default function VehiclesView({
     if (!editable) return;
 
     const plate = selectedVehicle.plate;
-    const nextAkte: VehicleAkte = {
-      ...defaultAkte,
-      ...(aktenByVehicle[plate] || {}),
-      [field]: value,
-    };
 
-    setAktenByVehicle((prev) => ({
-      ...prev,
-      [plate]: nextAkte,
-    }));
+    setAktenByVehicle((prev) => {
+      const nextAkte: VehicleAkte = {
+        ...defaultAkte,
+        ...(prev[plate] || {}),
+        [field]: value,
+      };
 
-    persistAkte(plate, nextAkte);
+      return {
+        ...prev,
+        [plate]: nextAkte,
+      };
+    });
+
+    persistAkte(plate, { [field]: value });
   };
 
   const saveAkte = () => {
@@ -338,8 +399,20 @@ export default function VehiclesView({
         return;
       }
 
-      const newImages = result.images.filter((item) => typeof item === "string" && item.trim() !== "");
+      const rawImages = result.images.filter((item) => typeof item === "string" && item.trim() !== "");
+      if (rawImages.length === 0) return;
+
+      const newImages = (await Promise.all(rawImages.map((item) => optimizeAkteImageUrl(item)))).filter(
+        (item) => item.trim() !== ""
+      );
       if (newImages.length === 0) return;
+
+      const rawLongest = rawImages.reduce((max, item) => Math.max(max, item.length), 0);
+      const optimizedLongest = newImages.reduce((max, item) => Math.max(max, item.length), 0);
+      void fetchNui("debugUiLog", {
+        tag: "vehicles-image-opt",
+        message: `plate=${plate} rawMax=${rawLongest} optimizedMax=${optimizedLongest} limit=${MAX_IMAGE_DATA_URL_LENGTH}`,
+      });
 
       const serverAkte = await fetchNui<VehicleAkte>("getVehicleAkte", { plate });
       const localAkte: VehicleAkte = {
@@ -404,7 +477,8 @@ export default function VehiclesView({
         return;
       }
 
-      const nextImage = result.images[result.images.length - 1];
+      const rawNextImage = result.images[result.images.length - 1];
+      const nextImage = rawNextImage ? await optimizeAkteImageUrl(rawNextImage) : "";
       if (!nextImage || nextImage.trim() === "") {
         return;
       }
@@ -436,6 +510,16 @@ export default function VehiclesView({
     setActiveImageIndex(merged.length - 1);
     setManualImageUrl("");
   };
+
+  useEffect(() => {
+    if (fullscreenImage) {
+      setFullscreenZoom(1);
+    }
+  }, [fullscreenImage]);
+
+  const zoomInFullscreen = () => setFullscreenZoom((prev) => Math.min(6, Number((prev + 0.25).toFixed(2))));
+  const zoomOutFullscreen = () => setFullscreenZoom((prev) => Math.max(1, Number((prev - 0.25).toFixed(2))));
+  const resetFullscreenZoom = () => setFullscreenZoom(1);
 
   if (!selectedVehicle) {
     return (
@@ -536,7 +620,7 @@ export default function VehiclesView({
                 src={activeImage}
                 alt={selectedVehicle.plate}
                 onClick={() => setFullscreenImage(activeImage)}
-                className="w-full h-44 object-cover rounded-md border border-[var(--mdt-border)] cursor-zoom-in"
+                className="w-full h-64 md:h-72 object-cover rounded-md border border-[var(--mdt-border)] cursor-zoom-in"
               />
             ) : (
               <div className="h-32 rounded-md border border-dashed border-[var(--mdt-border)] flex items-center justify-center text-xs text-[var(--mdt-text-muted)]">
@@ -665,26 +749,78 @@ export default function VehiclesView({
       {fullscreenImage && (
         <div
           className="fixed inset-0 z-[120] bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setFullscreenImage(null)}
+          onClick={() => {
+            setFullscreenImage(null);
+            setFullscreenZoom(1);
+          }}
         >
+          <div className="absolute top-4 left-4 flex items-center gap-2 z-[121]">
+            <button
+              type="button"
+              className="px-3 py-2 rounded-md bg-black/50 text-white border border-white/20 text-sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                zoomOutFullscreen();
+              }}
+            >
+              -
+            </button>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-md bg-black/50 text-white border border-white/20 text-sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                zoomInFullscreen();
+              }}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-md bg-black/50 text-white border border-white/20 text-sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                resetFullscreenZoom();
+              }}
+            >
+              100%
+            </button>
+          </div>
           <button
             type="button"
             className="absolute top-4 right-4 p-2 rounded-md bg-black/50 text-white border border-white/20"
             onClick={(event) => {
               event.stopPropagation();
               setFullscreenImage(null);
+              setFullscreenZoom(1);
             }}
             aria-label={t("close_mdt")}
           >
             <X className="w-5 h-5" />
           </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={fullscreenImage}
-            alt={selectedVehicle.plate}
-            className="max-w-full max-h-full object-contain"
+          <div
+            className="w-full h-full max-w-[96vw] max-h-[96vh] overflow-auto flex items-center justify-center"
+            onWheel={(event) => {
+              event.stopPropagation();
+              if (event.deltaY < 0) {
+                zoomInFullscreen();
+              } else {
+                zoomOutFullscreen();
+              }
+            }}
             onClick={(event) => event.stopPropagation()}
-          />
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={fullscreenImage}
+              alt={selectedVehicle.plate}
+              className="max-w-none object-contain"
+              style={{
+                transform: `scale(${fullscreenZoom})`,
+                transformOrigin: "center center",
+              }}
+            />
+          </div>
         </div>
       )}
     </div>

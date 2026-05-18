@@ -286,9 +286,17 @@ end)
 NUI.onCallback('saveVehicleAkte', function(body, cb)
 	local plate = body and body.plate or nil
 	local akte = body and body.akte or {}
+	local imageLen = 0
+	if type(akte) == 'table' and type(akte.vehicleImage) == 'string' then
+		imageLen = #akte.vehicleImage
+	end
 	local ok, result = pcall(function()
 		return lib.callback.await('TG_MDT:saveVehicleAkte', false, plate, akte)
 	end)
+	if not ok then
+		Debug.warn(('saveVehicleAkte failed plate=%s imageLen=%s err=%s')
+			:format(tostring(plate), tostring(imageLen), tostring(result)))
+	end
 	cb(ok and result or {})
 end)
 

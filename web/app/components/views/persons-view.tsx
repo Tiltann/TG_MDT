@@ -144,7 +144,7 @@ function encodeImages(items: string[]): string {
   return JSON.stringify(items.filter((item) => item.trim().length > 0));
 }
 
-const MAX_IMAGE_DATA_URL_LENGTH = 18000;
+const MAX_IMAGE_DATA_URL_LENGTH = 50000;
 
 function isDataImageUrl(value: string): boolean {
   return /^data:image\//i.test(value);
@@ -170,8 +170,8 @@ async function optimizeAkteImageUrl(raw: string): Promise<string> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return value;
 
-    const maxWidths = [1280, 1024, 896, 768, 640, 512];
-    const qualities = [0.85, 0.78, 0.72, 0.66, 0.58, 0.5];
+    const maxWidths = [1920, 1600, 1280, 1024, 896, 768, 640];
+    const qualities = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.6];
     let best = value;
 
     for (const maxWidth of maxWidths) {
@@ -228,6 +228,7 @@ export default function PersonsView({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [manualImageUrl, setManualImageUrl] = useState("");
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [fullscreenZoom, setFullscreenZoom] = useState(1);
 
   const imageFieldKey = useMemo(() => {
     const candidates = ["personImage", "image", "imageUrl", "photo", "photoUrl", "mugshot"];
@@ -542,6 +543,16 @@ export default function PersonsView({
     setManualImageUrl("");
   };
 
+  useEffect(() => {
+    if (fullscreenImage) {
+      setFullscreenZoom(1);
+    }
+  }, [fullscreenImage]);
+
+  const zoomInFullscreen = () => setFullscreenZoom((prev) => Math.min(6, Number((prev + 0.25).toFixed(2))));
+  const zoomOutFullscreen = () => setFullscreenZoom((prev) => Math.max(1, Number((prev - 0.25).toFixed(2))));
+  const resetFullscreenZoom = () => setFullscreenZoom(1);
+
   if (!selectedPerson) {
     return (
       <div className="h-full flex flex-col gap-4">
@@ -772,26 +783,78 @@ export default function PersonsView({
       {fullscreenImage && (
         <div
           className="fixed inset-0 z-[120] bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setFullscreenImage(null)}
+          onClick={() => {
+            setFullscreenImage(null);
+            setFullscreenZoom(1);
+          }}
         >
+          <div className="absolute top-4 left-4 flex items-center gap-2 z-[121]">
+            <button
+              type="button"
+              className="px-3 py-2 rounded-md bg-black/50 text-white border border-white/20 text-sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                zoomOutFullscreen();
+              }}
+            >
+              -
+            </button>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-md bg-black/50 text-white border border-white/20 text-sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                zoomInFullscreen();
+              }}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-md bg-black/50 text-white border border-white/20 text-sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                resetFullscreenZoom();
+              }}
+            >
+              100%
+            </button>
+          </div>
           <button
             type="button"
             className="absolute top-4 right-4 p-2 rounded-md bg-black/50 text-white border border-white/20"
             onClick={(event) => {
               event.stopPropagation();
               setFullscreenImage(null);
+              setFullscreenZoom(1);
             }}
             aria-label={t("close_mdt")}
           >
             <X className="w-5 h-5" />
           </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={fullscreenImage}
-            alt={selectedPerson.name || t("tablet.player.unknown_user")}
-            className="max-w-full max-h-full object-contain"
+          <div
+            className="w-full h-full max-w-[96vw] max-h-[96vh] overflow-auto flex items-center justify-center"
+            onWheel={(event) => {
+              event.stopPropagation();
+              if (event.deltaY < 0) {
+                zoomInFullscreen();
+              } else {
+                zoomOutFullscreen();
+              }
+            }}
             onClick={(event) => event.stopPropagation()}
-          />
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={fullscreenImage}
+              alt={selectedPerson.name || t("tablet.player.unknown_user")}
+              className="max-w-none object-contain"
+              style={{
+                transform: `scale(${fullscreenZoom})`,
+                transformOrigin: "center center",
+              }}
+            />
+          </div>
         </div>
       )}
     </div>
