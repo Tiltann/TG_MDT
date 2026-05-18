@@ -11,6 +11,7 @@ Debug.warn('No framework detected — using standalone bridge. Implement stubs a
 -- ── server ────────────────────────────────────────────────
 if IsDuplicityVersion() then
     Framework.Server = {}
+    local _state = {}
 
     ---@param src number
     ---@return nil
@@ -47,6 +48,48 @@ if IsDuplicityVersion() then
     function Framework.Server.getJob(src)
         -- TODO: implement
         return nil
+    end
+
+    ---@param src number
+    ---@return table
+    function Framework.Server.getJobData(src)
+        return {
+            name = nil,
+            grade = nil,
+            onduty = _state[src] and _state[src].tg_mdt_duty or true,
+        }
+    end
+
+    ---@param src number
+    ---@param key string
+    ---@param value any
+    ---@return boolean
+    function Framework.Server.setPlayerState(src, key, value)
+        _state[src] = _state[src] or {}
+        _state[src][key] = value
+        return true
+    end
+
+    ---@param src number
+    ---@param key string
+    ---@return any
+    function Framework.Server.getPlayerState(src, key)
+        return _state[src] and _state[src][key] or nil
+    end
+
+    ---@param _src number
+    ---@param _name string
+    ---@param _grade number|string|nil
+    ---@return boolean
+    function Framework.Server.setJob(_src, _name, _grade)
+        return false
+    end
+
+    ---@param _src number
+    ---@param _onDuty boolean
+    ---@return boolean
+    function Framework.Server.setJobDuty(_src, _onDuty)
+        return false
     end
 
 -- ── client ────────────────────────────────────────────────

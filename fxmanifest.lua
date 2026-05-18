@@ -29,6 +29,7 @@ server_scripts {
     'server/sql.lua',
     'server/logs.lua',
     'server/updater.lua',
+    'server/duty.lua',
     'server/init.lua',
 }
 

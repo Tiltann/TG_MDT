@@ -103,6 +103,16 @@ type AkteSyncPayload = {
   akte?: PersonAkte | VehicleAkte;
 };
 
+type DutyState = {
+  enabled?: boolean;
+  onDuty?: boolean;
+  framework?: string;
+  jobName?: string;
+  dutyJobName?: string;
+  switchJobEnabled?: boolean;
+  offDutyJobName?: string;
+};
+
 type SearchSuggestion = {
   id: string;
   label: string;
@@ -132,6 +142,7 @@ export default function Home() {
   const [mapStyleOverride, setMapStyleOverride] = useState<MapStyle | null>(null);
   const [isMapStyleReady, setMapStyleReady] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
+  const [isDutyBusy, setDutyBusy] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -278,8 +289,9 @@ export default function Home() {
     () => createTranslator(activeLocale, activeTranslations),
     [activeLocale, activeTranslations]
   );
+  const dutyState = ((screenData?.duty as DutyState | undefined) || { onDuty: true }) as DutyState;
   const player_data =
-    screenData?.player || { name: t("tablet.player.mock_user"), badge: branding.badge };
+    screenData?.player || { name: t("tablet.player.unknown_user"), badge: "" };
   const mapData = (screenData?.map as Record<string, unknown> | undefined) || {};
   const mapMarkers = Array.isArray(mapData.markers)
     ? (mapData.markers as Array<{ x: number; y: number; label?: string }>)
@@ -304,6 +316,25 @@ export default function Home() {
   const rootStyle = {
     "--mdt-accent-primary": branding.accent || defaultMockupBranding.accent || "#ff9100",
   } as CSSProperties;
+
+  const handleToggleDuty = async () => {
+    if (isDutyBusy) return;
+    setDutyBusy(true);
+    try {
+      const result = await fetchNui<DutyState>("toggleDuty", {
+        switchJob: dutyState.switchJobEnabled === true,
+      });
+
+      if (result && typeof result === "object") {
+        setScreenData((prev) => ({
+          ...prev,
+          duty: result,
+        }));
+      }
+    } finally {
+      setDutyBusy(false);
+    }
+  };
 
   const searchSuggestions = useMemo<SearchSuggestion[]>(() => {
     const query = globalSearch.trim().toLowerCase();
@@ -394,6 +425,7 @@ export default function Home() {
               currentView={activeScreen || "dashboard"} 
               modules={current_modules}
               playerData={player_data}
+              dutyState={dutyState}
               branding={branding}
               t={t}
               onScreenChange={(screen) => setActiveScreen(screen)}
@@ -409,6 +441,9 @@ export default function Home() {
                 searchSuggestions={searchSuggestions}
                 onSearchSelect={handleSearchSelect}
                 onSearchSubmit={handleSearchSubmit}
+                dutyState={dutyState}
+                isDutyBusy={isDutyBusy}
+                onToggleDuty={handleToggleDuty}
                 onOpenSettings={() => setActiveScreen("settings")}
                 onClose={() => fetchNui("hideUI", {}).catch(() => setVisible(false))}
               />

@@ -10,11 +10,16 @@ type Branding = {
   badge?: string;
 };
 
+type DutyState = {
+  onDuty?: boolean;
+};
+
 export function Sidebar({
   currentView,
   modules,
   onScreenChange,
   playerData,
+  dutyState,
   branding,
   t,
 }: {
@@ -22,6 +27,7 @@ export function Sidebar({
   modules: Record<string, boolean>;
   onScreenChange: (screen: string) => void;
   playerData: any;
+  dutyState: DutyState;
   branding: Branding;
   t: TFunction;
 }) {
@@ -40,6 +46,7 @@ export function Sidebar({
   ];
 
   const accent = branding.accent || "#ff9100";
+  const isOnDuty = dutyState?.onDuty !== false;
 
   return (
     <aside className="w-72 bg-[var(--mdt-bg-base)] border-r border-[var(--mdt-border)] flex flex-col justify-between p-4 flex-shrink-0">
@@ -94,12 +101,16 @@ export function Sidebar({
               <p className="text-white font-medium text-sm truncate w-32">
                 {playerData?.name || t("tablet.player.unknown_user")}
               </p>
-              <p className="text-xs text-[var(--mdt-text-muted)] truncate w-32">
-                {playerData?.badge || branding.badge || t("tablet.player.duty_profile")}
-              </p>
+              {(playerData?.badge || branding.badge) && (
+                <p className="text-xs text-[var(--mdt-text-muted)] truncate w-32">
+                  {playerData?.badge || branding.badge}
+                </p>
+              )}
               <div className="flex items-center gap-1 mt-1">
-                <div className="w-2 h-2 rounded-full bg-[var(--mdt-status-success)]"></div>
-                <span className="text-[10px] text-[var(--mdt-status-success)] uppercase font-semibold tracking-wider">{t("tablet.player.on_duty")}</span>
+                <div className={`w-2 h-2 rounded-full ${isOnDuty ? "bg-[var(--mdt-status-success)]" : "bg-yellow-400"}`}></div>
+                <span className={`text-[10px] uppercase font-semibold tracking-wider ${isOnDuty ? "text-[var(--mdt-status-success)]" : "text-yellow-300"}`}>
+                  {isOnDuty ? t("tablet.player.on_duty") : t("tablet.topbar.duty_off")}
+                </span>
               </div>
             </div>
           </div>

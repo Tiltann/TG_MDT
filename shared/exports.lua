@@ -71,6 +71,48 @@ if IsDuplicityVersion() then
         TriggerEvent('tg_mdt:internal:logAdminAction', admin_id, action, details)
     end)
 
+    --- Get duty state for a player.
+    ---@param src number
+    ---@return table
+    exports('GetDutyState', function(src)
+        if type(src) ~= 'number' then
+            return { onDuty = true, reason = 'invalid_source' }
+        end
+        if not Duty or type(Duty.getState) ~= 'function' then
+            return { onDuty = true, reason = 'duty_module_unavailable' }
+        end
+        return Duty.getState(src)
+    end)
+
+    --- Set duty state for a player.
+    ---@param src number
+    ---@param onDuty boolean
+    ---@param options table|nil
+    ---@return table
+    exports('SetDutyState', function(src, onDuty, options)
+        if type(src) ~= 'number' then
+            return { onDuty = true, reason = 'invalid_source' }
+        end
+        if not Duty or type(Duty.setState) ~= 'function' then
+            return { onDuty = true, reason = 'duty_module_unavailable' }
+        end
+        return Duty.setState(src, onDuty == true, options)
+    end)
+
+    --- Toggle duty state for a player.
+    ---@param src number
+    ---@param options table|nil
+    ---@return table
+    exports('ToggleDutyState', function(src, options)
+        if type(src) ~= 'number' then
+            return { onDuty = true, reason = 'invalid_source' }
+        end
+        if not Duty or type(Duty.toggleState) ~= 'function' then
+            return { onDuty = true, reason = 'duty_module_unavailable' }
+        end
+        return Duty.toggleState(src, options)
+    end)
+
 -- ────────────────────────────────────────────────────────
 --  Client-side exports (Framework wrappers)
 -- ────────────────────────────────────────────────────────

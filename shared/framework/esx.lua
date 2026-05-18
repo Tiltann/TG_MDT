@@ -48,6 +48,87 @@ if IsDuplicityVersion() then
         return player and player.job.name or nil
     end
 
+    --- Get normalized job details.
+    ---@param src number
+    ---@return table
+    function Framework.Server.getJobData(src)
+        local player = ESX.GetPlayerFromId(src)
+        if not player or type(player.job) ~= 'table' then
+            return {}
+        end
+
+        return {
+            name = player.job.name,
+            grade = player.job.grade,
+            grade_name = player.job.grade_name,
+            onduty = player.job.onDuty ~= false,
+        }
+    end
+
+    --- Persist a custom duty flag for the player (xPlayer.set/get storage).
+    ---@param src number
+    ---@param key string
+    ---@param value any
+    ---@return boolean
+    function Framework.Server.setPlayerState(src, key, value)
+        local player = ESX.GetPlayerFromId(src)
+        if not player or type(player.set) ~= 'function' then
+            return false
+        end
+
+        local ok = pcall(function()
+            player.set(key, value)
+        end)
+
+        return ok
+    end
+
+    --- Read a custom state value from xPlayer.get.
+    ---@param src number
+    ---@param key string
+    ---@return any
+    function Framework.Server.getPlayerState(src, key)
+        local player = ESX.GetPlayerFromId(src)
+        if not player or type(player.get) ~= 'function' then
+            return nil
+        end
+
+        local ok, value = pcall(function()
+            return player.get(key)
+        end)
+
+        return ok and value or nil
+    end
+
+    --- Set job while preserving compatibility across ESX versions.
+    ---@param src number
+    ---@param name string
+    ---@param grade number|string|nil
+    ---@param onDuty boolean|nil
+    ---@return boolean
+    function Framework.Server.setJob(src, name, grade, onDuty)
+        local player = ESX.GetPlayerFromId(src)
+        if not player or type(player.setJob) ~= 'function' then
+            return false
+        end
+
+        local ok = pcall(function()
+            player.setJob(name, grade or 0)
+        end)
+
+        if onDuty ~= nil then
+            pcall(function()
+                player.setJob(name, grade or 0, onDuty)
+            end)
+
+            if type(player.job) == 'table' then
+                player.job.onDuty = onDuty
+            end
+        end
+
+        return ok
+    end
+
 -- ── client ────────────────────────────────────────────────
 else
     local ESX = nil
@@ -111,5 +192,15 @@ else
     function Framework.Client.getJob()
         local data = Framework.Client.getPlayerData()
         return data and data.job or nil
+    end
+
+    --- Get the local player's duty flag.
+    ---@return boolean
+    function Framework.Client.getDuty()
+        local job = Framework.Client.getJob()
+        if type(job) == 'table' and job.onDuty ~= nil then
+            return job.onDuty == true
+        end
+        return true
     end
 end

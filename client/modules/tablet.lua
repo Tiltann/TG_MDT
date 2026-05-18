@@ -58,10 +58,18 @@ end
 local function buildAllowedJobLookup()
     local allowed = (Config.MDT and Config.MDT.allowed_jobs) or {}
     local lookup = {}
+    local dutyCfg = (Config.MDT and Config.MDT.duty) or {}
+    local switchJobs = dutyCfg.switch_job_on_offduty == true
+    local offPrefix = type(dutyCfg.offduty_job_prefix) == 'string' and dutyCfg.offduty_job_prefix or 'off'
 
     for i = 1, #allowed do
         if type(allowed[i]) == 'string' then
-            lookup[string.lower(allowed[i])] = true
+            local dutyJob = string.lower(allowed[i])
+            lookup[dutyJob] = true
+
+            if switchJobs then
+                lookup[string.lower(('%s%s'):format(offPrefix, dutyJob))] = true
+            end
         end
     end
 
@@ -101,8 +109,11 @@ end
 
 --- Open/toggle tablet only if player has an allowed job.
 local function toggleTablet()
+    if not TG_MDT_CLIENT_INITIALIZED then
+        notifyUser('MDT is still loading, please wait a moment.', 'inform')
+        return
+    end
 
-    print("what?")
     Debug.debug(('toggleTablet: invoked | command=%s | visible=%s | activeScreen=%s'):format(
         tostring(Config.Commands and Config.Commands.open_mdt or 'mdt'),
         tostring(NUI.isVisible()),

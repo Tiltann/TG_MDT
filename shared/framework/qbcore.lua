@@ -48,6 +48,106 @@ if IsDuplicityVersion() then
         return player and player.PlayerData.job.name or nil
     end
 
+    --- Get normalized job details.
+    ---@param src number
+    ---@return table
+    function Framework.Server.getJobData(src)
+        local player = QBCore.Functions.GetPlayer(src)
+        if not player or type(player.PlayerData) ~= 'table' then
+            return {}
+        end
+
+        local job = player.PlayerData.job or {}
+        local gradeLevel = nil
+        if type(job.grade) == 'table' then
+            gradeLevel = job.grade.level
+        else
+            gradeLevel = job.grade
+        end
+
+        return {
+            name = job.name,
+            grade = gradeLevel,
+            grade_name = type(job.grade) == 'table' and job.grade.name or nil,
+            onduty = job.onduty == true,
+        }
+    end
+
+    --- Persist custom player state in metadata.
+    ---@param src number
+    ---@param key string
+    ---@param value any
+    ---@return boolean
+    function Framework.Server.setPlayerState(src, key, value)
+        local player = QBCore.Functions.GetPlayer(src)
+        if not player or not player.Functions or type(player.Functions.SetMetaData) ~= 'function' then
+            return false
+        end
+
+        local ok = pcall(function()
+            player.Functions.SetMetaData(key, value)
+        end)
+
+        return ok
+    end
+
+    --- Read custom player metadata.
+    ---@param src number
+    ---@param key string
+    ---@return any
+    function Framework.Server.getPlayerState(src, key)
+        local player = QBCore.Functions.GetPlayer(src)
+        if not player or type(player.PlayerData) ~= 'table' then
+            return nil
+        end
+
+        local metadata = player.PlayerData.metadata or {}
+        return metadata[key]
+    end
+
+    --- Set player job by name + grade.
+    ---@param src number
+    ---@param name string
+    ---@param grade number|string|nil
+    ---@return boolean
+    function Framework.Server.setJob(src, name, grade)
+        local player = QBCore.Functions.GetPlayer(src)
+        if not player or not player.Functions or type(player.Functions.SetJob) ~= 'function' then
+            return false
+        end
+
+        local ok = pcall(function()
+            player.Functions.SetJob(name, grade or 0)
+        end)
+
+        return ok
+    end
+
+    --- Set job duty state.
+    ---@param src number
+    ---@param onDuty boolean
+    ---@return boolean
+    function Framework.Server.setJobDuty(src, onDuty)
+        local player = QBCore.Functions.GetPlayer(src)
+        if not player or not player.Functions then
+            return false
+        end
+
+        local ok = false
+        if type(player.Functions.SetJobDuty) == 'function' then
+            ok = pcall(function()
+                player.Functions.SetJobDuty(onDuty == true)
+            end)
+        end
+
+        if (not ok) and type(player.PlayerData) == 'table' and type(player.PlayerData.job) == 'table' then
+            player.PlayerData.job.onduty = onDuty == true
+            ok = true
+        end
+
+        return ok
+    end
+
 -- ── client ────────────────────────────────────────────────
 else
     local QBCore = exports['qb-core']:GetCoreObject()
@@ -72,5 +172,15 @@ else
     function Framework.Client.getJob()
         local data = Framework.Client.getPlayerData()
         return data and data.job or nil
+    end
+
+    --- Get the local player's duty flag.
+    ---@return boolean
+    function Framework.Client.getDuty()
+        local job = Framework.Client.getJob()
+        if type(job) == 'table' and job.onduty ~= nil then
+            return job.onduty == true
+        end
+        return true
     end
 end

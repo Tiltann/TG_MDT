@@ -9,6 +9,8 @@ Debug.debug('Client started')
 Debug.debug(('Locale set to: %s'):format(Config.Locale))
 Debug.debug(('Framework: %s'):format(Framework.name))
 
+TG_MDT_CLIENT_INITIALIZED = false
+
 local function loadLocaleDictionary(locale)
 	local resource = GetCurrentResourceName()
 	local path = ('locales/%s.json'):format(locale or 'en')
@@ -48,6 +50,65 @@ local translations_by_locale = {
 	de = loadLocaleDictionary('de'),
 }
 
+---@return table
+local function buildPlayerUiData()
+	local fallback = {
+		name = 'Unknown User',
+		badge = '',
+	}
+
+	if not Framework or not Framework.Client or type(Framework.Client.getPlayerData) ~= 'function' then
+		return fallback
+	end
+
+	local pdata = Framework.Client.getPlayerData() or {}
+	local job = (Framework.Client.getJob and Framework.Client.getJob()) or pdata.job or {}
+
+	local first = nil
+	local last = nil
+	local name = nil
+	local badge = nil
+
+	if type(pdata.firstname) == 'string' then first = pdata.firstname end
+	if type(pdata.lastname) == 'string' then last = pdata.lastname end
+
+	if type(pdata.charinfo) == 'table' then
+		if type(pdata.charinfo.firstname) == 'string' then first = first or pdata.charinfo.firstname end
+		if type(pdata.charinfo.lastname) == 'string' then last = last or pdata.charinfo.lastname end
+	end
+
+	if type(pdata.name) == 'string' and pdata.name ~= '' then
+		name = pdata.name
+	elseif type(first) == 'string' and type(last) == 'string' then
+		name = (first .. ' ' .. last)
+	elseif type(first) == 'string' and first ~= '' then
+		name = first
+	elseif type(last) == 'string' and last ~= '' then
+		name = last
+	elseif type(GetPlayerName(PlayerId())) == 'string' then
+		name = GetPlayerName(PlayerId())
+	end
+
+	if type(pdata.badge) == 'string' then
+		badge = pdata.badge
+	elseif type(pdata.callsign) == 'string' then
+		badge = pdata.callsign
+	elseif type(pdata.citizenid) == 'string' then
+		badge = pdata.citizenid
+	elseif type(pdata.identifier) == 'string' then
+		badge = pdata.identifier
+	elseif type(job) == 'table' and type(job.label) == 'string' then
+		badge = job.label
+	elseif type(job) == 'table' and type(job.name) == 'string' then
+		badge = job.name
+	end
+
+	return {
+		name = (type(name) == 'string' and name ~= '') and name or fallback.name,
+		badge = (type(badge) == 'string') and badge or fallback.badge,
+	}
+end
+
 Debug.debug('Client init: locale dictionaries loaded', {
 	active_locale = Config.Locale,
 	default_screen = (Config.MDT and Config.MDT.default_screen) or 'tablet',
@@ -79,6 +140,31 @@ NUI.onReady(function()
 		value = (Config.MDT and Config.MDT.allowed_jobs) or {},
 	})
 	Debug.debug('Client init: sent allowedJobs payload')
+
+	NUI.send('setData', {
+		key = 'player',
+		value = buildPlayerUiData(),
+	})
+	Debug.debug('Client init: sent player payload')
+
+	local duty = {
+		onDuty = true,
+	}
+	local okDuty, resultDuty = pcall(function()
+		return lib.callback.await('TG_MDT:getDutyState', false)
+	end)
+
+	if okDuty and type(resultDuty) == 'table' then
+		duty = resultDuty
+	else
+		Debug.warn('Client init: failed to fetch duty state from server callback')
+	end
+
+	NUI.send('setData', {
+		key = 'duty',
+		value = duty,
+	})
+	Debug.debug('Client init: sent duty payload')
 
 	local persons = {}
 	local ok, result = pcall(function()
@@ -135,6 +221,9 @@ NUI.onReady(function()
 		value = bootstrap.vehicleAkten or {},
 	})
 	Debug.debug('Client init: sent Akte bootstrap payload')
+
+	TG_MDT_CLIENT_INITIALIZED = true
+	Debug.debug('Client init: initialization complete')
 end)
 
 -- ── Map tile missing — NUI → client → server ───────────────
@@ -185,10 +274,39 @@ NUI.onCallback('saveVehicleAkte', function(body, cb)
 	cb(ok and result or {})
 end)
 
+NUI.onCallback('toggleDuty', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:toggleDuty', false, payload)
+	end)
+	cb(ok and result or { onDuty = true })
+end)
+
+NUI.onCallback('setDutyState', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:setDutyState', false, payload)
+	end)
+	cb(ok and result or { onDuty = true })
+end)
+
 RegisterNetEvent('TG_MDT:akteUpdated', function(payload)
 	if type(payload) ~= 'table' then return end
 	NUI.send('setData', {
 		key = 'akteSync',
 		value = payload,
+	})
+end)
+
+RegisterNetEvent('TG_MDT:dutyStateChanged', function(payload)
+	if type(payload) ~= 'table' then return end
+	NUI.send('setData', {
+		key = 'duty',
+		value = payload,
+	})
+
+	NUI.send('setData', {
+		key = 'player',
+		value = buildPlayerUiData(),
 	})
 end)

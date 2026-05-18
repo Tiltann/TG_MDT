@@ -44,6 +44,31 @@ Config.MDT = {
 
     -- Default live map tile style. Supported values: styleAtlas, styleGrid, styleSatelite.
     default_map_style = 'styleAtlas',
+
+    -- Duty system behavior (used by tablet toggle + exports).
+    duty = {
+        enabled = true,
+
+        -- Persist key for duty state (ESX xPlayer.set/get, QB/Qbox metadata).
+        duty_key = 'tg_mdt_duty',
+
+        -- Stores the original duty job while temporarily switched to off-duty job.
+        last_job_key = 'tg_mdt_duty_last_job',
+
+        -- If true, off-duty uses offduty_job_prefix .. dutyJobName.
+        -- If false, off-duty stays on the same job and only duty state is toggled.
+        switch_job_on_offduty = false,
+
+        -- Used when switch_job_on_offduty=true.
+        -- off-duty job becomes: prefix .. dutyJobName (example: offpolice)
+        offduty_job_prefix = 'off',
+
+        -- If true, duty state is reset on disconnect.
+        -- In job-switch mode this also tries to restore the saved duty job.
+        reset_on_disconnect = false,
+
+        notify_on_toggle = true,
+    },
 }
 
 -- ── BOLO / Warrants ───────────────────────────────────────

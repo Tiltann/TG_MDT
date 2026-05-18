@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Settings, X } from "lucide-react";
+import { Power, Search, Settings, X } from "lucide-react";
 import type { TFunction } from "../lib/i18n";
 
 type Branding = {
@@ -14,6 +14,12 @@ type SearchSuggestion = {
   subtitle: string;
 };
 
+type DutyState = {
+  enabled?: boolean;
+  onDuty?: boolean;
+  switchJobEnabled?: boolean;
+};
+
 export function Topbar({
   branding,
   t,
@@ -22,6 +28,9 @@ export function Topbar({
   searchSuggestions,
   onSearchSelect,
   onSearchSubmit,
+  dutyState,
+  isDutyBusy,
+  onToggleDuty,
   onOpenSettings,
   onClose,
 }: {
@@ -32,9 +41,14 @@ export function Topbar({
   searchSuggestions: SearchSuggestion[];
   onSearchSelect: (id: string) => void;
   onSearchSubmit: () => void;
+  dutyState: DutyState;
+  isDutyBusy: boolean;
+  onToggleDuty: () => void;
   onOpenSettings: () => void;
   onClose: () => void;
 }) {
+  const isOnDuty = dutyState?.onDuty !== false;
+
   return (
     <header className="h-16 flex items-center justify-between px-6 bg-transparent">
       
@@ -74,6 +88,26 @@ export function Topbar({
 
       {/* Right Actions */}
       <div className="flex items-center gap-6">
+        <button
+          onClick={onToggleDuty}
+          disabled={isDutyBusy || dutyState?.enabled === false}
+          className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            isOnDuty
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/15"
+              : "bg-yellow-500/10 border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/15"
+          }`}
+          title={t("tablet.topbar.toggle_duty")}
+        >
+          <Power className="w-4 h-4" />
+          <span className="text-xs uppercase tracking-wider font-semibold">
+            {isDutyBusy
+              ? t("loading")
+              : isOnDuty
+                ? t("tablet.topbar.duty_on")
+                : t("tablet.topbar.duty_off")}
+          </span>
+        </button>
+
         <div className="text-right">
           <p className="text-white font-medium">10:25</p>
           <p className="text-xs text-[var(--mdt-text-muted)] uppercase tracking-wider">{branding.dateLabel || t("tablet.topbar.date_fallback")}</p>
