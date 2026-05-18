@@ -757,6 +757,7 @@ RegisterNetEvent('TG_MDT:mapTilesMissing', function()
     print(MAP_TILE_WARNING)
 end)
 
+
 -- ── Persons callback (framework-backed) ────────────────────
 lib.callback.register('TG_MDT:getPersons', function(_src)
     local persons = getPersonsFromFramework()

@@ -77,6 +77,13 @@ Config.AkteModels = Config.AkteModels or {
 
         fields = {
             {
+                key = 'personImage',
+                label_key = 'tablet.persons.akte.image',
+                type = 'text',
+                default = '',
+                editable = true,
+            },
+            {
                 key = 'phone',
                 label_key = 'tablet.persons.akte.phone',
                 type = 'text',
@@ -170,6 +177,13 @@ Config.AkteModels = Config.AkteModels or {
         },
 
         fields = {
+            {
+                key = 'vehicleImage',
+                label_key = 'tablet.vehicles.akte.image',
+                type = 'text',
+                default = '',
+                editable = true,
+            },
             {
                 key = 'color',
                 label_key = 'tablet.vehicles.akte.color',

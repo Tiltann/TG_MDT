@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { fetchNui } from "../../../lib/useNui";
@@ -44,6 +44,7 @@ type AkteSyncPayload = {
 };
 
 const FALLBACK_FIELDS: AkteField[] = [
+  { key: "personImage", label_key: "tablet.persons.akte.image", type: "text", default: "", editable: true },
   { key: "phone", label_key: "tablet.persons.akte.phone", type: "text", default: "", editable: true },
   {
     key: "warrantStatus",
@@ -104,6 +105,8 @@ const FALLBACK_DATA_FIELDS: DataField[] = [
   { key: "address", label_key: "tablet.persons.akte.address", fallback: "-" },
 ];
 
+const SELECTED_PERSON_STORAGE_KEY = "tg_mdt_selected_person";
+
 const defaultsFromFields = (fields: AkteField[]) => {
   const defaults: PersonAkte = {};
   for (const field of fields) {
@@ -117,6 +120,85 @@ function normalizeGender(value?: string | number | null): string {
   if (value === 0 || value === "0" || value === "m" || value === "M" || value === "male") return "M";
   if (value === 1 || value === "1" || value === "f" || value === "F" || value === "female") return "F";
   return String(value).toUpperCase();
+}
+
+function decodeImages(raw?: string): string[] {
+  if (!raw || raw.trim() === "") return [];
+
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [trimmed];
+}
+
+function encodeImages(items: string[]): string {
+  return JSON.stringify(items.filter((item) => item.trim().length > 0));
+}
+
+const MAX_IMAGE_DATA_URL_LENGTH = 18000;
+
+function isDataImageUrl(value: string): boolean {
+  return /^data:image\//i.test(value);
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+async function optimizeAkteImageUrl(raw: string): Promise<string> {
+  const value = raw.trim();
+  if (value === "" || !isDataImageUrl(value)) return value;
+  if (value.length <= MAX_IMAGE_DATA_URL_LENGTH) return value;
+
+  try {
+    const image = await loadImage(value);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return value;
+
+    const maxWidths = [1280, 1024, 896, 768, 640, 512];
+    const qualities = [0.85, 0.78, 0.72, 0.66, 0.58, 0.5];
+    let best = value;
+
+    for (const maxWidth of maxWidths) {
+      const scale = Math.min(1, maxWidth / Math.max(1, image.width));
+      const width = Math.max(1, Math.floor(image.width * scale));
+      const height = Math.max(1, Math.floor(image.height * scale));
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(image, 0, 0, width, height);
+
+      for (const quality of qualities) {
+        const candidate = canvas.toDataURL("image/jpeg", quality);
+        if (candidate.length < best.length) {
+          best = candidate;
+        }
+        if (candidate.length <= MAX_IMAGE_DATA_URL_LENGTH) {
+          return candidate;
+        }
+      }
+    }
+
+    return best;
+  } catch {
+    return value;
+  }
 }
 
 export default function PersonsView({
@@ -142,6 +224,18 @@ export default function PersonsView({
 
   const [selectedIdentifier, setSelectedIdentifier] = useState<string | null>(null);
   const [aktenByPerson, setAktenByPerson] = useState<Record<string, PersonAkte>>(initialAkten || {});
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [manualImageUrl, setManualImageUrl] = useState("");
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+
+  const imageFieldKey = useMemo(() => {
+    const candidates = ["personImage", "image", "imageUrl", "photo", "photoUrl", "mugshot"];
+    for (const key of candidates) {
+      if (resolvedFields.some((field) => field.key === key)) return key;
+    }
+    return "personImage";
+  }, [resolvedFields]);
 
   useEffect(() => {
     setAktenByPerson((prev) => ({ ...initialAkten, ...prev }));
@@ -201,6 +295,23 @@ export default function PersonsView({
     filteredPersons.find((person) => person.identifier === selectedIdentifier) || null;
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(SELECTED_PERSON_STORAGE_KEY);
+    if (saved && saved.trim() !== "") {
+      setSelectedIdentifier(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!selectedIdentifier) {
+      window.localStorage.removeItem(SELECTED_PERSON_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(SELECTED_PERSON_STORAGE_KEY, selectedIdentifier);
+  }, [selectedIdentifier]);
+
+  useEffect(() => {
     if (!selectedPerson) return;
     if (aktenByPerson[selectedPerson.identifier]) return;
 
@@ -225,9 +336,20 @@ export default function PersonsView({
       }
     : defaultAkte;
 
+  const personImages = decodeImages(currentAkte[imageFieldKey] ?? "");
+  const activeImage = personImages[activeImageIndex] || personImages[0] || "";
+  const activeImageIsDataUrl = activeImage.startsWith("data:");
+  const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
+
   const persistAkte = (identifier: string, nextAkte: PersonAkte) => {
     fetchNui<PersonAkte>("savePersonAkte", { identifier, akte: nextAkte })
       .then((saved) => {
+        const savedImageCount = decodeImages(saved?.[imageFieldKey] ?? "").length;
+        void fetchNui("debugUiLog", {
+          tag: "persons-save",
+          message: `identifier=${identifier} savedImages=${savedImageCount}`,
+        });
+
         if (!saved) return;
         setAktenByPerson((prev) => ({
           ...prev,
@@ -248,23 +370,176 @@ export default function PersonsView({
     if (!editable) return;
 
     const identifier = selectedPerson.identifier;
-    const nextAkte: PersonAkte = {
-      ...defaultAkte,
-      ...(aktenByPerson[identifier] || {}),
-      [field]: value,
-    };
 
-    setAktenByPerson((prev) => ({
-      ...prev,
-      [identifier]: nextAkte,
-    }));
+    setAktenByPerson((prev) => {
+      const nextAkte: PersonAkte = {
+        ...defaultAkte,
+        ...(prev[identifier] || {}),
+        [field]: value,
+      };
 
-    persistAkte(identifier, nextAkte);
+      return {
+        ...prev,
+        [identifier]: nextAkte,
+      };
+    });
+
+    // Persist only the changed field so stale defaults cannot overwrite image data.
+    persistAkte(identifier, { [field]: value });
   };
 
   const saveAkte = () => {
     if (!selectedPerson) return;
     persistAkte(selectedPerson.identifier, currentAkte);
+  };
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+    setManualImageUrl("");
+  }, [selectedIdentifier]);
+
+  useEffect(() => {
+    if (activeImageIndex < personImages.length) return;
+    setActiveImageIndex(0);
+  }, [activeImageIndex, personImages.length]);
+
+  const capturePersonImage = async () => {
+    if (!selectedPerson || captureBusy) return;
+
+    const identifier = selectedPerson.identifier;
+
+    setCaptureBusy(true);
+    try {
+      const result = await fetchNui<{ ok?: boolean; images?: string[] }>("openAktePhotoMode", {
+        kind: "person",
+        identifier,
+        screen: "persons",
+      });
+
+      const incomingCount = Array.isArray(result?.images) ? result.images.length : 0;
+      const firstPrefix =
+        incomingCount > 0 && typeof result?.images?.[0] === "string"
+          ? String(result.images[0]).slice(0, 24)
+          : "none";
+      void fetchNui("debugUiLog", {
+        tag: "persons-capture",
+        message: `ok=${String(Boolean(result?.ok))} incoming=${incomingCount} first=${firstPrefix}`,
+      });
+
+      if (!result?.ok || !Array.isArray(result.images) || result.images.length === 0) {
+        return;
+      }
+
+      const rawImages = result.images.filter((item) => typeof item === "string" && item.trim() !== "");
+      if (rawImages.length === 0) return;
+
+      const newImages = (await Promise.all(rawImages.map((item) => optimizeAkteImageUrl(item)))).filter(
+        (item) => item.trim() !== ""
+      );
+      if (newImages.length === 0) return;
+
+      const rawLongest = rawImages.reduce((max, item) => Math.max(max, item.length), 0);
+      const optimizedLongest = newImages.reduce((max, item) => Math.max(max, item.length), 0);
+      void fetchNui("debugUiLog", {
+        tag: "persons-image-opt",
+        message: `identifier=${identifier} rawMax=${rawLongest} optimizedMax=${optimizedLongest} limit=${MAX_IMAGE_DATA_URL_LENGTH}`,
+      });
+
+      const serverAkte = await fetchNui<PersonAkte>("getPersonAkte", { identifier });
+      const localAkte: PersonAkte = {
+        ...defaultAkte,
+        ...(aktenByPerson[identifier] || {}),
+      };
+      const serverImages = decodeImages(serverAkte?.[imageFieldKey] ?? "");
+      const localImages = decodeImages(localAkte[imageFieldKey] ?? "");
+      const baseImages = serverImages.length >= localImages.length ? serverImages : localImages;
+      const merged = [...baseImages, ...newImages];
+      if (merged.length === 0) return;
+
+      void fetchNui("debugUiLog", {
+        tag: "persons-merge",
+        message: `identifier=${identifier} server=${serverImages.length} local=${localImages.length} new=${newImages.length} merged=${merged.length}`,
+      });
+
+      const nextAkte: PersonAkte = {
+        ...defaultAkte,
+        ...(serverAkte || {}),
+        ...localAkte,
+        [imageFieldKey]: encodeImages(merged),
+      };
+
+      setAktenByPerson((prev) => ({
+        ...prev,
+        [identifier]: nextAkte,
+      }));
+      persistAkte(identifier, nextAkte);
+      setActiveImageIndex(Math.max(0, merged.length - 1));
+    } finally {
+      setCaptureBusy(false);
+    }
+  };
+
+  const deleteCurrentImage = () => {
+    if (!selectedPerson || personImages.length === 0) return;
+
+    const nextImages = personImages.filter((_, index) => index !== activeImageIndex);
+    updateAkteField(imageFieldKey, encodeImages(nextImages), true);
+
+    if (nextImages.length === 0) {
+      setActiveImageIndex(0);
+      return;
+    }
+
+    setActiveImageIndex(Math.max(0, Math.min(activeImageIndex, nextImages.length - 1)));
+  };
+
+  const retakeCurrentImage = async () => {
+    if (!selectedPerson || captureBusy || personImages.length === 0) return;
+
+    setCaptureBusy(true);
+    try {
+      const result = await fetchNui<{ ok?: boolean; images?: string[] }>("openAktePhotoMode", {
+        kind: "person",
+        identifier: selectedPerson.identifier,
+        screen: "persons",
+      });
+
+      if (!result?.ok || !Array.isArray(result.images) || result.images.length === 0) {
+        return;
+      }
+
+      const rawNextImage = result.images[result.images.length - 1];
+      const nextImage = rawNextImage ? await optimizeAkteImageUrl(rawNextImage) : "";
+      if (!nextImage || nextImage.trim() === "") {
+        return;
+      }
+
+      const nextImages = [...personImages];
+      nextImages[activeImageIndex] = nextImage;
+      updateAkteField(imageFieldKey, encodeImages(nextImages), true);
+    } finally {
+      setCaptureBusy(false);
+    }
+  };
+
+  const updateCurrentHttpImageUrl = (nextUrl: string) => {
+    if (!selectedPerson || personImages.length === 0) return;
+    if (nextUrl.trim() !== "" && !/^https?:\/\//i.test(nextUrl.trim())) return;
+
+    const nextImages = [...personImages];
+    nextImages[activeImageIndex] = nextUrl.trim();
+    updateAkteField(imageFieldKey, encodeImages(nextImages), true);
+  };
+
+  const addManualHttpImage = () => {
+    const nextUrl = manualImageUrl.trim();
+    if (nextUrl === "") return;
+    if (!/^https?:\/\//i.test(nextUrl)) return;
+
+    const merged = [...personImages, nextUrl];
+    updateAkteField(imageFieldKey, encodeImages(merged), true);
+    setActiveImageIndex(merged.length - 1);
+    setManualImageUrl("");
   };
 
   if (!selectedPerson) {
@@ -343,9 +618,95 @@ export default function PersonsView({
         <Card className="col-span-7 p-4 overflow-auto space-y-3">
           <h4 className="card-title">{t("tablet.persons.akte.title")}</h4>
 
+          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-xs mdt-muted">{t("tablet.persons.akte.image")}</label>
+              <Button onClick={capturePersonImage} disabled={captureBusy}>
+                {captureBusy ? t("tablet.akte.capture_image_busy") : t("tablet.akte.capture_image")}
+              </Button>
+            </div>
+
+            {personImages.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" onClick={retakeCurrentImage} disabled={captureBusy}>
+                  {t("tablet.akte.retake_image")}
+                </Button>
+                <Button variant="ghost" onClick={deleteCurrentImage} disabled={captureBusy}>
+                  {t("tablet.akte.delete_image")}
+                </Button>
+              </div>
+            )}
+
+            {activeImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={activeImage}
+                alt={selectedPerson.name || t("tablet.player.unknown_user")}
+                onClick={() => setFullscreenImage(activeImage)}
+                className="w-full h-64 md:h-72 object-cover rounded-md border border-[var(--mdt-border)] cursor-zoom-in"
+              />
+            ) : (
+              <div className="h-32 rounded-md border border-dashed border-[var(--mdt-border)] flex items-center justify-center text-xs text-[var(--mdt-text-muted)]">
+                {t("tablet.akte.image_hint")}
+              </div>
+            )}
+
+            {personImages.length > 0 && (
+              <>
+                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.photos_count", { count: personImages.length })}</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {personImages.map((image, index) => (
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        if (index === activeImageIndex) {
+                          setFullscreenImage(image);
+                          return;
+                        }
+                        setActiveImageIndex(index);
+                      }}
+                      className={`rounded-md overflow-hidden border ${index === activeImageIndex ? "border-white" : "border-[var(--mdt-border)]"}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image} alt={`${selectedPerson.name || "person"}-${index + 1}`} className="w-full h-16 object-cover" />
+                    </button>
+                  ))}
+                </div>
+
+                {activeImageIsDataUrl ? (
+                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.url_hidden")}</p>
+                ) : (
+                  <div>
+                    <label className="block text-xs mdt-muted mb-1">{t("tablet.akte.image_url")}</label>
+                    <input
+                      value={activeImageIsHttpUrl ? activeImage : ""}
+                      onChange={(event) => updateCurrentHttpImageUrl(event.target.value)}
+                      className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                      placeholder="https://..."
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            <div>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.akte.add_https_url")}</label>
+              <div className="flex items-center gap-2">
+                <input
+                  value={manualImageUrl}
+                  onChange={(event) => setManualImageUrl(event.target.value)}
+                  className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                  placeholder="https://..."
+                />
+                <Button onClick={addManualHttpImage}>{t("tablet.akte.add_url")}</Button>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             {resolvedFields
-              .filter((field) => field.type !== "textarea")
+              .filter((field) => field.type !== "textarea" && field.key !== imageFieldKey)
               .map((field) => {
                 const label = field.label_key ? t(field.label_key) : field.key;
                 const editable = field.editable !== false;
@@ -407,6 +768,32 @@ export default function PersonsView({
             })}
         </Card>
       </div>
+
+      {fullscreenImage && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 rounded-md bg-black/50 text-white border border-white/20"
+            onClick={(event) => {
+              event.stopPropagation();
+              setFullscreenImage(null);
+            }}
+            aria-label={t("close_mdt")}
+          >
+            <X className="w-5 h-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fullscreenImage}
+            alt={selectedPerson.name || t("tablet.player.unknown_user")}
+            className="max-w-full max-h-full object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

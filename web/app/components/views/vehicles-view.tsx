@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { fetchNui } from "../../../lib/useNui";
@@ -41,6 +41,7 @@ type AkteSyncPayload = {
 };
 
 const FALLBACK_FIELDS: AkteField[] = [
+  { key: "vehicleImage", label_key: "tablet.vehicles.akte.image", type: "text", default: "", editable: true },
   { key: "color", label_key: "tablet.vehicles.akte.color", type: "text", default: "", editable: true },
   {
     key: "registrationStatus",
@@ -87,6 +88,8 @@ const FALLBACK_DATA_FIELDS: DataField[] = [
   { key: "state", label_key: "tablet.vehicles.field.state", fallback: "-" },
 ];
 
+const SELECTED_VEHICLE_STORAGE_KEY = "tg_mdt_selected_vehicle";
+
 const defaultsFromFields = (fields: AkteField[]) => {
   const defaults: VehicleAkte = {};
   for (const field of fields) {
@@ -94,6 +97,28 @@ const defaultsFromFields = (fields: AkteField[]) => {
   }
   return defaults;
 };
+
+function decodeImages(raw?: string): string[] {
+  if (!raw || raw.trim() === "") return [];
+
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [trimmed];
+}
+
+function encodeImages(items: string[]): string {
+  return JSON.stringify(items.filter((item) => item.trim().length > 0));
+}
 
 export default function VehiclesView({
   t,
@@ -118,6 +143,18 @@ export default function VehiclesView({
 
   const [selectedPlate, setSelectedPlate] = useState<string | null>(null);
   const [aktenByVehicle, setAktenByVehicle] = useState<Record<string, VehicleAkte>>(initialAkten || {});
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [manualImageUrl, setManualImageUrl] = useState("");
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+
+  const imageFieldKey = useMemo(() => {
+    const candidates = ["vehicleImage", "image", "imageUrl", "photo", "photoUrl"];
+    for (const key of candidates) {
+      if (resolvedFields.some((field) => field.key === key)) return key;
+    }
+    return "vehicleImage";
+  }, [resolvedFields]);
 
   useEffect(() => {
     setAktenByVehicle((prev) => ({ ...initialAkten, ...prev }));
@@ -170,6 +207,23 @@ export default function VehiclesView({
   const selectedVehicle = filteredVehicles.find((vehicle) => vehicle.plate === selectedPlate) || null;
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(SELECTED_VEHICLE_STORAGE_KEY);
+    if (saved && saved.trim() !== "") {
+      setSelectedPlate(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!selectedPlate) {
+      window.localStorage.removeItem(SELECTED_VEHICLE_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(SELECTED_VEHICLE_STORAGE_KEY, selectedPlate);
+  }, [selectedPlate]);
+
+  useEffect(() => {
     if (!selectedVehicle) return;
     if (aktenByVehicle[selectedVehicle.plate]) return;
 
@@ -194,9 +248,20 @@ export default function VehiclesView({
       }
     : defaultAkte;
 
+  const vehicleImages = decodeImages(currentAkte[imageFieldKey] ?? "");
+  const activeImage = vehicleImages[activeImageIndex] || vehicleImages[0] || "";
+  const activeImageIsDataUrl = activeImage.startsWith("data:");
+  const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
+
   const persistAkte = (plate: string, nextAkte: VehicleAkte) => {
     fetchNui<VehicleAkte>("saveVehicleAkte", { plate, akte: nextAkte })
       .then((saved) => {
+        const savedImageCount = decodeImages(saved?.[imageFieldKey] ?? "").length;
+        void fetchNui("debugUiLog", {
+          tag: "vehicles-save",
+          message: `plate=${plate} savedImages=${savedImageCount}`,
+        });
+
         if (!saved) return;
         setAktenByVehicle((prev) => ({
           ...prev,
@@ -234,6 +299,142 @@ export default function VehiclesView({
   const saveAkte = () => {
     if (!selectedVehicle) return;
     persistAkte(selectedVehicle.plate, currentAkte);
+  };
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+    setManualImageUrl("");
+  }, [selectedPlate]);
+
+  useEffect(() => {
+    if (activeImageIndex < vehicleImages.length) return;
+    setActiveImageIndex(0);
+  }, [activeImageIndex, vehicleImages.length]);
+
+  const captureVehicleImage = async () => {
+    if (!selectedVehicle || captureBusy) return;
+
+    const plate = selectedVehicle.plate;
+
+    setCaptureBusy(true);
+    try {
+      const result = await fetchNui<{ ok?: boolean; images?: string[] }>("openAktePhotoMode", {
+        kind: "vehicle",
+        plate,
+        screen: "vehicles",
+      });
+
+      const incomingCount = Array.isArray(result?.images) ? result.images.length : 0;
+      const firstPrefix =
+        incomingCount > 0 && typeof result?.images?.[0] === "string"
+          ? String(result.images[0]).slice(0, 24)
+          : "none";
+      void fetchNui("debugUiLog", {
+        tag: "vehicles-capture",
+        message: `ok=${String(Boolean(result?.ok))} incoming=${incomingCount} first=${firstPrefix}`,
+      });
+
+      if (!result?.ok || !Array.isArray(result.images) || result.images.length === 0) {
+        return;
+      }
+
+      const newImages = result.images.filter((item) => typeof item === "string" && item.trim() !== "");
+      if (newImages.length === 0) return;
+
+      const serverAkte = await fetchNui<VehicleAkte>("getVehicleAkte", { plate });
+      const localAkte: VehicleAkte = {
+        ...defaultAkte,
+        ...(aktenByVehicle[plate] || {}),
+      };
+      const serverImages = decodeImages(serverAkte?.[imageFieldKey] ?? "");
+      const localImages = decodeImages(localAkte[imageFieldKey] ?? "");
+      const baseImages = serverImages.length >= localImages.length ? serverImages : localImages;
+      const merged = [...baseImages, ...newImages];
+      if (merged.length === 0) return;
+
+      void fetchNui("debugUiLog", {
+        tag: "vehicles-merge",
+        message: `plate=${plate} server=${serverImages.length} local=${localImages.length} new=${newImages.length} merged=${merged.length}`,
+      });
+
+      const nextAkte: VehicleAkte = {
+        ...defaultAkte,
+        ...(serverAkte || {}),
+        ...localAkte,
+        [imageFieldKey]: encodeImages(merged),
+      };
+
+      setAktenByVehicle((prev) => ({
+        ...prev,
+        [plate]: nextAkte,
+      }));
+      persistAkte(plate, nextAkte);
+      setActiveImageIndex(Math.max(0, merged.length - 1));
+    } finally {
+      setCaptureBusy(false);
+    }
+  };
+
+  const deleteCurrentImage = () => {
+    if (!selectedVehicle || vehicleImages.length === 0) return;
+
+    const nextImages = vehicleImages.filter((_, index) => index !== activeImageIndex);
+    updateAkteField(imageFieldKey, encodeImages(nextImages), true);
+
+    if (nextImages.length === 0) {
+      setActiveImageIndex(0);
+      return;
+    }
+
+    setActiveImageIndex(Math.max(0, Math.min(activeImageIndex, nextImages.length - 1)));
+  };
+
+  const retakeCurrentImage = async () => {
+    if (!selectedVehicle || captureBusy || vehicleImages.length === 0) return;
+
+    setCaptureBusy(true);
+    try {
+      const result = await fetchNui<{ ok?: boolean; images?: string[] }>("openAktePhotoMode", {
+        kind: "vehicle",
+        plate: selectedVehicle.plate,
+        screen: "vehicles",
+      });
+
+      if (!result?.ok || !Array.isArray(result.images) || result.images.length === 0) {
+        return;
+      }
+
+      const nextImage = result.images[result.images.length - 1];
+      if (!nextImage || nextImage.trim() === "") {
+        return;
+      }
+
+      const nextImages = [...vehicleImages];
+      nextImages[activeImageIndex] = nextImage;
+      updateAkteField(imageFieldKey, encodeImages(nextImages), true);
+    } finally {
+      setCaptureBusy(false);
+    }
+  };
+
+  const updateCurrentHttpImageUrl = (nextUrl: string) => {
+    if (!selectedVehicle || vehicleImages.length === 0) return;
+    if (nextUrl.trim() !== "" && !/^https?:\/\//i.test(nextUrl.trim())) return;
+
+    const nextImages = [...vehicleImages];
+    nextImages[activeImageIndex] = nextUrl.trim();
+    updateAkteField(imageFieldKey, encodeImages(nextImages), true);
+  };
+
+  const addManualHttpImage = () => {
+    const nextUrl = manualImageUrl.trim();
+    if (nextUrl === "") return;
+    if (!/^https?:\/\//i.test(nextUrl)) return;
+
+    const merged = [...vehicleImages, nextUrl];
+    updateAkteField(imageFieldKey, encodeImages(merged), true);
+    setActiveImageIndex(merged.length - 1);
+    setManualImageUrl("");
   };
 
   if (!selectedVehicle) {
@@ -310,9 +511,95 @@ export default function VehiclesView({
         <Card className="col-span-7 p-4 overflow-auto space-y-3">
           <h4 className="card-title">{t("tablet.vehicles.akte.title")}</h4>
 
+          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-xs mdt-muted">{t("tablet.vehicles.akte.image")}</label>
+              <Button onClick={captureVehicleImage} disabled={captureBusy}>
+                {captureBusy ? t("tablet.akte.capture_image_busy") : t("tablet.akte.capture_image")}
+              </Button>
+            </div>
+
+            {vehicleImages.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" onClick={retakeCurrentImage} disabled={captureBusy}>
+                  {t("tablet.akte.retake_image")}
+                </Button>
+                <Button variant="ghost" onClick={deleteCurrentImage} disabled={captureBusy}>
+                  {t("tablet.akte.delete_image")}
+                </Button>
+              </div>
+            )}
+
+            {activeImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={activeImage}
+                alt={selectedVehicle.plate}
+                onClick={() => setFullscreenImage(activeImage)}
+                className="w-full h-44 object-cover rounded-md border border-[var(--mdt-border)] cursor-zoom-in"
+              />
+            ) : (
+              <div className="h-32 rounded-md border border-dashed border-[var(--mdt-border)] flex items-center justify-center text-xs text-[var(--mdt-text-muted)]">
+                {t("tablet.akte.image_hint")}
+              </div>
+            )}
+
+            {vehicleImages.length > 0 && (
+              <>
+                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.photos_count", { count: vehicleImages.length })}</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {vehicleImages.map((image, index) => (
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        if (index === activeImageIndex) {
+                          setFullscreenImage(image);
+                          return;
+                        }
+                        setActiveImageIndex(index);
+                      }}
+                      className={`rounded-md overflow-hidden border ${index === activeImageIndex ? "border-white" : "border-[var(--mdt-border)]"}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image} alt={`${selectedVehicle.plate}-${index + 1}`} className="w-full h-16 object-cover" />
+                    </button>
+                  ))}
+                </div>
+
+                {activeImageIsDataUrl ? (
+                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.url_hidden")}</p>
+                ) : (
+                  <div>
+                    <label className="block text-xs mdt-muted mb-1">{t("tablet.akte.image_url")}</label>
+                    <input
+                      value={activeImageIsHttpUrl ? activeImage : ""}
+                      onChange={(event) => updateCurrentHttpImageUrl(event.target.value)}
+                      className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                      placeholder="https://..."
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            <div>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.akte.add_https_url")}</label>
+              <div className="flex items-center gap-2">
+                <input
+                  value={manualImageUrl}
+                  onChange={(event) => setManualImageUrl(event.target.value)}
+                  className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                  placeholder="https://..."
+                />
+                <Button onClick={addManualHttpImage}>{t("tablet.akte.add_url")}</Button>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             {resolvedFields
-              .filter((field) => field.type !== "textarea")
+              .filter((field) => field.type !== "textarea" && field.key !== imageFieldKey)
               .map((field) => {
                 const label = field.label_key ? t(field.label_key) : field.key;
                 const editable = field.editable !== false;
@@ -374,6 +661,32 @@ export default function VehiclesView({
             })}
         </Card>
       </div>
+
+      {fullscreenImage && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 rounded-md bg-black/50 text-white border border-white/20"
+            onClick={(event) => {
+              event.stopPropagation();
+              setFullscreenImage(null);
+            }}
+            aria-label={t("close_mdt")}
+          >
+            <X className="w-5 h-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fullscreenImage}
+            alt={selectedVehicle.plate}
+            className="max-w-full max-h-full object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -39,6 +39,13 @@ Config.MDT = {
     -- How long (ms) the MDT open/close animation takes.
     animation_duration = 300,
 
+    -- Akte photo capture settings.
+    photo = {
+        -- JPEG quality used by screenshot-basic (range 0.1 - 1.0).
+        -- 1.0 = best quality / biggest payload.
+        screenshot_quality = 1,
+    },
+
     -- Allow users to switch the live map tile style from the settings page.
     allow_map_style_change = true,
 

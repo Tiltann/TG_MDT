@@ -50,6 +50,16 @@ local translations_by_locale = {
 	de = loadLocaleDictionary('de'),
 }
 
+---@param key string
+---@param fallback string
+---@return string
+local function t(key, fallback)
+	if type(locale_dictionary) == 'table' and type(locale_dictionary[key]) == 'string' and locale_dictionary[key] ~= '' then
+		return locale_dictionary[key]
+	end
+	return fallback
+end
+
 ---@return table
 local function buildPlayerUiData()
 	local fallback = {
@@ -251,9 +261,17 @@ end)
 NUI.onCallback('savePersonAkte', function(body, cb)
 	local identifier = body and body.identifier or nil
 	local akte = body and body.akte or {}
+	local imageLen = 0
+	if type(akte) == 'table' and type(akte.personImage) == 'string' then
+		imageLen = #akte.personImage
+	end
 	local ok, result = pcall(function()
 		return lib.callback.await('TG_MDT:savePersonAkte', false, identifier, akte)
 	end)
+	if not ok then
+		Debug.warn(('savePersonAkte failed identifier=%s imageLen=%s err=%s')
+			:format(tostring(identifier), tostring(imageLen), tostring(result)))
+	end
 	cb(ok and result or {})
 end)
 
@@ -288,6 +306,197 @@ NUI.onCallback('setDutyState', function(body, cb)
 		return lib.callback.await('TG_MDT:setDutyState', false, payload)
 	end)
 	cb(ok and result or { onDuty = true })
+end)
+
+NUI.onCallback('debugUiLog', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local tag = type(payload.tag) == 'string' and payload.tag or 'ui'
+	local message = type(payload.message) == 'string' and payload.message or ''
+	Debug.debug(('[ui:%s] %s'):format(tag, message))
+	cb({ ok = true })
+end)
+
+NUI.onCallback('openAktePhotoMode', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local _targetType = type(payload.kind) == 'string' and payload.kind or 'person'
+	local rawQuality = (((Config or {}).MDT or {}).photo or {}).screenshot_quality
+	local captureQuality = tonumber(rawQuality) or 0.65
+	if captureQuality < 0.1 then captureQuality = 0.1 end
+	if captureQuality > 1.0 then captureQuality = 1.0 end
+
+	if GetResourceState('screenshot-basic') ~= 'started' then
+		cb({ ok = false, error = 'screenshot_basic_not_started', images = {} })
+		return
+	end
+
+	local wasVisible = NUI and NUI.isVisible and NUI.isVisible() or false
+	local activeScreen = NUI and NUI.getActiveScreen and NUI.getActiveScreen() or 'tablet'
+	local requestedScreen = type(payload.screen) == 'string' and payload.screen or nil
+	local reopenScreen = requestedScreen or activeScreen
+	if reopenScreen == 'tablet' and _targetType == 'person' then
+		reopenScreen = 'persons'
+	elseif reopenScreen == 'tablet' and _targetType == 'vehicle' then
+		reopenScreen = 'vehicles'
+	end
+	local previousViewMode = GetFollowPedCamViewMode()
+	local ped = PlayerPedId()
+
+	local images = {}
+	local running = true
+	local inputUnlockAt = GetGameTimer() + 300
+	local function normalizeShotData(raw)
+		if type(raw) == 'string' then
+			local trimmed = raw:gsub('^%s+', ''):gsub('%s+$', '')
+			if trimmed == '' then return nil end
+
+			if trimmed:sub(1, 5) == 'data:' then
+				return trimmed
+			end
+
+			if trimmed:sub(1, 1) == '{' then
+				local okJson, decoded = pcall(json.decode, trimmed)
+				if okJson and type(decoded) == 'table' and type(decoded.data) == 'string' then
+					local nested = decoded.data:gsub('^%s+', ''):gsub('%s+$', '')
+					if nested ~= '' then
+						if nested:sub(1, 5) == 'data:' then
+							return nested
+						end
+						return ('data:image/jpeg;base64,%s'):format(nested)
+					end
+				end
+			end
+
+			return ('data:image/jpeg;base64,%s'):format(trimmed)
+		end
+
+		if type(raw) == 'table' and type(raw.data) == 'string' then
+			local nested = raw.data:gsub('^%s+', ''):gsub('%s+$', '')
+			if nested == '' then return nil end
+			if nested:sub(1, 5) == 'data:' then
+				return nested
+			end
+			return ('data:image/jpeg;base64,%s'):format(nested)
+		end
+
+		return nil
+	end
+	local function justPressed(control)
+		for group = 0, 2 do
+			if IsControlJustPressed(group, control) or IsDisabledControlJustPressed(group, control) then
+				return true
+			end
+		end
+		return false
+	end
+
+	local function isDown(control)
+		for group = 0, 2 do
+			if IsControlPressed(group, control) or IsDisabledControlPressed(group, control) then
+				return true
+			end
+		end
+		return false
+	end
+
+	local enterHeld = false
+
+	if wasVisible then
+		SetNuiFocus(false, false)
+		NUI.send('setVisible', {
+			visible = false,
+			screen = reopenScreen,
+		})
+	end
+
+	SetFollowPedCamViewMode(4)
+
+	local helpText = t(
+		'tablet.camera.capture_help',
+		'Press ENTER to take photo. ESC/BACKSPACE/DELETE to cancel.'
+	)
+
+	while running do
+		Wait(0)
+
+		if not DoesEntityExist(ped) then
+			break
+		end
+
+		-- Keep player in first-person while still allowing normal movement/look.
+		SetFollowPedCamViewMode(4)
+
+		BeginTextCommandDisplayHelp('STRING')
+		AddTextComponentSubstringPlayerName(helpText)
+		EndTextCommandDisplayHelp(0, false, false, -1)
+
+		if GetGameTimer() < inputUnlockAt then
+			goto continue
+		end
+
+		local enterDown =
+			isDown(18) or -- INPUT_ENTER
+			isDown(176) or -- INPUT_CELLPHONE_SELECT
+			isDown(191) or -- INPUT_FRONTEND_RRIGHT (Enter)
+			isDown(201) -- INPUT_FRONTEND_ACCEPT
+
+		local pressedEnter = (not enterHeld and enterDown)
+			or justPressed(18)
+			or justPressed(176)
+			or justPressed(191)
+			or justPressed(201)
+
+		enterHeld = enterDown
+
+		if pressedEnter then
+			Debug.debug(('[photo] Enter detected, requesting screenshot (quality=%s)...'):format(captureQuality))
+			local shotData = nil
+			local captureDone = false
+
+			exports['screenshot-basic']:requestScreenshot({
+				encoding = 'jpg',
+				quality = captureQuality,
+			}, function(data)
+				shotData = data
+				captureDone = true
+				local dataType = type(data)
+				local dataLen = dataType == 'string' and #data or -1
+				Debug.debug(('[photo] screenshot callback type=%s len=%s'):format(dataType, dataLen))
+			end)
+
+			local timeoutAt = GetGameTimer() + 5000
+			while not captureDone and GetGameTimer() < timeoutAt do
+				Wait(0)
+			end
+
+			local normalized = normalizeShotData(shotData)
+			if type(normalized) == 'string' and normalized ~= '' then
+				images[#images + 1] = normalized
+				Debug.debug(('[photo] normalized screenshot accepted len=%s'):format(#normalized))
+			else
+				Debug.debug('[photo] screenshot was empty/invalid after normalization')
+			end
+
+			running = false
+		elseif justPressed(200) or justPressed(177) or justPressed(178) then
+			running = false
+		end
+
+		::continue::
+	end
+
+	SetFollowPedCamViewMode(previousViewMode)
+
+	if wasVisible then
+		SetNuiFocus(true, true)
+		NUI.send('setScreen', { screen = reopenScreen })
+		NUI.send('setVisible', {
+			visible = true,
+			screen = reopenScreen,
+		})
+	end
+
+	Debug.debug(('[photo] returning images count=%s'):format(#images))
+	cb({ ok = true, images = images })
 end)
 
 RegisterNetEvent('TG_MDT:akteUpdated', function(payload)
