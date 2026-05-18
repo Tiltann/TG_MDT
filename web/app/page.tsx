@@ -36,7 +36,6 @@ type NuiBrandingPayload = {
   name?: string;
   subtitle?: string;
   accent?: string;
-  badge?: string;
   greeting?: string;
   dateLabel?: string;
 };
@@ -291,7 +290,7 @@ export default function Home() {
   );
   const dutyState = ((screenData?.duty as DutyState | undefined) || { onDuty: true }) as DutyState;
   const player_data =
-    screenData?.player || { name: t("tablet.player.unknown_user"), badge: "" };
+    screenData?.player || { name: t("tablet.player.unknown_user"), gradeDisplay: "" };
   const actorName =
     typeof (player_data as { name?: unknown })?.name === "string" &&
     ((player_data as { name?: string }).name || "").trim() !== ""

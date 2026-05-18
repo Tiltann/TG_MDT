@@ -7,7 +7,6 @@ type Branding = {
   name?: string;
   subtitle?: string;
   accent?: string;
-  badge?: string;
 };
 
 type DutyState = {
@@ -101,9 +100,9 @@ export function Sidebar({
               <p className="text-white font-medium text-sm truncate w-32">
                 {playerData?.name || t("tablet.player.unknown_user")}
               </p>
-              {(playerData?.badge || branding.badge) && (
+              {playerData?.gradeDisplay && (
                 <p className="text-xs text-[var(--mdt-text-muted)] truncate w-32">
-                  {playerData?.badge || branding.badge}
+                  {playerData?.gradeDisplay}
                 </p>
               )}
               <div className="flex items-center gap-1 mt-1">

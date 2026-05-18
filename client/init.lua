@@ -64,7 +64,7 @@ end
 local function buildPlayerUiData()
 	local fallback = {
 		name = 'Unknown User',
-		badge = '',
+		gradeDisplay = '',
 	}
 
 	if not Framework or not Framework.Client or type(Framework.Client.getPlayerData) ~= 'function' then
@@ -77,7 +77,8 @@ local function buildPlayerUiData()
 	local first = nil
 	local last = nil
 	local name = nil
-	local badge = nil
+	local gradeName = nil
+	local gradeNumber = nil
 
 	if type(pdata.firstname) == 'string' then first = pdata.firstname end
 	if type(pdata.lastname) == 'string' then last = pdata.lastname end
@@ -99,23 +100,46 @@ local function buildPlayerUiData()
 		name = GetPlayerName(PlayerId())
 	end
 
-	if type(pdata.badge) == 'string' then
-		badge = pdata.badge
-	elseif type(pdata.callsign) == 'string' then
-		badge = pdata.callsign
-	elseif type(pdata.citizenid) == 'string' then
-		badge = pdata.citizenid
-	elseif type(pdata.identifier) == 'string' then
-		badge = pdata.identifier
-	elseif type(job) == 'table' and type(job.label) == 'string' then
-		badge = job.label
-	elseif type(job) == 'table' and type(job.name) == 'string' then
-		badge = job.name
+	if type(job) == 'table' then
+		if type(job.grade) == 'table' then
+			if type(job.grade.label) == 'string' and job.grade.label ~= '' then
+				gradeName = job.grade.label
+			elseif type(job.grade.name) == 'string' and job.grade.name ~= '' then
+				gradeName = job.grade.name
+			end
+
+			if type(job.grade.level) == 'number' or type(job.grade.level) == 'string' then
+				gradeNumber = tostring(job.grade.level)
+			elseif type(job.grade.grade) == 'number' or type(job.grade.grade) == 'string' then
+				gradeNumber = tostring(job.grade.grade)
+			elseif type(job.grade.value) == 'number' or type(job.grade.value) == 'string' then
+				gradeNumber = tostring(job.grade.value)
+			end
+		else
+			if type(job.grade_label) == 'string' and job.grade_label ~= '' then
+				gradeName = job.grade_label
+			elseif type(job.grade_name) == 'string' and job.grade_name ~= '' then
+				gradeName = job.grade_name
+			end
+
+			if type(job.grade) == 'number' or type(job.grade) == 'string' then
+				gradeNumber = tostring(job.grade)
+			end
+		end
+	end
+
+	local gradeDisplay = ''
+	if type(gradeName) == 'string' and gradeName ~= '' and type(gradeNumber) == 'string' and gradeNumber ~= '' then
+		gradeDisplay = ('%s %s'):format(gradeName, gradeNumber)
+	elseif type(gradeName) == 'string' and gradeName ~= '' then
+		gradeDisplay = gradeName
+	elseif type(gradeNumber) == 'string' and gradeNumber ~= '' then
+		gradeDisplay = gradeNumber
 	end
 
 	return {
 		name = (type(name) == 'string' and name ~= '') and name or fallback.name,
-		badge = (type(badge) == 'string') and badge or fallback.badge,
+		gradeDisplay = gradeDisplay ~= '' and gradeDisplay or fallback.gradeDisplay,
 	}
 end
 
