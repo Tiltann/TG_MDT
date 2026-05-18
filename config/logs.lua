@@ -7,38 +7,49 @@
 Config = Config or {}
 
 -- ── Logging System ────────────────────────────────────────
+-- Configure which logs to send and where.
+-- 
+-- fivemanage_token: Your Fivemanage API token (get from fivemanage.com)
+-- discord_webhook:  Single Discord webhook URL for all logs
+--
+-- For each log type:
+--   enabled     = true/false  → Enable/disable this log type completely
+--   fivemanage  = true/false  → Send to Fivemanage (requires token)
+--   discord     = true/false  → Send to Discord (requires webhook)
 
 Config.Logs = {
-    -- Enable or disable Fivemanage logging
-    -- true  = send logs to Fivemanage
-    -- false = disable Fivemanage logging
-    use_fivemanage = false,
-
-    -- Enable or disable Discord webhook logging
-    -- true  = send logs to Discord webhooks
-    -- false = disable Discord webhook logging
-    use_discord = false,
-
-    -- Fivemanage API token (get from fivemanage.com)
-    -- Only used server-side, never exposed to client
     fivemanage_token = '',
+    discord_webhook = '',
 
-    -- Discord webhook URLs per log type
-    -- Only used server-side, never exposed to client
-    discord_webhooks = {
-        -- General MDT actions
-        mdt_actions = '',
+    types = {
+        mdt_actions = {
+            enabled = true,
+            fivemanage = false,
+            discord = false,
+        },
 
-        -- Player-related logs
-        player_actions = '',
+        player_actions = {
+            enabled = true,
+            fivemanage = false,
+            discord = false,
+        },
 
-        -- Vehicle-related logs
-        vehicle_actions = '',
+        vehicle_actions = {
+            enabled = true,
+            fivemanage = false,
+            discord = false,
+        },
 
-        -- Evidence and report logs
-        evidence = '',
+        evidence = {
+            enabled = true,
+            fivemanage = false,
+            discord = false,
+        },
 
-        -- Administrative actions
-        admin_actions = '',
+        admin_actions = {
+            enabled = true,
+            fivemanage = false,
+            discord = true,
+        },
     },
 }

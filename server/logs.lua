@@ -15,10 +15,12 @@ local EVENT_LOG_ADMIN_ACTION   = 'tg_mdt:internal:logAdminAction'
 -- ── Fivemanage Logging ────────────────────────────────────
 
 --- Sends a log to Fivemanage.
----@param log_type string The type of log (e.g., 'mdt_action', 'player_action').
+---@param log_type string The type of log (e.g., 'mdt_actions', 'player_actions').
 ---@param data table The log data to send.
 local function sendToFivemanage(log_type, data)
-    if not Config.Logs.use_fivemanage then return end
+    local log_config = Config.Logs.types[log_type]
+    if not log_config or not log_config.enabled or not log_config.fivemanage then return end
+    
     if not Config.Logs.fivemanage_token or Config.Logs.fivemanage_token == '' then
         Debug.warn(('Logging: %s - %s'):format('Fivemanage', 'No token configured'))
         return
@@ -29,12 +31,14 @@ end
 -- ── Discord Webhook Logging ───────────────────────────────
 
 --- Sends a log to Discord webhook.
----@param webhook_type string The webhook type from config (e.g., 'mdt_actions').
+---@param log_type string The log type from config (e.g., 'mdt_actions').
 ---@param embed table The Discord embed data.
-local function sendToDiscord(webhook_type, embed)
-    if not Config.Logs.use_discord then return end
-    if not Config.Logs.discord_webhooks[webhook_type] or Config.Logs.discord_webhooks[webhook_type] == '' then
-        Debug.warn(('Logging: %s - %s'):format('Discord', ('Webhook %s not configured'):format(webhook_type)))
+local function sendToDiscord(log_type, embed)
+    local log_config = Config.Logs.types[log_type]
+    if not log_config or not log_config.enabled or not log_config.discord then return end
+    
+    if not Config.Logs.discord_webhook or Config.Logs.discord_webhook == '' then
+        Debug.warn(('Logging: %s - %s'):format('Discord', 'No webhook configured'))
         return
     end
 
@@ -47,8 +51,11 @@ end
 ---@param action string The action performed.
 ---@param details table Additional details about the action.
 local function logMDTAction(player_id, action, details)
-    if not Config.Logs.use_fivemanage and not Config.Logs.use_discord then return end
+    local log_config = Config.Logs.types.mdt_actions
+    if not log_config or not log_config.enabled then return end
 
+    sendToFivemanage('mdt_actions', { player_id = player_id, action = action, details = details })
+    sendToDiscord('mdt_actions', { player_id = player_id, action = action, details = details })
 end
 
 --- Logs a player-related action.
@@ -57,8 +64,11 @@ end
 ---@param action string The action performed.
 ---@param details table Additional details about the action.
 local function logPlayerAction(officer_id, target_id, action, details)
-    if not Config.Logs.use_fivemanage and not Config.Logs.use_discord then return end
+    local log_config = Config.Logs.types.player_actions
+    if not log_config or not log_config.enabled then return end
 
+    sendToFivemanage('player_actions', { officer_id = officer_id, target_id = target_id, action = action, details = details })
+    sendToDiscord('player_actions', { officer_id = officer_id, target_id = target_id, action = action, details = details })
 end
 
 --- Logs a vehicle-related action.
@@ -67,8 +77,11 @@ end
 ---@param vehicle_data table Vehicle information.
 ---@param details table Additional details about the action.
 local function logVehicleAction(player_id, action, vehicle_data, details)
-    if not Config.Logs.use_fivemanage and not Config.Logs.use_discord then return end
+    local log_config = Config.Logs.types.vehicle_actions
+    if not log_config or not log_config.enabled then return end
 
+    sendToFivemanage('vehicle_actions', { player_id = player_id, action = action, vehicle_data = vehicle_data, details = details })
+    sendToDiscord('vehicle_actions', { player_id = player_id, action = action, vehicle_data = vehicle_data, details = details })
 end
 
 --- Logs an evidence-related action.
@@ -76,8 +89,11 @@ end
 ---@param action string The action performed.
 ---@param evidence_data table Evidence information.
 local function logEvidence(player_id, action, evidence_data)
-    if not Config.Logs.use_fivemanage and not Config.Logs.use_discord then return end
+    local log_config = Config.Logs.types.evidence
+    if not log_config or not log_config.enabled then return end
 
+    sendToFivemanage('evidence', { player_id = player_id, action = action, evidence_data = evidence_data })
+    sendToDiscord('evidence', { player_id = player_id, action = action, evidence_data = evidence_data })
 end
 
 --- Logs an administrative action.
@@ -85,8 +101,11 @@ end
 ---@param action string The action performed.
 ---@param details table Additional details about the action.
 local function logAdminAction(admin_id, action, details)
-    if not Config.Logs.use_fivemanage and not Config.Logs.use_discord then return end
+    local log_config = Config.Logs.types.admin_actions
+    if not log_config or not log_config.enabled then return end
 
+    sendToFivemanage('admin_actions', { admin_id = admin_id, action = action, details = details })
+    sendToDiscord('admin_actions', { admin_id = admin_id, action = action, details = details })
 end
 
 -- ── Event Handlers ────────────────────────────────────────
