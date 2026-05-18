@@ -663,67 +663,6 @@ export default function PersonsView({
             <h3 className="text-xl card-title">{t("tablet.sidebar.persons")}</h3>
             <p className="card-sub mt-1">{t("tablet.persons.subtitle")}</p>
           </div>
-
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <label className="block text-xs mdt-muted">{t("tablet.persons.akte.notes")}</label>
-              {expiredNotesCount > 0 && (
-                <span className="text-xs text-[var(--mdt-text-muted)]">
-                  {t("tablet.notes.expired_hidden", { count: expiredNotesCount })}
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-2 max-h-44 overflow-auto">
-              {activeNotes.length === 0 ? (
-                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
-              ) : (
-                activeNotes.map((note) => (
-                  <div key={note.id} className="rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-2">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-xs text-[var(--mdt-text-muted)]">
-                        {note.author} - {new Date(note.createdAt).toLocaleString()}
-                        {note.expiresAt
-                          ? ` - ${t("tablet.notes.expires_at")} ${new Date(note.expiresAt).toLocaleString()}`
-                          : ""}
-                      </p>
-                      <button
-                        type="button"
-                        className="text-xs text-red-300 hover:text-red-200"
-                        onClick={() => removeNote(note.id)}
-                      >
-                        {t("tablet.notes.remove")}
-                      </button>
-                    </div>
-                    <p className="text-sm text-white whitespace-pre-wrap break-words">{note.text}</p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <textarea
-                value={newNoteText}
-                onChange={(event) => setNewNoteText(event.target.value)}
-                rows={3}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-                placeholder={t("tablet.notes.placeholder")}
-              />
-              <div className="flex items-center gap-2">
-                <select
-                  value={newNoteExpiryDays}
-                  onChange={(event) => setNewNoteExpiryDays(event.target.value)}
-                  className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-                >
-                  <option value="never">{t("tablet.notes.expiry.none")}</option>
-                  <option value="1">{t("tablet.notes.expiry.day_1")}</option>
-                  <option value="7">{t("tablet.notes.expiry.day_7")}</option>
-                  <option value="30">{t("tablet.notes.expiry.day_30")}</option>
-                </select>
-                <Button onClick={addNote}>{t("tablet.notes.add")}</Button>
-              </div>
-            </div>
-          </div>
           <div className="px-3 py-1 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] text-xs text-[var(--mdt-text-muted)]">
             {filteredPersons.length} / {normalizedPersons.length}
           </div>
@@ -874,6 +813,67 @@ export default function PersonsView({
                   placeholder="https://..."
                 />
                 <Button onClick={addManualHttpImage}>{t("tablet.akte.add_url")}</Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-xs mdt-muted">{t("tablet.persons.akte.notes")}</label>
+              {expiredNotesCount > 0 && (
+                <span className="text-xs text-[var(--mdt-text-muted)]">
+                  {t("tablet.notes.expired_hidden", { count: expiredNotesCount })}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-2 max-h-44 overflow-auto">
+              {activeNotes.length === 0 ? (
+                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
+              ) : (
+                activeNotes.map((note) => (
+                  <div key={note.id} className="rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-2">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="text-xs text-[var(--mdt-text-muted)]">
+                        {note.author} - {new Date(note.createdAt).toLocaleString()}
+                        {note.expiresAt
+                          ? ` - ${t("tablet.notes.expires_at")} ${new Date(note.expiresAt).toLocaleString()}`
+                          : ""}
+                      </p>
+                      <button
+                        type="button"
+                        className="text-xs text-red-300 hover:text-red-200"
+                        onClick={() => removeNote(note.id)}
+                      >
+                        {t("tablet.notes.remove")}
+                      </button>
+                    </div>
+                    <p className="text-sm text-white whitespace-pre-wrap break-words">{note.text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <textarea
+                value={newNoteText}
+                onChange={(event) => setNewNoteText(event.target.value)}
+                rows={3}
+                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                placeholder={t("tablet.notes.placeholder")}
+              />
+              <div className="flex items-center gap-2">
+                <select
+                  value={newNoteExpiryDays}
+                  onChange={(event) => setNewNoteExpiryDays(event.target.value)}
+                  className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                >
+                  <option value="never">{t("tablet.notes.expiry.none")}</option>
+                  <option value="1">{t("tablet.notes.expiry.day_1")}</option>
+                  <option value="7">{t("tablet.notes.expiry.day_7")}</option>
+                  <option value="30">{t("tablet.notes.expiry.day_30")}</option>
+                </select>
+                <Button onClick={addNote}>{t("tablet.notes.add")}</Button>
               </div>
             </div>
           </div>
