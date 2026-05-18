@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Card } from "../ui/card";
 import type { TFunction } from "../../lib/i18n";
-import { fetchNui } from "../../../lib/useNui";
+import { fetchNui } from "../../../../lib/useNui";
 
 type LeafletModule = typeof import("leaflet");
 

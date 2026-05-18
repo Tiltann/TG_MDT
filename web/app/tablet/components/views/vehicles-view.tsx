@@ -4,22 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, X } from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
-import { fetchNui } from "../../../lib/useNui";
+import { fetchNui } from "../../../../lib/useNui";
 import type { TFunction } from "../../lib/i18n";
 
-type PersonRecord = {
-  identifier: string;
-  firstname?: string | null;
-  lastname?: string | null;
-  name?: string | null;
-  dob?: string | null;
-  gender?: string | number | null;
-  job?: string | null;
-  address?: string | null;
+type VehicleRecord = {
+  plate: string;
+  ownerIdentifier?: string | null;
+  ownerName?: string | null;
+  model?: string | number | null;
+  state?: string | number | null;
   [key: string]: string | number | null | undefined;
 };
 
-type PersonAkte = Record<string, string>;
+type VehicleAkte = Record<string, string>;
 
 type AkteField = {
   key: string;
@@ -52,83 +49,62 @@ type AkteNote = {
 };
 
 const FALLBACK_FIELDS: AkteField[] = [
-  { key: "personImage", label_key: "tablet.persons.akte.image", type: "text", default: "", editable: true },
-  { key: "phone", label_key: "tablet.persons.akte.phone", type: "text", default: "", editable: true },
+  { key: "vehicleImage", label_key: "tablet.vehicles.akte.image", type: "text", default: "", editable: true },
+  { key: "color", label_key: "tablet.vehicles.akte.color", type: "text", default: "", editable: true },
   {
-    key: "warrantStatus",
-    label_key: "tablet.persons.akte.warrant",
-    type: "select",
-    default: "none",
-    editable: true,
-    options: [
-      { value: "none", label_key: "tablet.persons.akte.warrant.none" },
-      { value: "active", label_key: "tablet.persons.akte.warrant.active" },
-      { value: "served", label_key: "tablet.persons.akte.warrant.served" },
-    ],
-  },
-  {
-    key: "dangerLevel",
-    label_key: "tablet.persons.akte.danger",
-    type: "select",
-    default: "low",
-    editable: true,
-    options: [
-      { value: "low", label_key: "tablet.persons.akte.danger.low" },
-      { value: "medium", label_key: "tablet.persons.akte.danger.medium" },
-      { value: "high", label_key: "tablet.persons.akte.danger.high" },
-    ],
-  },
-  {
-    key: "driverLicense",
-    label_key: "tablet.persons.akte.driver_license",
+    key: "registrationStatus",
+    label_key: "tablet.vehicles.akte.registration",
     type: "select",
     default: "valid",
     editable: true,
     options: [
-      { value: "valid", label_key: "tablet.persons.akte.license.valid" },
-      { value: "suspended", label_key: "tablet.persons.akte.license.suspended" },
-      { value: "revoked", label_key: "tablet.persons.akte.license.revoked" },
+      { value: "valid", label_key: "tablet.vehicles.akte.registration.valid" },
+      { value: "expired", label_key: "tablet.vehicles.akte.registration.expired" },
+      { value: "revoked", label_key: "tablet.vehicles.akte.registration.revoked" },
     ],
   },
   {
-    key: "weaponLicense",
-    label_key: "tablet.persons.akte.weapon_license",
+    key: "insuranceStatus",
+    label_key: "tablet.vehicles.akte.insurance",
     type: "select",
-    default: "none",
+    default: "active",
     editable: true,
     options: [
-      { value: "none", label_key: "tablet.persons.akte.weapon.none" },
-      { value: "valid", label_key: "tablet.persons.akte.weapon.valid" },
-      { value: "revoked", label_key: "tablet.persons.akte.weapon.revoked" },
+      { value: "active", label_key: "tablet.vehicles.akte.insurance.active" },
+      { value: "expired", label_key: "tablet.vehicles.akte.insurance.expired" },
+      { value: "none", label_key: "tablet.vehicles.akte.insurance.none" },
     ],
   },
-  { key: "notes", label_key: "tablet.persons.akte.notes", type: "textarea", default: "", editable: true },
+  {
+    key: "stolenStatus",
+    label_key: "tablet.vehicles.akte.stolen",
+    type: "select",
+    default: "no",
+    editable: true,
+    options: [
+      { value: "no", label_key: "tablet.vehicles.akte.stolen.no" },
+      { value: "yes", label_key: "tablet.vehicles.akte.stolen.yes" },
+      { value: "investigation", label_key: "tablet.vehicles.akte.stolen.investigation" },
+    ],
+  },
+  { key: "notes", label_key: "tablet.vehicles.akte.notes", type: "textarea", default: "", editable: true },
 ];
 
 const FALLBACK_DATA_FIELDS: DataField[] = [
-  { key: "name", label_key: "tablet.persons.field.name", fallback: "-" },
-  { key: "dob", label_key: "tablet.persons.field.dob", fallback: "-" },
-  { key: "gender", label_key: "tablet.persons.field.gender", fallback: "-" },
-  { key: "job", label_key: "tablet.persons.akte.occupation", fallback: "-" },
-  { key: "address", label_key: "tablet.persons.akte.address", fallback: "-" },
+  { key: "model", label_key: "tablet.vehicles.field.model", fallback: "-" },
+  { key: "ownerName", label_key: "tablet.vehicles.field.owner", fallback: "-" },
+  { key: "state", label_key: "tablet.vehicles.field.state", fallback: "-" },
 ];
 
-const SELECTED_PERSON_STORAGE_KEY = "tg_mdt_selected_person";
+const SELECTED_VEHICLE_STORAGE_KEY = "tg_mdt_selected_vehicle";
 
 const defaultsFromFields = (fields: AkteField[]) => {
-  const defaults: PersonAkte = {};
+  const defaults: VehicleAkte = {};
   for (const field of fields) {
     defaults[field.key] = field.default || "";
   }
   return defaults;
 };
-
-function normalizeGender(value?: string | number | null): string {
-  if (value === undefined || value === null || value === "") return "-";
-  if (value === 0 || value === "0" || value === "m" || value === "M" || value === "male") return "M";
-  if (value === 1 || value === "1" || value === "f" || value === "F" || value === "female") return "F";
-  return String(value).toUpperCase();
-}
 
 function decodeImages(raw?: string): string[] {
   if (!raw || raw.trim() === "") return [];
@@ -257,10 +233,10 @@ async function optimizeAkteImageUrl(raw: string): Promise<string> {
   }
 }
 
-export default function PersonsView({
+export default function VehiclesView({
   t,
   actorName,
-  persons,
+  vehicles,
   globalSearch,
   initialAkten,
   akteSync,
@@ -269,9 +245,9 @@ export default function PersonsView({
 }: {
   t: TFunction;
   actorName?: string;
-  persons: PersonRecord[];
+  vehicles: VehicleRecord[];
   globalSearch: string;
-  initialAkten: Record<string, PersonAkte>;
+  initialAkten: Record<string, VehicleAkte>;
   akteSync?: AkteSyncPayload;
   akteFields?: AkteField[];
   dataFields?: DataField[];
@@ -280,8 +256,8 @@ export default function PersonsView({
   const resolvedDataFields = dataFields && dataFields.length > 0 ? dataFields : FALLBACK_DATA_FIELDS;
   const defaultAkte = useMemo(() => defaultsFromFields(resolvedFields), [resolvedFields]);
 
-  const [selectedIdentifier, setSelectedIdentifier] = useState<string | null>(null);
-  const [aktenByPerson, setAktenByPerson] = useState<Record<string, PersonAkte>>(initialAkten || {});
+  const [selectedPlate, setSelectedPlate] = useState<string | null>(null);
+  const [aktenByVehicle, setAktenByVehicle] = useState<Record<string, VehicleAkte>>(initialAkten || {});
   const [captureBusy, setCaptureBusy] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [manualImageUrl, setManualImageUrl] = useState("");
@@ -291,11 +267,11 @@ export default function PersonsView({
   const [newNoteExpiryDays, setNewNoteExpiryDays] = useState("never");
 
   const imageFieldKey = useMemo(() => {
-    const candidates = ["personImage", "image", "imageUrl", "photo", "photoUrl", "mugshot"];
+    const candidates = ["vehicleImage", "image", "imageUrl", "photo", "photoUrl"];
     for (const key of candidates) {
       if (resolvedFields.some((field) => field.key === key)) return key;
     }
-    return "personImage";
+    return "vehicleImage";
   }, [resolvedFields]);
 
   const notesFieldKey = useMemo(() => {
@@ -304,88 +280,81 @@ export default function PersonsView({
   }, [resolvedFields]);
 
   useEffect(() => {
-    setAktenByPerson((prev) => ({ ...initialAkten, ...prev }));
+    setAktenByVehicle((prev) => ({ ...initialAkten, ...prev }));
   }, [initialAkten]);
 
   useEffect(() => {
-    if (!akteSync || akteSync.kind !== "person" || !akteSync.identifier || !akteSync.akte) return;
-    setAktenByPerson((prev) => ({
+    if (!akteSync || akteSync.kind !== "vehicle" || !akteSync.plate || !akteSync.akte) return;
+    setAktenByVehicle((prev) => ({
       ...prev,
-      [akteSync.identifier as string]: {
+      [akteSync.plate as string]: {
         ...defaultAkte,
-        ...(prev[akteSync.identifier as string] || {}),
+        ...(prev[akteSync.plate as string] || {}),
         ...(akteSync.akte || {}),
       },
     }));
   }, [akteSync, defaultAkte]);
 
-  const normalizedPersons = useMemo(
+  const normalizedVehicles = useMemo(
     () =>
-      (persons || []).map((person) => {
-        const displayName =
-          person.name ||
-          [person.firstname, person.lastname].filter(Boolean).join(" ") ||
-          t("tablet.player.unknown_user");
-
-        return {
-          ...person,
-          name: displayName,
-        };
-      }),
-    [persons, t]
+      (vehicles || []).map((vehicle) => ({
+        ...vehicle,
+        plate: (vehicle.plate || "UNKNOWN").toUpperCase(),
+        model: vehicle.model == null || vehicle.model === "" ? "-" : String(vehicle.model),
+      })),
+    [vehicles]
   );
 
-  const filteredPersons = useMemo(() => {
+  const filteredVehicles = useMemo(() => {
     const term = globalSearch.trim().toLowerCase();
-    if (!term) return normalizedPersons;
+    if (!term) return normalizedVehicles;
 
-    return normalizedPersons.filter((person) => {
-      const haystack = [person.name, person.firstname, person.lastname, person.job, person.dob]
+    return normalizedVehicles.filter((vehicle) => {
+      const haystack = [vehicle.plate, vehicle.ownerName, vehicle.model, vehicle.state]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
       return haystack.includes(term);
     });
-  }, [normalizedPersons, globalSearch]);
+  }, [normalizedVehicles, globalSearch]);
 
   useEffect(() => {
-    if (!selectedIdentifier) return;
-    const exists = filteredPersons.some((person) => person.identifier === selectedIdentifier);
+    if (!selectedPlate) return;
+    const exists = filteredVehicles.some((vehicle) => vehicle.plate === selectedPlate);
     if (!exists) {
-      setSelectedIdentifier(null);
+      setSelectedPlate(null);
     }
-  }, [filteredPersons, selectedIdentifier]);
+  }, [filteredVehicles, selectedPlate]);
 
-  const selectedPerson =
-    filteredPersons.find((person) => person.identifier === selectedIdentifier) || null;
+  const selectedVehicle = filteredVehicles.find((vehicle) => vehicle.plate === selectedPlate) || null;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const saved = window.localStorage.getItem(SELECTED_PERSON_STORAGE_KEY);
+    const saved = window.localStorage.getItem(SELECTED_VEHICLE_STORAGE_KEY);
     if (saved && saved.trim() !== "") {
-      setSelectedIdentifier(saved);
+      setSelectedPlate(saved);
     }
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!selectedIdentifier) {
-      window.localStorage.removeItem(SELECTED_PERSON_STORAGE_KEY);
+    if (!selectedPlate) {
+      window.localStorage.removeItem(SELECTED_VEHICLE_STORAGE_KEY);
       return;
     }
-    window.localStorage.setItem(SELECTED_PERSON_STORAGE_KEY, selectedIdentifier);
-  }, [selectedIdentifier]);
+    window.localStorage.setItem(SELECTED_VEHICLE_STORAGE_KEY, selectedPlate);
+  }, [selectedPlate]);
 
   useEffect(() => {
-    if (!selectedPerson) return;
-    if (aktenByPerson[selectedPerson.identifier]) return;
+    if (!selectedVehicle) return;
+    if (aktenByVehicle[selectedVehicle.plate]) return;
 
-    fetchNui<PersonAkte>("getPersonAkte", { identifier: selectedPerson.identifier })
+    fetchNui<VehicleAkte>("getVehicleAkte", { plate: selectedVehicle.plate })
       .then((akte) => {
-        setAktenByPerson((prev) => ({
+        setAktenByVehicle((prev) => ({
           ...prev,
-          [selectedPerson.identifier]: {
+          [selectedVehicle.plate]: {
             ...defaultAkte,
             ...(akte || {}),
           },
@@ -394,40 +363,40 @@ export default function PersonsView({
       .catch(() => {
         // Keep defaults when callback fails.
       });
-  }, [selectedPerson, aktenByPerson, defaultAkte]);
+  }, [selectedVehicle, aktenByVehicle, defaultAkte]);
 
-  const currentAkte: PersonAkte = selectedPerson
-    ? aktenByPerson[selectedPerson.identifier] || {
+  const currentAkte: VehicleAkte = selectedVehicle
+    ? aktenByVehicle[selectedVehicle.plate] || {
         ...defaultAkte,
       }
     : defaultAkte;
 
-  const personImages = decodeImages(currentAkte[imageFieldKey] ?? "");
+  const vehicleImages = decodeImages(currentAkte[imageFieldKey] ?? "");
   const allNotes = useMemo(
     () => parseAkteNotes(currentAkte[notesFieldKey] ?? "").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
     [currentAkte, notesFieldKey]
   );
   const activeNotes = allNotes.filter((note) => !isNoteExpired(note));
   const expiredNotesCount = allNotes.length - activeNotes.length;
-  const activeImage = personImages[activeImageIndex] || personImages[0] || "";
+  const activeImage = vehicleImages[activeImageIndex] || vehicleImages[0] || "";
   const activeImageIsDataUrl = activeImage.startsWith("data:");
   const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
 
-  const persistAkte = (identifier: string, nextAkte: PersonAkte) => {
-    fetchNui<PersonAkte>("savePersonAkte", { identifier, akte: nextAkte })
+  const persistAkte = (plate: string, nextAkte: VehicleAkte) => {
+    fetchNui<VehicleAkte>("saveVehicleAkte", { plate, akte: nextAkte })
       .then((saved) => {
         const savedImageCount = decodeImages(saved?.[imageFieldKey] ?? "").length;
         void fetchNui("debugUiLog", {
-          tag: "persons-save",
-          message: `identifier=${identifier} savedImages=${savedImageCount}`,
+          tag: "vehicles-save",
+          message: `plate=${plate} savedImages=${savedImageCount}`,
         });
 
         if (!saved) return;
-        setAktenByPerson((prev) => ({
+        setAktenByVehicle((prev) => ({
           ...prev,
-          [identifier]: {
+          [plate]: {
             ...defaultAkte,
-            ...(prev[identifier] || {}),
+            ...(prev[plate] || {}),
             ...(saved || {}),
           },
         }));
@@ -438,54 +407,53 @@ export default function PersonsView({
   };
 
   const updateAkteField = (field: string, value: string, editable = true) => {
-    if (!selectedPerson) return;
+    if (!selectedVehicle) return;
     if (!editable) return;
 
-    const identifier = selectedPerson.identifier;
+    const plate = selectedVehicle.plate;
 
-    setAktenByPerson((prev) => {
-      const nextAkte: PersonAkte = {
+    setAktenByVehicle((prev) => {
+      const nextAkte: VehicleAkte = {
         ...defaultAkte,
-        ...(prev[identifier] || {}),
+        ...(prev[plate] || {}),
         [field]: value,
       };
 
       return {
         ...prev,
-        [identifier]: nextAkte,
+        [plate]: nextAkte,
       };
     });
 
-    // Persist only the changed field so stale defaults cannot overwrite image data.
-    persistAkte(identifier, { [field]: value });
+    persistAkte(plate, { [field]: value });
   };
 
   const saveAkte = () => {
-    if (!selectedPerson) return;
-    persistAkte(selectedPerson.identifier, currentAkte);
+    if (!selectedVehicle) return;
+    persistAkte(selectedVehicle.plate, currentAkte);
   };
 
   useEffect(() => {
     setActiveImageIndex(0);
     setManualImageUrl("");
-  }, [selectedIdentifier]);
+  }, [selectedPlate]);
 
   useEffect(() => {
-    if (activeImageIndex < personImages.length) return;
+    if (activeImageIndex < vehicleImages.length) return;
     setActiveImageIndex(0);
-  }, [activeImageIndex, personImages.length]);
+  }, [activeImageIndex, vehicleImages.length]);
 
-  const capturePersonImage = async () => {
-    if (!selectedPerson || captureBusy) return;
+  const captureVehicleImage = async () => {
+    if (!selectedVehicle || captureBusy) return;
 
-    const identifier = selectedPerson.identifier;
+    const plate = selectedVehicle.plate;
 
     setCaptureBusy(true);
     try {
       const result = await fetchNui<{ ok?: boolean; images?: string[] }>("openAktePhotoMode", {
-        kind: "person",
-        identifier,
-        screen: "persons",
+        kind: "vehicle",
+        plate,
+        screen: "vehicles",
       });
 
       const incomingCount = Array.isArray(result?.images) ? result.images.length : 0;
@@ -494,7 +462,7 @@ export default function PersonsView({
           ? String(result.images[0]).slice(0, 24)
           : "none";
       void fetchNui("debugUiLog", {
-        tag: "persons-capture",
+        tag: "vehicles-capture",
         message: `ok=${String(Boolean(result?.ok))} incoming=${incomingCount} first=${firstPrefix}`,
       });
 
@@ -513,14 +481,14 @@ export default function PersonsView({
       const rawLongest = rawImages.reduce((max, item) => Math.max(max, item.length), 0);
       const optimizedLongest = newImages.reduce((max, item) => Math.max(max, item.length), 0);
       void fetchNui("debugUiLog", {
-        tag: "persons-image-opt",
-        message: `identifier=${identifier} rawMax=${rawLongest} optimizedMax=${optimizedLongest} limit=${MAX_IMAGE_DATA_URL_LENGTH}`,
+        tag: "vehicles-image-opt",
+        message: `plate=${plate} rawMax=${rawLongest} optimizedMax=${optimizedLongest} limit=${MAX_IMAGE_DATA_URL_LENGTH}`,
       });
 
-      const serverAkte = await fetchNui<PersonAkte>("getPersonAkte", { identifier });
-      const localAkte: PersonAkte = {
+      const serverAkte = await fetchNui<VehicleAkte>("getVehicleAkte", { plate });
+      const localAkte: VehicleAkte = {
         ...defaultAkte,
-        ...(aktenByPerson[identifier] || {}),
+        ...(aktenByVehicle[plate] || {}),
       };
       const serverImages = decodeImages(serverAkte?.[imageFieldKey] ?? "");
       const localImages = decodeImages(localAkte[imageFieldKey] ?? "");
@@ -529,22 +497,22 @@ export default function PersonsView({
       if (merged.length === 0) return;
 
       void fetchNui("debugUiLog", {
-        tag: "persons-merge",
-        message: `identifier=${identifier} server=${serverImages.length} local=${localImages.length} new=${newImages.length} merged=${merged.length}`,
+        tag: "vehicles-merge",
+        message: `plate=${plate} server=${serverImages.length} local=${localImages.length} new=${newImages.length} merged=${merged.length}`,
       });
 
-      const nextAkte: PersonAkte = {
+      const nextAkte: VehicleAkte = {
         ...defaultAkte,
         ...(serverAkte || {}),
         ...localAkte,
         [imageFieldKey]: encodeImages(merged),
       };
 
-      setAktenByPerson((prev) => ({
+      setAktenByVehicle((prev) => ({
         ...prev,
-        [identifier]: nextAkte,
+        [plate]: nextAkte,
       }));
-      persistAkte(identifier, nextAkte);
+      persistAkte(plate, nextAkte);
       setActiveImageIndex(Math.max(0, merged.length - 1));
     } finally {
       setCaptureBusy(false);
@@ -552,9 +520,9 @@ export default function PersonsView({
   };
 
   const deleteCurrentImage = () => {
-    if (!selectedPerson || personImages.length === 0) return;
+    if (!selectedVehicle || vehicleImages.length === 0) return;
 
-    const nextImages = personImages.filter((_, index) => index !== activeImageIndex);
+    const nextImages = vehicleImages.filter((_, index) => index !== activeImageIndex);
     updateAkteField(imageFieldKey, encodeImages(nextImages), true);
 
     if (nextImages.length === 0) {
@@ -566,14 +534,14 @@ export default function PersonsView({
   };
 
   const retakeCurrentImage = async () => {
-    if (!selectedPerson || captureBusy || personImages.length === 0) return;
+    if (!selectedVehicle || captureBusy || vehicleImages.length === 0) return;
 
     setCaptureBusy(true);
     try {
       const result = await fetchNui<{ ok?: boolean; images?: string[] }>("openAktePhotoMode", {
-        kind: "person",
-        identifier: selectedPerson.identifier,
-        screen: "persons",
+        kind: "vehicle",
+        plate: selectedVehicle.plate,
+        screen: "vehicles",
       });
 
       if (!result?.ok || !Array.isArray(result.images) || result.images.length === 0) {
@@ -586,7 +554,7 @@ export default function PersonsView({
         return;
       }
 
-      const nextImages = [...personImages];
+      const nextImages = [...vehicleImages];
       nextImages[activeImageIndex] = nextImage;
       updateAkteField(imageFieldKey, encodeImages(nextImages), true);
     } finally {
@@ -595,10 +563,10 @@ export default function PersonsView({
   };
 
   const updateCurrentHttpImageUrl = (nextUrl: string) => {
-    if (!selectedPerson || personImages.length === 0) return;
+    if (!selectedVehicle || vehicleImages.length === 0) return;
     if (nextUrl.trim() !== "" && !/^https?:\/\//i.test(nextUrl.trim())) return;
 
-    const nextImages = [...personImages];
+    const nextImages = [...vehicleImages];
     nextImages[activeImageIndex] = nextUrl.trim();
     updateAkteField(imageFieldKey, encodeImages(nextImages), true);
   };
@@ -608,14 +576,14 @@ export default function PersonsView({
     if (nextUrl === "") return;
     if (!/^https?:\/\//i.test(nextUrl)) return;
 
-    const merged = [...personImages, nextUrl];
+    const merged = [...vehicleImages, nextUrl];
     updateAkteField(imageFieldKey, encodeImages(merged), true);
     setActiveImageIndex(merged.length - 1);
     setManualImageUrl("");
   };
 
   const addNote = () => {
-    if (!selectedPerson) return;
+    if (!selectedVehicle) return;
     const text = newNoteText.trim();
     if (text === "") return;
 
@@ -655,18 +623,18 @@ export default function PersonsView({
   const zoomOutFullscreen = () => setFullscreenZoom((prev) => Math.max(1, Number((prev - 0.25).toFixed(2))));
   const resetFullscreenZoom = () => setFullscreenZoom(1);
 
-  if (!selectedPerson) {
+  if (!selectedVehicle) {
     return (
       <div className="h-full flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl card-title">{t("tablet.sidebar.persons")}</h3>
-            <p className="card-sub mt-1">{t("tablet.persons.subtitle")}</p>
+            <h3 className="text-xl card-title">{t("tablet.sidebar.vehicles")}</h3>
+            <p className="card-sub mt-1">{t("tablet.vehicles.subtitle")}</p>
           </div>
 
           <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <label className="block text-xs mdt-muted">{t("tablet.persons.akte.notes")}</label>
+              <label className="block text-xs mdt-muted">{t("tablet.vehicles.akte.notes")}</label>
               {expiredNotesCount > 0 && (
                 <span className="text-xs text-[var(--mdt-text-muted)]">
                   {t("tablet.notes.expired_hidden", { count: expiredNotesCount })}
@@ -725,27 +693,27 @@ export default function PersonsView({
             </div>
           </div>
           <div className="px-3 py-1 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] text-xs text-[var(--mdt-text-muted)]">
-            {filteredPersons.length} / {normalizedPersons.length}
+            {filteredVehicles.length} / {normalizedVehicles.length}
           </div>
         </div>
 
         <Card className="p-4 flex-1 overflow-auto">
-          {filteredPersons.length === 0 ? (
+          {filteredVehicles.length === 0 ? (
             <div className="h-full min-h-28 flex items-center justify-center text-sm text-[var(--mdt-text-muted)]">
-              {t("tablet.persons.no_match")}
+              {t("tablet.vehicles.no_match")}
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredPersons.map((person) => (
+              {filteredVehicles.map((vehicle) => (
                 <button
-                  key={person.identifier}
+                  key={vehicle.plate}
                   type="button"
-                  onClick={() => setSelectedIdentifier(person.identifier)}
+                  onClick={() => setSelectedPlate(vehicle.plate)}
                   className="w-full p-3 text-left rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] hover:bg-[rgba(255,255,255,0.03)] transition-colors"
                 >
-                  <p className="text-sm text-white font-medium">{person.name}</p>
+                  <p className="text-sm text-white font-medium">{vehicle.plate}</p>
                   <p className="text-xs text-[var(--mdt-text-muted)] mt-1">
-                    {person.job || t("tablet.persons.not_available")}
+                    {String(vehicle.model || "-")} - {vehicle.ownerName || t("tablet.vehicles.not_available")}
                   </p>
                 </button>
               ))}
@@ -759,7 +727,7 @@ export default function PersonsView({
   return (
     <div className="h-full flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => setSelectedIdentifier(null)} className="inline-flex items-center gap-2">
+        <Button variant="ghost" onClick={() => setSelectedPlate(null)} className="inline-flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" />
           {t("tablet.actions.back")}
         </Button>
@@ -769,16 +737,14 @@ export default function PersonsView({
       <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
         <Card className="col-span-5 p-4 space-y-3 overflow-auto">
           <div>
-            <p className="text-xs uppercase tracking-wider text-[var(--mdt-text-muted)]">{t("tablet.persons.detail_title")}</p>
-            <h4 className="text-2xl text-white font-semibold mt-1">{selectedPerson.name}</h4>
+            <p className="text-xs uppercase tracking-wider text-[var(--mdt-text-muted)]">{t("tablet.vehicles.detail_title")}</p>
+            <h4 className="text-2xl text-white font-semibold mt-1">{selectedVehicle.plate}</h4>
           </div>
 
           {resolvedDataFields.map((field) => {
             const label = field.label_key ? t(field.label_key) : field.key;
-            const rawValue = (selectedPerson as Record<string, unknown>)[field.key];
-            const value = field.key === "gender"
-              ? normalizeGender(rawValue as string | number | null | undefined)
-              : String(rawValue ?? field.fallback ?? t("tablet.persons.not_available"));
+            const rawValue = (selectedVehicle as Record<string, unknown>)[field.key];
+            const value = String(rawValue ?? field.fallback ?? t("tablet.vehicles.not_available"));
 
             return (
               <div key={field.key} className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)]">
@@ -790,17 +756,17 @@ export default function PersonsView({
         </Card>
 
         <Card className="col-span-7 p-4 overflow-auto space-y-3">
-          <h4 className="card-title">{t("tablet.persons.akte.title")}</h4>
+          <h4 className="card-title">{t("tablet.vehicles.akte.title")}</h4>
 
           <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <label className="block text-xs mdt-muted">{t("tablet.persons.akte.image")}</label>
-              <Button onClick={capturePersonImage} disabled={captureBusy}>
+              <label className="block text-xs mdt-muted">{t("tablet.vehicles.akte.image")}</label>
+              <Button onClick={captureVehicleImage} disabled={captureBusy}>
                 {captureBusy ? t("tablet.akte.capture_image_busy") : t("tablet.akte.capture_image")}
               </Button>
             </div>
 
-            {personImages.length > 0 && (
+            {vehicleImages.length > 0 && (
               <div className="flex items-center gap-2">
                 <Button variant="ghost" onClick={retakeCurrentImage} disabled={captureBusy}>
                   {t("tablet.akte.retake_image")}
@@ -815,7 +781,7 @@ export default function PersonsView({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={activeImage}
-                alt={selectedPerson.name || t("tablet.player.unknown_user")}
+                alt={selectedVehicle.plate}
                 onClick={() => setFullscreenImage(activeImage)}
                 className="w-full h-64 md:h-72 object-cover rounded-md border border-[var(--mdt-border)] cursor-zoom-in"
               />
@@ -825,11 +791,11 @@ export default function PersonsView({
               </div>
             )}
 
-            {personImages.length > 0 && (
+            {vehicleImages.length > 0 && (
               <>
-                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.photos_count", { count: personImages.length })}</p>
+                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.photos_count", { count: vehicleImages.length })}</p>
                 <div className="grid grid-cols-4 gap-2">
-                  {personImages.map((image, index) => (
+                  {vehicleImages.map((image, index) => (
                     <button
                       key={`${image}-${index}`}
                       type="button"
@@ -843,7 +809,7 @@ export default function PersonsView({
                       className={`rounded-md overflow-hidden border ${index === activeImageIndex ? "border-white" : "border-[var(--mdt-border)]"}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={image} alt={`${selectedPerson.name || "person"}-${index + 1}`} className="w-full h-16 object-cover" />
+                      <img src={image} alt={`${selectedVehicle.plate}-${index + 1}`} className="w-full h-16 object-cover" />
                     </button>
                   ))}
                 </div>
@@ -1010,7 +976,7 @@ export default function PersonsView({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={fullscreenImage}
-              alt={selectedPerson.name || t("tablet.player.unknown_user")}
+              alt={selectedVehicle.plate}
               className="max-w-none object-contain"
               style={{
                 transform: `scale(${fullscreenZoom})`,

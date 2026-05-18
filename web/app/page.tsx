@@ -2,21 +2,21 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { fetchNui, useNuiEvent } from "@/lib/useNui";
-import { Sidebar } from "./components/sidebar";
-import { Topbar } from "./components/topbar";
-import DashboardView from "./components/dashboard-view";
-import IncidentsView from "./components/views/incidents-view";
-import DispatchView from "./components/views/dispatch-view";
-import PersonsView from "./components/views/persons-view";
-import VehiclesView from "./components/views/vehicles-view";
-import ReportsView from "./components/views/reports-view";
-import WarrantsView from "./components/views/warrants-view";
-import PenaltiesView from "./components/views/penalties-view";
-import BoloView from "./components/views/bolo-view";
-import SettingsView from "./components/views/settings-view";
-import MapView from "./components/views/map-view";
-import { defaultMockupBranding, defaultMockupModules } from "./lib/mockup-config";
-import { createTranslator, normalizeLocale, type SupportedLocale } from "./lib/i18n";
+import { Sidebar } from "./tablet/components/sidebar";
+import { Topbar } from "./tablet/components/topbar";
+import DashboardView from "./tablet/components/dashboard-view";
+import IncidentsView from "./tablet/components/views/incidents-view";
+import DispatchView from "./tablet/components/views/dispatch-view";
+import PersonsView from "./tablet/components/views/persons-view";
+import VehiclesView from "./tablet/components/views/vehicles-view";
+import ReportsView from "./tablet/components/views/reports-view";
+import WarrantsView from "./tablet/components/views/warrants-view";
+import PenaltiesView from "./tablet/components/views/penalties-view";
+import BoloView from "./tablet/components/views/bolo-view";
+import SettingsView from "./tablet/components/views/settings-view";
+import MapView from "./tablet/components/views/map-view";
+import { defaultMockupBranding, defaultMockupModules } from "./tablet/lib/mockup-config";
+import { createTranslator, normalizeLocale, type SupportedLocale } from "./tablet/lib/i18n";
 
 type NuiVisibilityPayload = {
   visible?: boolean;
