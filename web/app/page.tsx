@@ -146,17 +146,39 @@ export default function Home() {
   useEffect(() => {
     let isMounted = true;
 
+    const isBrowser = typeof window !== "undefined" && !("invokeNative" in window);
+    if (isBrowser) {
+      setHandshakeDone(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    let attempts = 0;
+    const maxAttempts = 60;
+    const retryDelayMs = 500;
+
     const handshake = async () => {
+      if (!isMounted) return;
+
       try {
         await fetchNui("nuiReady", {});
-      } catch {
-        // Browser/dev mode can run without a game client callback.
-      } finally {
         if (isMounted) setHandshakeDone(true);
+        return;
+      } catch {
+        attempts += 1;
       }
+
+      if (attempts >= maxAttempts) {
+        // Prevent a permanent blank screen if callback wiring is unavailable.
+        if (isMounted) setHandshakeDone(true);
+        return;
+      }
+
+      window.setTimeout(handshake, retryDelayMs);
     };
 
-    handshake();
+    void handshake();
     return () => {
       isMounted = false;
     };
