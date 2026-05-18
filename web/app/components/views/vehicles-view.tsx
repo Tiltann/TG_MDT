@@ -40,6 +40,14 @@ type AkteSyncPayload = {
   akte?: Record<string, string>;
 };
 
+type AkteNote = {
+  id: string;
+  text: string;
+  author: string;
+  createdAt: string;
+  expiresAt?: string;
+};
+
 const FALLBACK_FIELDS: AkteField[] = [
   { key: "vehicleImage", label_key: "tablet.vehicles.akte.image", type: "text", default: "", editable: true },
   { key: "color", label_key: "tablet.vehicles.akte.color", type: "text", default: "", editable: true },
@@ -120,6 +128,54 @@ function encodeImages(items: string[]): string {
   return JSON.stringify(items.filter((item) => item.trim().length > 0));
 }
 
+function parseAkteNotes(raw?: string): AkteNote[] {
+  if (!raw || raw.trim() === "") return [];
+
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((item) => item && typeof item === "object" && typeof item.text === "string")
+          .map((item, index) => ({
+            id: typeof item.id === "string" && item.id !== "" ? item.id : `note-${index}`,
+            text: String(item.text || "").trim(),
+            author: typeof item.author === "string" && item.author !== "" ? item.author : "Unknown",
+            createdAt:
+              typeof item.createdAt === "string" && item.createdAt !== ""
+                ? item.createdAt
+                : new Date().toISOString(),
+            expiresAt: typeof item.expiresAt === "string" && item.expiresAt !== "" ? item.expiresAt : undefined,
+          }))
+          .filter((note) => note.text !== "");
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [
+    {
+      id: "legacy-note",
+      text: trimmed,
+      author: "Unknown",
+      createdAt: new Date().toISOString(),
+    },
+  ];
+}
+
+function encodeAkteNotes(notes: AkteNote[]): string {
+  return JSON.stringify(notes);
+}
+
+function isNoteExpired(note: AkteNote): boolean {
+  if (!note.expiresAt) return false;
+  const expires = Date.parse(note.expiresAt);
+  if (Number.isNaN(expires)) return false;
+  return expires <= Date.now();
+}
+
 const MAX_IMAGE_DATA_URL_LENGTH = 50000;
 
 function isDataImageUrl(value: string): boolean {
@@ -179,6 +235,7 @@ async function optimizeAkteImageUrl(raw: string): Promise<string> {
 
 export default function VehiclesView({
   t,
+  actorName,
   vehicles,
   globalSearch,
   initialAkten,
@@ -187,6 +244,7 @@ export default function VehiclesView({
   dataFields,
 }: {
   t: TFunction;
+  actorName?: string;
   vehicles: VehicleRecord[];
   globalSearch: string;
   initialAkten: Record<string, VehicleAkte>;
@@ -205,6 +263,8 @@ export default function VehiclesView({
   const [manualImageUrl, setManualImageUrl] = useState("");
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [fullscreenZoom, setFullscreenZoom] = useState(1);
+  const [newNoteText, setNewNoteText] = useState("");
+  const [newNoteExpiryDays, setNewNoteExpiryDays] = useState("never");
 
   const imageFieldKey = useMemo(() => {
     const candidates = ["vehicleImage", "image", "imageUrl", "photo", "photoUrl"];
@@ -212,6 +272,11 @@ export default function VehiclesView({
       if (resolvedFields.some((field) => field.key === key)) return key;
     }
     return "vehicleImage";
+  }, [resolvedFields]);
+
+  const notesFieldKey = useMemo(() => {
+    if (resolvedFields.some((field) => field.key === "notes")) return "notes";
+    return "notes";
   }, [resolvedFields]);
 
   useEffect(() => {
@@ -307,6 +372,12 @@ export default function VehiclesView({
     : defaultAkte;
 
   const vehicleImages = decodeImages(currentAkte[imageFieldKey] ?? "");
+  const allNotes = useMemo(
+    () => parseAkteNotes(currentAkte[notesFieldKey] ?? "").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    [currentAkte, notesFieldKey]
+  );
+  const activeNotes = allNotes.filter((note) => !isNoteExpired(note));
+  const expiredNotesCount = allNotes.length - activeNotes.length;
   const activeImage = vehicleImages[activeImageIndex] || vehicleImages[0] || "";
   const activeImageIsDataUrl = activeImage.startsWith("data:");
   const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
@@ -511,6 +582,37 @@ export default function VehiclesView({
     setManualImageUrl("");
   };
 
+  const addNote = () => {
+    if (!selectedVehicle) return;
+    const text = newNoteText.trim();
+    if (text === "") return;
+
+    const expiresAt =
+      newNoteExpiryDays === "never"
+        ? undefined
+        : new Date(Date.now() + Number(newNoteExpiryDays) * 24 * 60 * 60 * 1000).toISOString();
+
+    const nextNotes: AkteNote[] = [
+      {
+        id: `${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        text,
+        author: (actorName || t("tablet.player.unknown_user")).trim() || "Unknown",
+        createdAt: new Date().toISOString(),
+        expiresAt,
+      },
+      ...allNotes,
+    ];
+
+    updateAkteField(notesFieldKey, encodeAkteNotes(nextNotes), true);
+    setNewNoteText("");
+    setNewNoteExpiryDays("never");
+  };
+
+  const removeNote = (id: string) => {
+    const nextNotes = allNotes.filter((note) => note.id !== id);
+    updateAkteField(notesFieldKey, encodeAkteNotes(nextNotes), true);
+  };
+
   useEffect(() => {
     if (fullscreenImage) {
       setFullscreenZoom(1);
@@ -528,6 +630,67 @@ export default function VehiclesView({
           <div>
             <h3 className="text-xl card-title">{t("tablet.sidebar.vehicles")}</h3>
             <p className="card-sub mt-1">{t("tablet.vehicles.subtitle")}</p>
+          </div>
+
+          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-xs mdt-muted">{t("tablet.vehicles.akte.notes")}</label>
+              {expiredNotesCount > 0 && (
+                <span className="text-xs text-[var(--mdt-text-muted)]">
+                  {t("tablet.notes.expired_hidden", { count: expiredNotesCount })}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-2 max-h-44 overflow-auto">
+              {activeNotes.length === 0 ? (
+                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
+              ) : (
+                activeNotes.map((note) => (
+                  <div key={note.id} className="rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-2">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="text-xs text-[var(--mdt-text-muted)]">
+                        {note.author} - {new Date(note.createdAt).toLocaleString()}
+                        {note.expiresAt
+                          ? ` - ${t("tablet.notes.expires_at")} ${new Date(note.expiresAt).toLocaleString()}`
+                          : ""}
+                      </p>
+                      <button
+                        type="button"
+                        className="text-xs text-red-300 hover:text-red-200"
+                        onClick={() => removeNote(note.id)}
+                      >
+                        {t("tablet.notes.remove")}
+                      </button>
+                    </div>
+                    <p className="text-sm text-white whitespace-pre-wrap break-words">{note.text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <textarea
+                value={newNoteText}
+                onChange={(event) => setNewNoteText(event.target.value)}
+                rows={3}
+                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                placeholder={t("tablet.notes.placeholder")}
+              />
+              <div className="flex items-center gap-2">
+                <select
+                  value={newNoteExpiryDays}
+                  onChange={(event) => setNewNoteExpiryDays(event.target.value)}
+                  className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                >
+                  <option value="never">{t("tablet.notes.expiry.none")}</option>
+                  <option value="1">{t("tablet.notes.expiry.day_1")}</option>
+                  <option value="7">{t("tablet.notes.expiry.day_7")}</option>
+                  <option value="30">{t("tablet.notes.expiry.day_30")}</option>
+                </select>
+                <Button onClick={addNote}>{t("tablet.notes.add")}</Button>
+              </div>
+            </div>
           </div>
           <div className="px-3 py-1 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] text-xs text-[var(--mdt-text-muted)]">
             {filteredVehicles.length} / {normalizedVehicles.length}
@@ -724,7 +887,7 @@ export default function VehiclesView({
           </div>
 
           {resolvedFields
-            .filter((field) => field.type === "textarea")
+            .filter((field) => field.type === "textarea" && field.key !== notesFieldKey)
             .map((field) => {
               const label = field.label_key ? t(field.label_key) : field.key;
               const editable = field.editable !== false;

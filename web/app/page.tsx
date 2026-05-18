@@ -292,6 +292,11 @@ export default function Home() {
   const dutyState = ((screenData?.duty as DutyState | undefined) || { onDuty: true }) as DutyState;
   const player_data =
     screenData?.player || { name: t("tablet.player.unknown_user"), badge: "" };
+  const actorName =
+    typeof (player_data as { name?: unknown })?.name === "string" &&
+    ((player_data as { name?: string }).name || "").trim() !== ""
+      ? ((player_data as { name?: string }).name as string)
+      : t("tablet.player.unknown_user");
   const mapData = (screenData?.map as Record<string, unknown> | undefined) || {};
   const mapMarkers = Array.isArray(mapData.markers)
     ? (mapData.markers as Array<{ x: number; y: number; label?: string }>)
@@ -455,6 +460,7 @@ export default function Home() {
                 {activeScreen === "persons" && (
                   <PersonsView
                     t={t}
+                    actorName={actorName}
                     persons={personsData}
                     globalSearch={globalSearch}
                     initialAkten={personAktenData}
@@ -466,6 +472,7 @@ export default function Home() {
                 {activeScreen === "vehicles" && (
                   <VehiclesView
                     t={t}
+                    actorName={actorName}
                     vehicles={vehiclesData}
                     globalSearch={globalSearch}
                     initialAkten={vehicleAktenData}
