@@ -16,6 +16,8 @@ NUI = {}
 local _visible = false
 local _active_screen = nil
 
+local CONTROL_ESCAPE = 200  -- INPUT_FRONTEND_CANCEL
+
 -- Add allowed screens here.
 -- For now only tablet exists.
 local SCREENS = {
@@ -162,7 +164,7 @@ end)
 CreateThread(function()
     while true do
         Wait(0)
-        if _visible and IsControlJustPressed(0, 200) then -- 200 = INPUT_FRONTEND_CANCEL (Escape)
+        if _visible and IsControlJustPressed(0, CONTROL_ESCAPE) then
             NUI.hide()
         end
     end

@@ -26,14 +26,12 @@ local function getDutyConfig()
     }
 end
 
+--- Returns value if it's a boolean, otherwise returns fallback.
 ---@param value any
 ---@param fallback boolean
 ---@return boolean
 local function boolOr(value, fallback)
-    if type(value) == 'boolean' then
-        return value
-    end
-    return fallback
+    return type(value) == 'boolean' and value or fallback
 end
 
 ---@param src number

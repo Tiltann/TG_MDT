@@ -20,7 +20,7 @@ local EVENT_LOG_ADMIN_ACTION   = 'tg_mdt:internal:logAdminAction'
 local function sendToFivemanage(log_type, data)
     if not Config.Logs.use_fivemanage then return end
     if not Config.Logs.fivemanage_token or Config.Logs.fivemanage_token == '' then
-        Debug.warn('Fivemanage logging enabled but no token configured')
+        Debug.warn(('Logging: %s - %s'):format('Fivemanage', 'No token configured'))
         return
     end
 
@@ -34,7 +34,7 @@ end
 local function sendToDiscord(webhook_type, embed)
     if not Config.Logs.use_discord then return end
     if not Config.Logs.discord_webhooks[webhook_type] or Config.Logs.discord_webhooks[webhook_type] == '' then
-        Debug.warn(('Discord webhook for %s not configured'):format(webhook_type))
+        Debug.warn(('Logging: %s - %s'):format('Discord', ('Webhook %s not configured'):format(webhook_type)))
         return
     end
 
