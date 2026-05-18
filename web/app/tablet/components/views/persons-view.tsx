@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { fetchNui } from "../../../../lib/useNui";
@@ -50,6 +52,9 @@ type AkteNote = {
   createdAt: string;
   expiresAt?: string;
 };
+
+type ExpiryMode = "none" | "relative" | "custom";
+type ExpiryUnit = "minutes" | "hours" | "days";
 
 const FALLBACK_FIELDS: AkteField[] = [
   { key: "personImage", label_key: "tablet.persons.akte.image", type: "text", default: "", editable: true },
@@ -200,6 +205,55 @@ function isNoteExpired(note: AkteNote): boolean {
   return expires <= Date.now();
 }
 
+function formatRelativeTime(timestamp: string): string {
+  const parsed = Date.parse(timestamp);
+  if (Number.isNaN(parsed)) return "";
+
+  const diffMs = parsed - Date.now();
+  const absMs = Math.abs(diffMs);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  let value = 0;
+  let unit = "minute";
+
+  if (absMs >= day) {
+    value = Math.max(1, Math.round(absMs / day));
+    unit = value === 1 ? "day" : "days";
+  } else if (absMs >= hour) {
+    value = Math.max(1, Math.round(absMs / hour));
+    unit = value === 1 ? "hour" : "hours";
+  } else {
+    value = Math.max(1, Math.round(absMs / minute));
+    unit = value === 1 ? "minute" : "minutes";
+  }
+
+  return diffMs < 0 ? `${value} ${unit} ago` : `in ${value} ${unit}`;
+}
+
+function getExpiryFromInput(mode: ExpiryMode, amount: string, unit: ExpiryUnit, customAt: string): string | undefined {
+  if (mode === "none") return undefined;
+
+  if (mode === "custom") {
+    if (!customAt || customAt.trim() === "") return undefined;
+    const customDate = new Date(customAt);
+    if (Number.isNaN(customDate.getTime())) return undefined;
+    return customDate.toISOString();
+  }
+
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) return undefined;
+
+  const multipliers: Record<ExpiryUnit, number> = {
+    minutes: 60 * 1000,
+    hours: 60 * 60 * 1000,
+    days: 24 * 60 * 60 * 1000,
+  };
+
+  return new Date(Date.now() + numericAmount * multipliers[unit]).toISOString();
+}
+
 const MAX_IMAGE_DATA_URL_LENGTH = 50000;
 
 function isDataImageUrl(value: string): boolean {
@@ -288,7 +342,10 @@ export default function PersonsView({
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [fullscreenZoom, setFullscreenZoom] = useState(1);
   const [newNoteText, setNewNoteText] = useState("");
-  const [newNoteExpiryDays, setNewNoteExpiryDays] = useState("never");
+  const [newNoteExpiryMode, setNewNoteExpiryMode] = useState<ExpiryMode>("none");
+  const [newNoteExpiryAmount, setNewNoteExpiryAmount] = useState("1");
+  const [newNoteExpiryUnit, setNewNoteExpiryUnit] = useState<ExpiryUnit>("days");
+  const [newNoteCustomAt, setNewNoteCustomAt] = useState("");
 
   const imageFieldKey = useMemo(() => {
     const candidates = ["personImage", "image", "imageUrl", "photo", "photoUrl", "mugshot"];
@@ -619,10 +676,7 @@ export default function PersonsView({
     const text = newNoteText.trim();
     if (text === "") return;
 
-    const expiresAt =
-      newNoteExpiryDays === "never"
-        ? undefined
-        : new Date(Date.now() + Number(newNoteExpiryDays) * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = getExpiryFromInput(newNoteExpiryMode, newNoteExpiryAmount, newNoteExpiryUnit, newNoteCustomAt);
 
     const nextNotes: AkteNote[] = [
       {
@@ -637,7 +691,10 @@ export default function PersonsView({
 
     updateAkteField(notesFieldKey, encodeAkteNotes(nextNotes), true);
     setNewNoteText("");
-    setNewNoteExpiryDays("never");
+    setNewNoteExpiryMode("none");
+    setNewNoteExpiryAmount("1");
+    setNewNoteExpiryUnit("days");
+    setNewNoteCustomAt("");
   };
 
   const removeNote = (id: string) => {
@@ -835,10 +892,8 @@ export default function PersonsView({
                   <div key={note.id} className="rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-2">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <p className="text-xs text-[var(--mdt-text-muted)]">
-                        {note.author} - {new Date(note.createdAt).toLocaleString()}
-                        {note.expiresAt
-                          ? ` - ${t("tablet.notes.expires_at")} ${new Date(note.expiresAt).toLocaleString()}`
-                          : ""}
+                        {note.author} - posted {formatRelativeTime(note.createdAt)}
+                        {note.expiresAt ? ` | removing ${formatRelativeTime(note.expiresAt)}` : ""}
                       </p>
                       <button
                         type="button"
@@ -848,13 +903,16 @@ export default function PersonsView({
                         {t("tablet.notes.remove")}
                       </button>
                     </div>
-                    <p className="text-sm text-white whitespace-pre-wrap break-words">{note.text}</p>
+                    <div className="text-sm text-white whitespace-pre-wrap break-words prose prose-invert max-w-none prose-p:my-1 prose-li:my-0">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.text}</ReactMarkdown>
+                    </div>
                   </div>
                 ))
               )}
             </div>
 
             <div className="space-y-2">
+              <p className="text-xs text-[var(--mdt-text-muted)]">Markdown supported (headings, lists, **bold**, links, checklists).</p>
               <textarea
                 value={newNoteText}
                 onChange={(event) => setNewNoteText(event.target.value)}
@@ -862,17 +920,55 @@ export default function PersonsView({
                 className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
                 placeholder={t("tablet.notes.placeholder")}
               />
-              <div className="flex items-center gap-2">
+              {newNoteText.trim() !== "" && (
+                <div className="rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-2">
+                  <p className="text-xs text-[var(--mdt-text-muted)] mb-1">Preview</p>
+                  <div className="text-sm text-white prose prose-invert max-w-none prose-p:my-1 prose-li:my-0">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{newNoteText}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-2 flex-wrap">
                 <select
-                  value={newNoteExpiryDays}
-                  onChange={(event) => setNewNoteExpiryDays(event.target.value)}
+                  value={newNoteExpiryMode}
+                  onChange={(event) => setNewNoteExpiryMode(event.target.value as ExpiryMode)}
                   className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
                 >
-                  <option value="never">{t("tablet.notes.expiry.none")}</option>
-                  <option value="1">{t("tablet.notes.expiry.day_1")}</option>
-                  <option value="7">{t("tablet.notes.expiry.day_7")}</option>
-                  <option value="30">{t("tablet.notes.expiry.day_30")}</option>
+                  <option value="none">{t("tablet.notes.expiry.none")}</option>
+                  <option value="relative">Duration</option>
+                  <option value="custom">Date & time</option>
                 </select>
+
+                {newNoteExpiryMode === "relative" && (
+                  <>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={newNoteExpiryAmount}
+                      onChange={(event) => setNewNoteExpiryAmount(event.target.value)}
+                      className="w-24 p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                    />
+                    <select
+                      value={newNoteExpiryUnit}
+                      onChange={(event) => setNewNoteExpiryUnit(event.target.value as ExpiryUnit)}
+                      className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                    >
+                      <option value="minutes">Minutes</option>
+                      <option value="hours">Hours</option>
+                      <option value="days">Days</option>
+                    </select>
+                  </>
+                )}
+
+                {newNoteExpiryMode === "custom" && (
+                  <input
+                    type="datetime-local"
+                    value={newNoteCustomAt}
+                    onChange={(event) => setNewNoteCustomAt(event.target.value)}
+                    className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                  />
+                )}
                 <Button onClick={addNote}>{t("tablet.notes.add")}</Button>
               </div>
             </div>

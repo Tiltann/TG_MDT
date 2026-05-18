@@ -318,6 +318,11 @@ export default function Home() {
     ((player_data as { name?: string }).name || "").trim() !== ""
       ? ((player_data as { name?: string }).name as string)
       : t("tablet.player.unknown_user");
+  const actorGrade =
+    typeof (player_data as { gradeDisplay?: unknown })?.gradeDisplay === "string"
+      ? (((player_data as { gradeDisplay?: string }).gradeDisplay as string) || "").trim()
+      : "";
+  const actorLabel = actorGrade !== "" ? `${actorName} (${actorGrade})` : actorName;
   const mapData = (screenData?.map as Record<string, unknown> | undefined) || {};
   const mapMarkers = Array.isArray(mapData.markers)
     ? (mapData.markers as Array<{ x: number; y: number; label?: string }>)
@@ -481,7 +486,7 @@ export default function Home() {
                 {activeScreen === "persons" && (
                   <PersonsView
                     t={t}
-                    actorName={actorName}
+                    actorName={actorLabel}
                     persons={personsData}
                     globalSearch={globalSearch}
                     initialAkten={personAktenData}
@@ -493,7 +498,7 @@ export default function Home() {
                 {activeScreen === "vehicles" && (
                   <VehiclesView
                     t={t}
-                    actorName={actorName}
+                    actorName={actorLabel}
                     vehicles={vehiclesData}
                     globalSearch={globalSearch}
                     initialAkten={vehicleAktenData}
