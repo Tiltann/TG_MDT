@@ -258,7 +258,7 @@ lib.callback.register('TG_MDT:setDutyState', function(src, payload)
 
     local cfg = getDutyConfig()
     if cfg.notify_on_toggle then
-        local text = state.onDuty and 'You are now on duty.' or 'You are now off duty.'
+        local text = state.onDuty and lib.locale('duty_on') or lib.locale('duty_off')
         notify(src, text, state.onDuty and 'success' or 'inform')
     end
 
@@ -270,7 +270,7 @@ lib.callback.register('TG_MDT:toggleDuty', function(src, payload)
 
     local cfg = getDutyConfig()
     if cfg.notify_on_toggle then
-        local text = state.onDuty and 'You are now on duty.' or 'You are now off duty.'
+        local text = state.onDuty and lib.locale('duty_on') or lib.locale('duty_off')
         notify(src, text, state.onDuty and 'success' or 'inform')
     end
 

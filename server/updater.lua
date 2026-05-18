@@ -10,6 +10,8 @@ local GITHUB_REPO = 'Tiltann/TG_MDT'
 local GITHUB_API_URL = ('https://api.github.com/repos/%s/releases/latest'):format(GITHUB_REPO)
 local GITHUB_DOWNLOAD_URL = ('https://github.com/%s/releases/latest'):format(GITHUB_REPO)
 
+local retry_count = 0
+
 -- ── Helper Functions ──────────────────────────────────────
 
 --- Parse semantic version string into comparable table.
@@ -80,43 +82,40 @@ end
 --- Fetch latest release from GitHub API.
 ---@param callback fun(success: boolean, version: string|nil)
 local function fetchLatestVersion(callback)
-    PerformHttpRequest(GITHUB_API_URL, function(status_code, response_body, headers)
-        if status_code ~= 200 then
-            printCheckError(('HTTP %d'):format(status_code))
+    PerformHttpRequest(GITHUB_API_URL, function(status, body)
+        if status ~= 200 then
+            if status == 403 then
+                printCheckError('GitHub rate limit - try again later')
+            elseif status == 404 then
+                printCheckError('No GitHub releases found')
+            else
+                printCheckError(('HTTP %d'):format(status))
+            end
             callback(false, nil)
             return
         end
 
-        local success, data = pcall(json.decode, response_body)
-        if not success or not data then
-            printCheckError('Invalid JSON response')
+        local ok, data = pcall(json.decode, body)
+        if not ok or not data or not data.tag_name then
+            printCheckError('Invalid response from GitHub')
             callback(false, nil)
             return
         end
 
-        local tag_name = data.tag_name
-        if not tag_name or type(tag_name) ~= 'string' then
-            printCheckError('No tag_name in response')
-            callback(false, nil)
-            return
-        end
-
-        callback(true, tag_name)
+        callback(true, data.tag_name)
     end, 'GET', '', { ['User-Agent'] = 'TG_MDT-VersionCheck' })
 end
 
 --- Perform version check and print appropriate message.
 local function checkVersion()
     fetchLatestVersion(function(success, latest_version)
-        if not success or not latest_version then
-            return
-        end
+        if not success or not latest_version then return end
 
         local current = parseVersion(CURRENT_VERSION)
         local latest = parseVersion(latest_version)
 
         if not current or not latest then
-            printCheckError('Failed to parse version strings')
+            printCheckError('Failed to parse versions')
             return
         end
 

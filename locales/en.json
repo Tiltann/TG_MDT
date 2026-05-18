@@ -221,5 +221,7 @@
   "tablet.map.style.grid": "Grid",
   "tablet.map.style.satellite": "Satellite",
   "tablet.map.marker.default_label": "Unit marker",
-  "tablet.map.marker.player": "You"
+  "tablet.map.marker.player": "You",
+  "duty_on": "You are now on duty.",
+  "duty_off": "You are now off duty."
 }

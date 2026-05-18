@@ -221,5 +221,7 @@
   "tablet.map.style.grid": "Raster",
   "tablet.map.style.satellite": "Satellit",
   "tablet.map.marker.default_label": "Einheiten-Marker",
-  "tablet.map.marker.player": "Du"
+  "tablet.map.marker.player": "Du",
+  "duty_on": "Du bist jetzt im Dienst.",
+  "duty_off": "Du bist jetzt außer Dienst."
 }
