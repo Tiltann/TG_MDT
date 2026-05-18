@@ -220,6 +220,58 @@ NUI.onCallback('getTabletBootstrap', function(_, cb)
 	cb(result or { persons = {}, vehicles = {}, akteBootstrap = { personAkten = {}, vehicleAkten = {} } })
 end)
 
+NUI.onCallback('getAkteCompartments', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local kind = type(payload.kind) == 'string' and payload.kind or ''
+	local value = type(payload.value) == 'string' and payload.value or ''
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:getAkteCompartments', false, kind, value)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('getPersonAkte', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local identifier = type(payload.identifier) == 'string' and payload.identifier or ''
+	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:getPersonAkte', false, identifier, compartment)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('savePersonAkte', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local identifier = type(payload.identifier) == 'string' and payload.identifier or ''
+	local akte = type(payload.akte) == 'table' and payload.akte or {}
+	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:savePersonAkte', false, identifier, akte, compartment)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('getVehicleAkte', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local plate = type(payload.plate) == 'string' and payload.plate or ''
+	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:getVehicleAkte', false, plate, compartment)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('saveVehicleAkte', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local plate = type(payload.plate) == 'string' and payload.plate or ''
+	local akte = type(payload.akte) == 'table' and payload.akte or {}
+	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:saveVehicleAkte', false, plate, akte, compartment)
+	end)
+	cb(ok and result or {})
+end)
+
 RegisterNetEvent('TG_MDT:akteUpdated', function(payload)
 	if type(payload) ~= 'table' then return end
 	NUI.send('setData', {
@@ -307,9 +359,11 @@ function TG_MDT_sendInitialState()
 			for jobKey, jobModel in pairs(Config.AkteModels.job_models) do
 				if type(jobModel) == 'table' then
 					jm[jobKey] = {
+						compartment = jobModel.compartment,
+						jobs        = jobModel.jobs,
+						shared_with = jobModel.shared_with,
 						person      = serializeModel(jobModel.person),
 						vehicle     = serializeModel(jobModel.vehicle),
-						shared_with = jobModel.shared_with,
 					}
 				end
 			end

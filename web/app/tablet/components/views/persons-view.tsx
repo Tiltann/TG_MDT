@@ -42,7 +42,13 @@ type AkteSyncPayload = {
   kind?: "person" | "vehicle";
   identifier?: string;
   plate?: string;
+  compartment?: string;
   akte?: Record<string, string>;
+};
+
+type CompartmentOption = {
+  value: string;
+  label: string;
 };
 
 type RelatedIncident = {
@@ -341,6 +347,7 @@ export default function PersonsView({
   dataFields,
   incidents,
   bolos,
+  akteScope,
 }: {
   t: TFunction;
   actorName?: string;
@@ -352,13 +359,20 @@ export default function PersonsView({
   dataFields?: DataField[];
   incidents?: RelatedIncident[];
   bolos?: RelatedBolo[];
+  akteScope?: string;
 }) {
   const resolvedFields = akteFields && akteFields.length > 0 ? akteFields : FALLBACK_FIELDS;
   const resolvedDataFields = dataFields && dataFields.length > 0 ? dataFields : FALLBACK_DATA_FIELDS;
   const defaultAkte = useMemo(() => defaultsFromFields(resolvedFields), [resolvedFields]);
+  const baseScope = (akteScope || "default").trim().toLowerCase() || "default";
+
+  const akteKey = (identifier: string, scope: string) => `${identifier}::${scope.trim().toLowerCase() || "default"}`;
 
   const [selectedIdentifier, setSelectedIdentifier] = useState<string | null>(null);
-  const [aktenByPerson, setAktenByPerson] = useState<Record<string, PersonAkte>>(initialAkten || {});
+  const [aktenByPerson, setAktenByPerson] = useState<Record<string, PersonAkte>>({});
+  const [personCompartments, setPersonCompartments] = useState<CompartmentOption[]>([]);
+  const [selectedCompartment, setSelectedCompartment] = useState(baseScope);
+  const [shareTarget, setShareTarget] = useState("");
   const [captureBusy, setCaptureBusy] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [manualImageUrl, setManualImageUrl] = useState("");
@@ -384,16 +398,56 @@ export default function PersonsView({
   }, [resolvedFields]);
 
   useEffect(() => {
-    setAktenByPerson((prev) => ({ ...initialAkten, ...prev }));
-  }, [initialAkten]);
+    if (!selectedPerson) {
+      setPersonCompartments([]);
+      setSelectedCompartment(baseScope);
+      setShareTarget("");
+      return;
+    }
+
+    setPersonCompartments([{ value: baseScope, label: baseScope.toUpperCase() }]);
+    setSelectedCompartment(baseScope);
+    setShareTarget("");
+
+    fetchNui<string[]>("getAkteCompartments", { kind: "person", value: selectedPerson.identifier })
+      .then((result) => {
+        const scopes = Array.isArray(result)
+          ? result.filter((entry) => typeof entry === "string" && entry.trim() !== "")
+          : [];
+        const unique = [baseScope, ...scopes.map((entry) => entry.trim().toLowerCase())].filter(
+          (entry, index, self) => self.indexOf(entry) === index
+        );
+        setPersonCompartments(unique.map((entry) => ({ value: entry, label: entry.toUpperCase() })));
+      })
+      .catch(() => {
+        // Keep the current scope tab when the compartment lookup is unavailable.
+      });
+  }, [baseScope, selectedIdentifier]);
+
+  useEffect(() => {
+    setAktenByPerson((prev) => {
+      const next = { ...prev };
+      for (const [identifier, akte] of Object.entries(initialAkten || {})) {
+        const key = akteKey(identifier, baseScope);
+        if (!next[key]) {
+          next[key] = {
+            ...defaultAkte,
+            ...(akte || {}),
+          };
+        }
+      }
+      return next;
+    });
+  }, [initialAkten, baseScope, defaultAkte]);
 
   useEffect(() => {
     if (!akteSync || akteSync.kind !== "person" || !akteSync.identifier || !akteSync.akte) return;
+    const scope = (akteSync.compartment || baseScope).trim().toLowerCase() || baseScope;
     setAktenByPerson((prev) => ({
       ...prev,
-      [akteSync.identifier as string]: {
+      [akteKey(akteSync.identifier as string, scope)]: {
         ...defaultAkte,
-        ...(prev[akteSync.identifier as string] || {}),
+        ...(prev[akteKey(akteSync.identifier as string, scope)] || {}),
         ...(akteSync.akte || {}),
       },
     }));
@@ -440,6 +494,8 @@ export default function PersonsView({
   const selectedPerson =
     filteredPersons.find((person) => person.identifier === selectedIdentifier) || null;
 
+  const currentAkteKey = selectedPerson ? akteKey(selectedPerson.identifier, selectedCompartment) : "";
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = window.localStorage.getItem(SELECTED_PERSON_STORAGE_KEY);
@@ -459,13 +515,14 @@ export default function PersonsView({
 
   useEffect(() => {
     if (!selectedPerson) return;
-    if (aktenByPerson[selectedPerson.identifier]) return;
+    const scopeKey = currentAkteKey;
+    if (aktenByPerson[scopeKey]) return;
 
-    fetchNui<PersonAkte>("getPersonAkte", { identifier: selectedPerson.identifier })
+    fetchNui<PersonAkte>("getPersonAkte", { identifier: selectedPerson.identifier, compartment: selectedCompartment })
       .then((akte) => {
         setAktenByPerson((prev) => ({
           ...prev,
-          [selectedPerson.identifier]: {
+          [scopeKey]: {
             ...defaultAkte,
             ...(akte || {}),
           },
@@ -474,10 +531,10 @@ export default function PersonsView({
       .catch(() => {
         // Keep defaults when callback fails.
       });
-  }, [selectedPerson, aktenByPerson, defaultAkte]);
+  }, [selectedPerson, selectedCompartment, currentAkteKey, aktenByPerson, defaultAkte, baseScope]);
 
   const currentAkte: PersonAkte = selectedPerson
-    ? aktenByPerson[selectedPerson.identifier] || {
+    ? aktenByPerson[currentAkteKey] || {
         ...defaultAkte,
       }
     : defaultAkte;
@@ -498,20 +555,20 @@ export default function PersonsView({
   const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
 
   const persistAkte = (identifier: string, nextAkte: PersonAkte) => {
-    fetchNui<PersonAkte>("savePersonAkte", { identifier, akte: nextAkte })
+    fetchNui<PersonAkte>("savePersonAkte", { identifier, akte: nextAkte, compartment: selectedCompartment })
       .then((saved) => {
         const savedImageCount = decodeImages(saved?.[imageFieldKey] ?? "").length;
         void fetchNui("debugUiLog", {
           tag: "persons-save",
-          message: `identifier=${identifier} savedImages=${savedImageCount}`,
+          message: `identifier=${identifier} scope=${selectedCompartment} savedImages=${savedImageCount}`,
         });
 
         if (!saved) return;
         setAktenByPerson((prev) => ({
           ...prev,
-          [identifier]: {
+          [akteKey(identifier, selectedCompartment)]: {
             ...defaultAkte,
-            ...(prev[identifier] || {}),
+            ...(prev[akteKey(identifier, selectedCompartment)] || {}),
             ...(saved || {}),
           },
         }));
@@ -530,13 +587,13 @@ export default function PersonsView({
     setAktenByPerson((prev) => {
       const nextAkte: PersonAkte = {
         ...defaultAkte,
-        ...(prev[identifier] || {}),
+        ...(prev[akteKey(identifier, selectedCompartment)] || {}),
         [field]: value,
       };
 
       return {
         ...prev,
-        [identifier]: nextAkte,
+        [akteKey(identifier, selectedCompartment)]: nextAkte,
       };
     });
 
@@ -549,6 +606,33 @@ export default function PersonsView({
     persistAkte(selectedPerson.identifier, currentAkte);
   };
 
+  const shareCurrentAkte = () => {
+    if (!selectedPerson) return;
+    const target = shareTarget.trim().toLowerCase();
+    if (target === "" || target === selectedCompartment) return;
+    persistAkte(selectedPerson.identifier, currentAkte);
+    fetchNui<PersonAkte>("savePersonAkte", {
+      identifier: selectedPerson.identifier,
+      akte: currentAkte,
+      compartment: target,
+    }).then((saved) => {
+      if (!saved) return;
+      setPersonCompartments((prev) => {
+        if (prev.some((entry) => entry.value === target)) return prev;
+        return [...prev, { value: target, label: target.toUpperCase() }];
+      });
+      setAktenByPerson((prev) => ({
+        ...prev,
+        [akteKey(selectedPerson.identifier, target)]: {
+          ...defaultAkte,
+          ...(saved || {}),
+        },
+      }));
+      setSelectedCompartment(target);
+      setShareTarget("");
+    });
+  };
+
   const setSelectedPersonSearchState = (searched: boolean) => {
     if (!selectedPerson) return;
     updateAkteField("searchStatus", searched ? "searched" : "", true);
@@ -559,6 +643,13 @@ export default function PersonsView({
     setActiveImageIndex(0);
     setManualImageUrl("");
   }, [selectedIdentifier]);
+
+  useEffect(() => {
+    setPersonCompartments((prev) => {
+      if (prev.some((entry) => entry.value === baseScope)) return prev;
+      return [{ value: baseScope, label: baseScope.toUpperCase() }, ...prev];
+    });
+  }, [baseScope]);
 
   useEffect(() => {
     if (activeImageIndex < personImages.length) return;
@@ -844,6 +935,37 @@ export default function PersonsView({
 
         <Card className="col-span-7 p-4 overflow-auto space-y-3">
           <h4 className="card-title">{t("tablet.persons.akte.title")}</h4>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] p-2">
+            <div className="flex flex-wrap gap-2">
+              {personCompartments.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSelectedCompartment(option.value)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                    option.value === selectedCompartment
+                      ? "border-[var(--mdt-accent-primary)] bg-[rgba(255,145,0,0.15)] text-[var(--mdt-accent-primary)]"
+                      : "border-[var(--mdt-border)] bg-[rgba(255,255,255,0.03)] text-[var(--mdt-text-muted)] hover:text-white"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <input
+                value={shareTarget}
+                onChange={(event) => setShareTarget(event.target.value)}
+                className="min-w-[180px] rounded-md border border-[var(--mdt-border)] bg-[var(--mdt-bg-base)] px-3 py-2 text-sm text-white"
+                placeholder="share with... AMBULANCE"
+              />
+              <Button variant="ghost" onClick={shareCurrentAkte} disabled={shareTarget.trim() === ""}>
+                Share with
+              </Button>
+            </div>
+          </div>
 
           <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
             <div className="flex items-center justify-between gap-3">

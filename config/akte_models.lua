@@ -43,20 +43,28 @@
 --    ctx.record -> current framework record
 --
 --  job_models (optional):
---    Define job-specific Akte schemas and share access with other jobs.
+--    Define compartment-based Akte schemas.
 --    Structure:
 --      job_models = {
---        police = {
---          shared_with = { 'sheriff' },
+--        lspd = {
+--          compartment = 'lspd',
+--          jobs = { 'police', 'sheriff' },
 --          person = { data_fields = {...}, fields = {...} },
 --          vehicle = { data_fields = {...}, fields = {...} },
+--        },
+--        mdt = {
+--          compartment = 'mdt',
+--          jobs = { 'mdt' },
+--          person = { ... },
+--          vehicle = { ... },
 --        }
 --      }
 --
 --    Rules:
---      - If a player's job has its own schema, it is used.
---      - Otherwise, if job is listed in another schema's shared_with, that schema is used.
---      - Otherwise fallback to default person/vehicle schemas below.
+--      - Jobs in the same compartment share the same Akte data.
+--      - shared_with still works as a compatibility alias for membership.
+--      - If no compartment is configured, the job name is used as the scope.
+--      - Otherwise fallback to the default person/vehicle schemas below.
 -- ============================================================
 
 Config = Config or {}
@@ -272,8 +280,9 @@ Config.AkteModels = Config.AkteModels or {
     -- Keep empty to use default schemas for all jobs.
     job_models = {
         -- Example:
-        -- police = {
-        --     shared_with = { 'sheriff' },
+        -- lspd = {
+        --     compartment = 'lspd',
+        --     jobs = { 'police', 'sheriff' },
         --     person = {
         --         data_fields = {
         --             { key = 'name', label_key = 'tablet.persons.field.name', source = 'name' },
@@ -290,6 +299,12 @@ Config.AkteModels = Config.AkteModels or {
         --             { key = 'notes', label_key = 'tablet.vehicles.akte.notes', type = 'textarea', default = '', editable = true },
         --         },
         --     },
+        -- },
+        -- mdt = {
+        --     compartment = 'mdt',
+        --     jobs = { 'mdt' },
+        --     person = { ... },
+        --     vehicle = { ... },
         -- },
     },
 }

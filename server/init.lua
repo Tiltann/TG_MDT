@@ -89,6 +89,23 @@ local function normalizeJobName(job)
     return string.lower((job:gsub('^%s+', ''):gsub('%s+$', '')))
 end
 
+---@param list table|nil
+---@param viewerJob string
+---@return boolean
+local function jobListContains(list, viewerJob)
+    if viewerJob == '' or type(list) ~= 'table' then
+        return false
+    end
+
+    for i = 1, #list do
+        if normalizeJobName(list[i]) == viewerJob then
+            return true
+        end
+    end
+
+    return false
+end
+
 ---@param src number|nil
 ---@return string
 local function getViewerJobName(src)
@@ -107,18 +124,21 @@ end
 ---@param viewerJob string
 ---@return string|nil
 ---@return table|nil
-local function resolveSharedJobOwner(modelRoot, viewerJob)
+local function resolveJobModelOwner(modelRoot, viewerJob)
     if viewerJob == '' then
         return nil, nil
     end
 
     local jobModels = type(modelRoot.job_models) == 'table' and modelRoot.job_models or {}
+
+    if type(jobModels[viewerJob]) == 'table' then
+        return viewerJob, jobModels[viewerJob]
+    end
+
     for ownerJob, config in pairs(jobModels) do
-        if type(config) == 'table' and type(config.shared_with) == 'table' then
-            for i = 1, #config.shared_with do
-                if normalizeJobName(config.shared_with[i]) == viewerJob then
-                    return ownerJob, config
-                end
+        if type(config) == 'table' then
+            if jobListContains(config.jobs, viewerJob) or jobListContains(config.shared_with, viewerJob) then
+                return ownerJob, config
             end
         end
     end
@@ -126,21 +146,40 @@ local function resolveSharedJobOwner(modelRoot, viewerJob)
     return nil, nil
 end
 
+---@param value any
+---@return string
+local function normalizeAkteScopeName(value)
+    local scope = normalizeJobName(type(value) == 'string' and value or '')
+    if scope == '' then
+        return 'default'
+    end
+
+    return scope
+end
+
+---@param modelRoot table
+---@param src number|nil
+---@return string
+---@return table|nil
+local function resolveAkteScope(modelRoot, src)
+    local viewerJob = getViewerJobName(src)
+    local ownerJob, config = resolveJobModelOwner(modelRoot, viewerJob)
+
+    if type(config) == 'table' then
+        return normalizeAkteScopeName(config.compartment or config.scope or config.group or ownerJob or viewerJob), config
+    end
+
+    return normalizeAkteScopeName(viewerJob), nil
+end
+
 ---@param modelRoot table
 ---@param kind string
 ---@param src number|nil
 ---@return table
 local function resolveAkteModelForViewer(modelRoot, kind, src)
-    local viewerJob = getViewerJobName(src)
-    local jobModels = type(modelRoot.job_models) == 'table' and modelRoot.job_models or {}
-
-    if viewerJob ~= '' and type(jobModels[viewerJob]) == 'table' and type(jobModels[viewerJob][kind]) == 'table' then
-        return jobModels[viewerJob][kind]
-    end
-
-    local _, sharedConfig = resolveSharedJobOwner(modelRoot, viewerJob)
-    if type(sharedConfig) == 'table' and type(sharedConfig[kind]) == 'table' then
-        return sharedConfig[kind]
+    local _, config = resolveAkteScope(modelRoot, src)
+    if type(config) == 'table' and type(config[kind]) == 'table' then
+        return config[kind]
     end
 
     if type(modelRoot[kind]) == 'table' then
@@ -368,6 +407,51 @@ end
 local function getAkteDataFields(kind, src)
     local model = getAkteModel(kind, src)
     return model.data_fields or {}
+end
+
+---@param scope string
+---@param value string
+---@return string
+local function buildAkteStorageKey(scope, value)
+    return ('%s::%s'):format(normalizeAkteScopeName(scope), tostring(value))
+end
+
+---@param storageKey string
+---@return string|nil
+---@return string
+local function splitAkteStorageKey(storageKey)
+    if type(storageKey) ~= 'string' then
+        return nil, ''
+    end
+
+    local scope, rawKey = storageKey:match('^(.-)::(.+)$')
+    if scope and rawKey then
+        return normalizeAkteScopeName(scope), rawKey
+    end
+
+    return nil, storageKey
+end
+
+---@param tableName string
+---@param columnName string
+---@param scope string
+---@param value string
+---@return table|nil
+local function loadAkteRow(tableName, columnName, scope, value)
+    local scopedKey = buildAkteStorageKey(scope, value)
+    local row = SQL.single(('SELECT data FROM %s WHERE %s = ? LIMIT 1'):format(tableName, columnName), { scopedKey })
+    if row then
+        return row
+    end
+
+    if scopedKey ~= value then
+        row = SQL.single(('SELECT data FROM %s WHERE %s = ? LIMIT 1'):format(tableName, columnName), { value })
+        if row then
+            return row
+        end
+    end
+
+    return nil
 end
 
 ---@param kind string
@@ -625,22 +709,45 @@ local function buildVehicleAkteDefaults(plate, src)
     return defaults
 end
 
+---@param src number|nil
+---@return string
+local function getAkteScope(src)
+    local models = Config.AkteModels or {}
+    local scope = resolveAkteScope(models, src)
+    return scope
+end
+
+---@param src number|nil
+---@param requestedScope string|nil
+---@return string
+local function resolveRequestedAkteScope(src, requestedScope)
+    if type(requestedScope) == 'string' and requestedScope ~= '' then
+        return normalizeAkteScopeName(requestedScope)
+    end
+
+    return getAkteScope(src)
+end
+
 ---@param identifier string
 ---@param src number|nil
+---@param compartment string|nil
 ---@return table
-local function getPersonAkte(identifier, src)
+local function getPersonAkte(identifier, src, compartment)
     local defaults = buildPersonAkteDefaults(identifier, src)
-    local row = SQL.single('SELECT data FROM tg_mdt_person_akten WHERE identifier = ? LIMIT 1', { identifier })
+    local scope = resolveRequestedAkteScope(src, compartment)
+    local row = loadAkteRow('tg_mdt_person_akten', 'identifier', scope, identifier)
     local decoded = row and decodeObject(row.data) or nil
     return normalizeAkteToSchema('person', decoded, defaults, src)
 end
 
 ---@param plate string
 ---@param src number|nil
+---@param compartment string|nil
 ---@return table
-local function getVehicleAkte(plate, src)
+local function getVehicleAkte(plate, src, compartment)
     local defaults = buildVehicleAkteDefaults(plate, src)
-    local row = SQL.single('SELECT data FROM tg_mdt_vehicle_akten WHERE plate = ? LIMIT 1', { plate })
+    local scope = resolveRequestedAkteScope(src, compartment)
+    local row = loadAkteRow('tg_mdt_vehicle_akten', 'plate', scope, plate)
     local decoded = row and decodeObject(row.data) or nil
     return normalizeAkteToSchema('vehicle', decoded, defaults, src)
 end
@@ -821,6 +928,29 @@ local function getVehiclesFromFramework(src)
     return {}
 end
 
+---@param tableName string
+---@param columnName string
+---@param value string
+---@return string[]
+local function getAkteCompartmentsForRow(tableName, columnName, value)
+    local query = ('SELECT %s FROM %s WHERE %s = ? OR %s LIKE ?'):format(columnName, tableName, columnName, columnName)
+    local rows = SQL.query(query, { value, ('%%::%s'):format(value) })
+    local scopes = {}
+    local seen = {}
+
+    for i = 1, #rows do
+        local row = rows[i]
+        local scope, _ = splitAkteStorageKey(row[columnName])
+        if scope and not seen[scope] then
+            seen[scope] = true
+            scopes[#scopes + 1] = scope
+        end
+    end
+
+    table.sort(scopes)
+    return scopes
+end
+
 -- ── Startup ────────────────────────────────────────────
 Debug.debug(('Framework: %s'):format(Framework.name))
 
@@ -861,19 +991,26 @@ end)
 
 -- ── Akte callbacks (db-backed + live sync) ────────────────
 lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
+    local scope = getAkteScope(src)
     local personRows = SQL.query('SELECT identifier, data FROM tg_mdt_person_akten', {})
     local vehicleRows = SQL.query('SELECT plate, data FROM tg_mdt_vehicle_akten', {})
 
     local personAkten = {}
     for i = 1, #personRows do
         local row = personRows[i]
-        personAkten[row.identifier] = normalizeAkteToSchema('person', decodeObject(row.data), defaultPersonAkte(src), src)
+        local rowScope, rawIdentifier = splitAkteStorageKey(row.identifier)
+        if rowScope == scope or (rowScope == nil and personAkten[rawIdentifier] == nil) then
+            personAkten[rawIdentifier] = normalizeAkteToSchema('person', decodeObject(row.data), defaultPersonAkte(src), src)
+        end
     end
 
     local vehicleAkten = {}
     for i = 1, #vehicleRows do
         local row = vehicleRows[i]
-        vehicleAkten[row.plate] = normalizeAkteToSchema('vehicle', decodeObject(row.data), defaultVehicleAkte(src), src)
+        local rowScope, rawPlate = splitAkteStorageKey(row.plate)
+        if rowScope == scope or (rowScope == nil and vehicleAkten[rawPlate] == nil) then
+            vehicleAkten[rawPlate] = normalizeAkteToSchema('vehicle', decodeObject(row.data), defaultVehicleAkte(src), src)
+        end
     end
 
     return {
@@ -882,56 +1019,74 @@ lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
     }
 end)
 
-lib.callback.register('TG_MDT:getPersonAkte', function(src, identifier)
+lib.callback.register('TG_MDT:getAkteCompartments', function(_, kind, value)
+    if kind == 'vehicle' and type(value) == 'string' and value ~= '' then
+        return getAkteCompartmentsForRow('tg_mdt_vehicle_akten', 'plate', value)
+    end
+
+    if kind == 'person' and type(value) == 'string' and value ~= '' then
+        return getAkteCompartmentsForRow('tg_mdt_person_akten', 'identifier', value)
+    end
+
+    return {}
+end)
+
+lib.callback.register('TG_MDT:getPersonAkte', function(src, identifier, compartment)
     if type(identifier) ~= 'string' or identifier == '' then
         return defaultPersonAkte(src)
     end
-    return getPersonAkte(identifier, src)
+    return getPersonAkte(identifier, src, compartment)
 end)
 
-lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte)
+lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, compartment)
     if type(identifier) ~= 'string' or identifier == '' then
         return nil
     end
 
-    local merged = applyEditableAkteFields('person', getPersonAkte(identifier, src), akte, src)
+    local scope = resolveRequestedAkteScope(src, compartment)
+    local merged = applyEditableAkteFields('person', getPersonAkte(identifier, src, scope), akte, src)
+    local storageKey = buildAkteStorageKey(scope, identifier)
 
     SQL.execute(
         'INSERT INTO tg_mdt_person_akten (identifier, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',
-        { identifier, json.encode(merged) }
+        { storageKey, json.encode(merged) }
     )
 
     TriggerClientEvent('TG_MDT:akteUpdated', -1, {
         kind = 'person',
         identifier = identifier,
+        compartment = scope,
         akte = merged,
     })
 
     return merged
 end)
 
-lib.callback.register('TG_MDT:getVehicleAkte', function(src, plate)
+lib.callback.register('TG_MDT:getVehicleAkte', function(src, plate, compartment)
     if type(plate) ~= 'string' or plate == '' then
         return defaultVehicleAkte(src)
     end
-    return getVehicleAkte(plate, src)
+    return getVehicleAkte(plate, src, compartment)
 end)
 
-lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte)
+lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compartment)
     if type(plate) ~= 'string' or plate == '' then
         return nil
     end
 
-    local merged = applyEditableAkteFields('vehicle', getVehicleAkte(plate, src), akte, src)
+    local scope = resolveRequestedAkteScope(src, compartment)
+    local merged = applyEditableAkteFields('vehicle', getVehicleAkte(plate, src, scope), akte, src)
+    local storageKey = buildAkteStorageKey(scope, plate)
 
     SQL.execute(
         'INSERT INTO tg_mdt_vehicle_akten (plate, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',
-        { plate, json.encode(merged) }
+        { storageKey, json.encode(merged) }
     )
 
     TriggerClientEvent('TG_MDT:akteUpdated', -1, {
         kind = 'vehicle',
         plate = plate,
+        compartment = scope,
         akte = merged,
     })
 

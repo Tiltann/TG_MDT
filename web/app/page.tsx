@@ -69,6 +69,8 @@ type NuiMetaPayload = {
     job_models?: Record<
       string,
       {
+        compartment?: string;
+        jobs?: string[];
         shared_with?: string[];
         person?: { fields?: AkteFieldSchema[]; data_fields?: DataFieldSchema[] };
         vehicle?: { fields?: AkteFieldSchema[]; data_fields?: DataFieldSchema[] };
@@ -120,6 +122,7 @@ type AkteSyncPayload = {
   kind?: "person" | "vehicle";
   identifier?: string;
   plate?: string;
+  compartment?: string;
   akte?: PersonAkte | VehicleAkte;
 };
 
@@ -290,8 +293,21 @@ function resolveJobAkteModels(meta: NuiMetaPayload, job?: string) {
   const byJob = meta.akteModels?.job_models || {};
   const viewerJob = normalizeJobKey(job);
 
+  const matchesViewerJob = (cfg?: { jobs?: string[]; shared_with?: string[] }) => {
+    if (!cfg) return false;
+    const jobs = Array.isArray(cfg.jobs) ? cfg.jobs : [];
+    const sharedWith = Array.isArray(cfg.shared_with) ? cfg.shared_with : [];
+    return (
+      jobs.some((entry) => normalizeJobKey(entry) === viewerJob) ||
+      sharedWith.some((entry) => normalizeJobKey(entry) === viewerJob)
+    );
+  };
+
+  const compartmentFrom = (cfg?: { compartment?: string }) => normalizeJobKey(cfg?.compartment) || viewerJob || "default";
+
   if (viewerJob && byJob[viewerJob]) {
     return {
+      compartment: compartmentFrom(byJob[viewerJob]),
       person: byJob[viewerJob].person || basePerson,
       vehicle: byJob[viewerJob].vehicle || baseVehicle,
     };
@@ -299,18 +315,17 @@ function resolveJobAkteModels(meta: NuiMetaPayload, job?: string) {
 
   if (viewerJob) {
     for (const [_, cfg] of Object.entries(byJob)) {
-      if (!cfg || !Array.isArray(cfg.shared_with)) continue;
-      const isShared = cfg.shared_with.some((entry) => normalizeJobKey(entry) === viewerJob);
-      if (isShared) {
-        return {
-          person: cfg.person || basePerson,
-          vehicle: cfg.vehicle || baseVehicle,
-        };
-      }
+      if (!matchesViewerJob(cfg)) continue;
+      return {
+        compartment: compartmentFrom(cfg),
+        person: cfg?.person || basePerson,
+        vehicle: cfg?.vehicle || baseVehicle,
+      };
     }
   }
 
   return {
+    compartment: viewerJob || "default",
     person: basePerson,
     vehicle: baseVehicle,
   };
@@ -714,13 +729,16 @@ export default function Home() {
   const personAktenData = ((screenData?.personAkten as Record<string, PersonAkte>) || {});
   const vehicleAktenData = ((screenData?.vehicleAkten as Record<string, VehicleAkte>) || {});
   const akteSyncData = (screenData?.akteSync as AkteSyncPayload | undefined) || undefined;
-  const personAkteSync = akteSyncData?.kind === "person" ? akteSyncData : undefined;
-  const vehicleAkteSync = akteSyncData?.kind === "vehicle" ? akteSyncData : undefined;
   const resolvedAkteModels = resolveJobAkteModels(typedMeta, sessionJob);
+  const activeAkteCompartment = normalizeJobKey(resolvedAkteModels.compartment);
   const personAkteFields = resolvedAkteModels.person?.fields || [];
   const vehicleAkteFields = resolvedAkteModels.vehicle?.fields || [];
   const personDataFields = resolvedAkteModels.person?.data_fields || [];
   const vehicleDataFields = resolvedAkteModels.vehicle?.data_fields || [];
+  const akteSyncMatchesScope =
+    !akteSyncData?.compartment || normalizeJobKey(akteSyncData.compartment) === activeAkteCompartment;
+  const personAkteSync = akteSyncData?.kind === "person" && akteSyncMatchesScope ? akteSyncData : undefined;
+  const vehicleAkteSync = akteSyncData?.kind === "vehicle" && akteSyncMatchesScope ? akteSyncData : undefined;
   const createActivity = (activity: Omit<DashboardActivity, "id" | "timestamp"> & { timestamp?: string }) => ({
     id: `${Date.now()}-${Math.floor(Math.random() * 100000)}`,
     timestamp: activity.timestamp || new Date().toISOString(),
@@ -1191,6 +1209,7 @@ export default function Home() {
                     dataFields={personDataFields}
                     incidents={incidentRecords}
                     bolos={boloRecords}
+                    akteScope={activeAkteCompartment}
                   />
                 )}
                 {activeScreen === "vehicles" && (
@@ -1205,6 +1224,7 @@ export default function Home() {
                     dataFields={vehicleDataFields}
                     incidents={incidentRecords}
                     bolos={boloRecords}
+                    akteScope={activeAkteCompartment}
                   />
                 )}
                 {activeScreen === "warrants" && <WarrantsView t={t} />}

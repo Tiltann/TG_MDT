@@ -39,7 +39,13 @@ type AkteSyncPayload = {
   kind?: "person" | "vehicle";
   identifier?: string;
   plate?: string;
+  compartment?: string;
   akte?: Record<string, string>;
+};
+
+type CompartmentOption = {
+  value: string;
+  label: string;
 };
 
 type RelatedIncident = {
@@ -317,6 +323,7 @@ export default function VehiclesView({
   dataFields,
   incidents,
   bolos,
+  akteScope,
 }: {
   t: TFunction;
   actorName?: string;
@@ -328,13 +335,20 @@ export default function VehiclesView({
   dataFields?: DataField[];
   incidents?: RelatedIncident[];
   bolos?: RelatedBolo[];
+  akteScope?: string;
 }) {
   const resolvedFields = akteFields && akteFields.length > 0 ? akteFields : FALLBACK_FIELDS;
   const resolvedDataFields = dataFields && dataFields.length > 0 ? dataFields : FALLBACK_DATA_FIELDS;
   const defaultAkte = useMemo(() => defaultsFromFields(resolvedFields), [resolvedFields]);
+  const baseScope = (akteScope || "default").trim().toLowerCase() || "default";
+
+  const akteKey = (plate: string, scope: string) => `${plate}::${scope.trim().toLowerCase() || "default"}`;
 
   const [selectedPlate, setSelectedPlate] = useState<string | null>(null);
-  const [aktenByVehicle, setAktenByVehicle] = useState<Record<string, VehicleAkte>>(initialAkten || {});
+  const [aktenByVehicle, setAktenByVehicle] = useState<Record<string, VehicleAkte>>({});
+  const [vehicleCompartments, setVehicleCompartments] = useState<CompartmentOption[]>([]);
+  const [selectedCompartment, setSelectedCompartment] = useState(baseScope);
+  const [shareTarget, setShareTarget] = useState("");
   const [captureBusy, setCaptureBusy] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [manualImageUrl, setManualImageUrl] = useState("");
@@ -360,16 +374,56 @@ export default function VehiclesView({
   }, [resolvedFields]);
 
   useEffect(() => {
-    setAktenByVehicle((prev) => ({ ...initialAkten, ...prev }));
-  }, [initialAkten]);
+    if (!selectedPlate) {
+      setVehicleCompartments([]);
+      setSelectedCompartment(baseScope);
+      setShareTarget("");
+      return;
+    }
+
+    setVehicleCompartments([{ value: baseScope, label: baseScope.toUpperCase() }]);
+    setSelectedCompartment(baseScope);
+    setShareTarget("");
+
+    fetchNui<string[]>("getAkteCompartments", { kind: "vehicle", value: selectedPlate })
+      .then((result) => {
+        const scopes = Array.isArray(result)
+          ? result.filter((entry) => typeof entry === "string" && entry.trim() !== "")
+          : [];
+        const unique = [baseScope, ...scopes.map((entry) => entry.trim().toLowerCase())].filter(
+          (entry, index, self) => self.indexOf(entry) === index
+        );
+        setVehicleCompartments(unique.map((entry) => ({ value: entry, label: entry.toUpperCase() })));
+      })
+      .catch(() => {
+        // Keep the base scope tab when discovery fails.
+      });
+  }, [baseScope, selectedPlate]);
+
+  useEffect(() => {
+    setAktenByVehicle((prev) => {
+      const next = { ...prev };
+      for (const [plate, akte] of Object.entries(initialAkten || {})) {
+        const key = akteKey(plate, baseScope);
+        if (!next[key]) {
+          next[key] = {
+            ...defaultAkte,
+            ...(akte || {}),
+          };
+        }
+      }
+      return next;
+    });
+  }, [initialAkten, baseScope, defaultAkte]);
 
   useEffect(() => {
     if (!akteSync || akteSync.kind !== "vehicle" || !akteSync.plate || !akteSync.akte) return;
+    const scope = (akteSync.compartment || baseScope).trim().toLowerCase() || baseScope;
     setAktenByVehicle((prev) => ({
       ...prev,
-      [akteSync.plate as string]: {
+      [akteKey(akteSync.plate as string, scope)]: {
         ...defaultAkte,
-        ...(prev[akteSync.plate as string] || {}),
+        ...(prev[akteKey(akteSync.plate as string, scope)] || {}),
         ...(akteSync.akte || {}),
       },
     }));
@@ -408,6 +462,7 @@ export default function VehiclesView({
   }, [filteredVehicles, selectedPlate]);
 
   const selectedVehicle = filteredVehicles.find((vehicle) => vehicle.plate === selectedPlate) || null;
+  const currentAkteKey = selectedVehicle ? akteKey(selectedVehicle.plate, selectedCompartment) : "";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -428,13 +483,14 @@ export default function VehiclesView({
 
   useEffect(() => {
     if (!selectedVehicle) return;
-    if (aktenByVehicle[selectedVehicle.plate]) return;
+    const scopeKey = currentAkteKey;
+    if (aktenByVehicle[scopeKey]) return;
 
-    fetchNui<VehicleAkte>("getVehicleAkte", { plate: selectedVehicle.plate })
+    fetchNui<VehicleAkte>("getVehicleAkte", { plate: selectedVehicle.plate, compartment: selectedCompartment })
       .then((akte) => {
         setAktenByVehicle((prev) => ({
           ...prev,
-          [selectedVehicle.plate]: {
+          [scopeKey]: {
             ...defaultAkte,
             ...(akte || {}),
           },
@@ -443,10 +499,10 @@ export default function VehiclesView({
       .catch(() => {
         // Keep defaults when callback fails.
       });
-  }, [selectedVehicle, aktenByVehicle, defaultAkte]);
+  }, [selectedVehicle, selectedCompartment, currentAkteKey, aktenByVehicle, defaultAkte, baseScope]);
 
   const currentAkte: VehicleAkte = selectedVehicle
-    ? aktenByVehicle[selectedVehicle.plate] || {
+    ? aktenByVehicle[currentAkteKey] || {
         ...defaultAkte,
       }
     : defaultAkte;
@@ -465,20 +521,20 @@ export default function VehiclesView({
   const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
 
   const persistAkte = (plate: string, nextAkte: VehicleAkte) => {
-    fetchNui<VehicleAkte>("saveVehicleAkte", { plate, akte: nextAkte })
+    fetchNui<VehicleAkte>("saveVehicleAkte", { plate, akte: nextAkte, compartment: selectedCompartment })
       .then((saved) => {
         const savedImageCount = decodeImages(saved?.[imageFieldKey] ?? "").length;
         void fetchNui("debugUiLog", {
           tag: "vehicles-save",
-          message: `plate=${plate} savedImages=${savedImageCount}`,
+          message: `plate=${plate} scope=${selectedCompartment} savedImages=${savedImageCount}`,
         });
 
         if (!saved) return;
         setAktenByVehicle((prev) => ({
           ...prev,
-          [plate]: {
+          [akteKey(plate, selectedCompartment)]: {
             ...defaultAkte,
-            ...(prev[plate] || {}),
+            ...(prev[akteKey(plate, selectedCompartment)] || {}),
             ...(saved || {}),
           },
         }));
@@ -497,13 +553,13 @@ export default function VehiclesView({
     setAktenByVehicle((prev) => {
       const nextAkte: VehicleAkte = {
         ...defaultAkte,
-        ...(prev[plate] || {}),
+        ...(prev[akteKey(plate, selectedCompartment)] || {}),
         [field]: value,
       };
 
       return {
         ...prev,
-        [plate]: nextAkte,
+        [akteKey(plate, selectedCompartment)]: nextAkte,
       };
     });
 
@@ -515,10 +571,44 @@ export default function VehiclesView({
     persistAkte(selectedVehicle.plate, currentAkte);
   };
 
+  const shareCurrentAkte = () => {
+    if (!selectedVehicle) return;
+    const target = shareTarget.trim().toLowerCase();
+    if (target === "" || target === selectedCompartment) return;
+
+    fetchNui<VehicleAkte>("saveVehicleAkte", {
+      plate: selectedVehicle.plate,
+      akte: currentAkte,
+      compartment: target,
+    }).then((saved) => {
+      if (!saved) return;
+      setVehicleCompartments((prev) => {
+        if (prev.some((entry) => entry.value === target)) return prev;
+        return [...prev, { value: target, label: target.toUpperCase() }];
+      });
+      setAktenByVehicle((prev) => ({
+        ...prev,
+        [akteKey(selectedVehicle.plate, target)]: {
+          ...defaultAkte,
+          ...(saved || {}),
+        },
+      }));
+      setSelectedCompartment(target);
+      setShareTarget("");
+    });
+  };
+
   useEffect(() => {
     setActiveImageIndex(0);
     setManualImageUrl("");
   }, [selectedPlate]);
+
+  useEffect(() => {
+    setVehicleCompartments((prev) => {
+      if (prev.some((entry) => entry.value === baseScope)) return prev;
+      return [{ value: baseScope, label: baseScope.toUpperCase() }, ...prev];
+    });
+  }, [baseScope]);
 
   useEffect(() => {
     if (activeImageIndex < vehicleImages.length) return;
@@ -778,6 +868,37 @@ export default function VehiclesView({
 
         <Card className="col-span-7 p-4 overflow-auto space-y-3">
           <h4 className="card-title">{t("tablet.vehicles.akte.title")}</h4>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] p-2">
+            <div className="flex flex-wrap gap-2">
+              {vehicleCompartments.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSelectedCompartment(option.value)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                    option.value === selectedCompartment
+                      ? "border-[var(--mdt-accent-primary)] bg-[rgba(255,145,0,0.15)] text-[var(--mdt-accent-primary)]"
+                      : "border-[var(--mdt-border)] bg-[rgba(255,255,255,0.03)] text-[var(--mdt-text-muted)] hover:text-white"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <input
+                value={shareTarget}
+                onChange={(event) => setShareTarget(event.target.value)}
+                className="min-w-[180px] rounded-md border border-[var(--mdt-border)] bg-[var(--mdt-bg-base)] px-3 py-2 text-sm text-white"
+                placeholder="share with... AMBULANCE"
+              />
+              <Button variant="ghost" onClick={shareCurrentAkte} disabled={shareTarget.trim() === ""}>
+                Share with
+              </Button>
+            </div>
+          </div>
 
           <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
             <div className="flex items-center justify-between gap-3">
