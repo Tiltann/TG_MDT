@@ -146,6 +146,12 @@ local function toggleTablet()
         tostring(NUI.getActiveScreen())
     ))
 
+    -- Always resend meta + player when opening so the UI has fresh data
+    -- even if the nuiReady handshake was skipped.
+    if NUI.isVisible() and type(TG_MDT_sendInitialState) == 'function' then
+        TG_MDT_sendInitialState()
+    end
+
     NUI.send('setData', {
         key = 'session',
         value = {
@@ -160,6 +166,275 @@ end
 local OPEN_COMMAND = (Config.Commands and Config.Commands.open_mdt)
 RegisterCommand(OPEN_COMMAND, toggleTablet)
 Debug.debug(('Tablet command registered: /%s'):format(OPEN_COMMAND))
+
+local function requestModel(model)
+    if not IsModelInCdimage(model) then return false end
+    RequestModel(model)
+    local timeoutAt = GetGameTimer() + 3000
+    while not HasModelLoaded(model) and GetGameTimer() < timeoutAt do
+        Wait(0)
+    end
+    return HasModelLoaded(model)
+end
+
+local function deleteEntitySafe(entity)
+    if entity and DoesEntityExist(entity) then
+        DeleteEntity(entity)
+    end
+end
+
+local function startPhotoSelfieSetup(ped)
+    local phoneModel = joaat('prop_phone_ing_02_lod')
+    local phone = nil
+    local cam = nil
+    local animDict = 'cellphone@'
+    local animName = 'cellphone_text_read_base'
+    local phoneCoords = GetEntityCoords(ped)
+
+    if requestModel(phoneModel) then
+        phone = CreateObject(phoneModel, phoneCoords.x, phoneCoords.y, phoneCoords.z, true, true, false)
+        SetEntityCollision(phone, false, false)
+        AttachEntityToEntity(
+            phone,
+            ped,
+            GetPedBoneIndex(ped, 28422),
+            0.02,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            -10.0,
+            true,
+            true,
+            false,
+            true,
+            1,
+            true
+        )
+        SetModelAsNoLongerNeeded(phoneModel)
+    end
+
+    if not HasAnimDictLoaded(animDict) then
+        RequestAnimDict(animDict)
+        local timeoutAt = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(animDict) and GetGameTimer() < timeoutAt do
+            Wait(0)
+        end
+    end
+
+    TaskPlayAnim(ped, animDict, animName, 8.0, -8.0, -1, 49, 0, false, false, false)
+
+    cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
+    local camPos = GetOffsetFromEntityInWorldCoords(ped, 0.0, 1.15, 0.7)
+    SetCamCoord(cam, camPos.x, camPos.y, camPos.z)
+    PointCamAtEntity(cam, ped, 0.0, 0.0, 0.65, true)
+    SetCamFov(cam, 42.0)
+    SetCamActive(cam, true)
+    RenderScriptCams(true, false, 0, true, true)
+
+    return {
+        cam = cam,
+        phone = phone,
+    }
+end
+
+NUI.onCallback('openAktePhotoMode', function(body, cb)
+    local payload = type(body) == 'table' and body or {}
+    local _targetType = type(payload.kind) == 'string' and payload.kind or 'person'
+    local captureMode = type(payload.mode) == 'string' and payload.mode:lower() or 'standard'
+    local rawQuality = (((Config or {}).MDT or {}).photo or {}).screenshot_quality
+    local captureQuality = tonumber(rawQuality) or 0.65
+    if captureQuality < 0.1 then captureQuality = 0.1 end
+    if captureQuality > 1.0 then captureQuality = 1.0 end
+
+    if GetResourceState('screenshot-basic') ~= 'started' then
+        cb({ ok = false, error = 'screenshot_basic_not_started', images = {} })
+        return
+    end
+
+    local wasVisible = NUI and NUI.isVisible and NUI.isVisible() or false
+    local activeScreen = NUI and NUI.getActiveScreen and NUI.getActiveScreen() or 'tablet'
+    local requestedScreen = type(payload.screen) == 'string' and payload.screen or nil
+    local reopenScreen = requestedScreen or activeScreen
+    if reopenScreen == 'tablet' and _targetType == 'person' then
+        reopenScreen = 'persons'
+    elseif reopenScreen == 'tablet' and _targetType == 'vehicle' then
+        reopenScreen = 'vehicles'
+    end
+    local previousViewMode = GetFollowPedCamViewMode()
+    local ped = PlayerPedId()
+
+    local images = {}
+    local running = true
+    local inputUnlockAt = GetGameTimer() + 300
+    local selfieState = nil
+    local function normalizeShotData(raw)
+        if type(raw) == 'string' then
+            local trimmed = raw:gsub('^%s+', ''):gsub('%s+$', '')
+            if trimmed == '' then return nil end
+
+            if trimmed:sub(1, 5) == 'data:' then
+                return trimmed
+            end
+
+            if trimmed:sub(1, 1) == '{' then
+                local okJson, decoded = pcall(json.decode, trimmed)
+                if okJson and type(decoded) == 'table' and type(decoded.data) == 'string' then
+                    local nested = decoded.data:gsub('^%s+', ''):gsub('%s+$', '')
+                    if nested ~= '' then
+                        if nested:sub(1, 5) == 'data:' then
+                            return nested
+                        end
+                        return ('data:image/jpeg;base64,%s'):format(nested)
+                    end
+                end
+            end
+
+            return ('data:image/jpeg;base64,%s'):format(trimmed)
+        end
+
+        if type(raw) == 'table' and type(raw.data) == 'string' then
+            local nested = raw.data:gsub('^%s+', ''):gsub('%s+$', '')
+            if nested == '' then return nil end
+            if nested:sub(1, 5) == 'data:' then
+                return nested
+            end
+            return ('data:image/jpeg;base64,%s'):format(nested)
+        end
+
+        return nil
+    end
+    local function justPressed(control)
+        for group = 0, 2 do
+            if IsControlJustPressed(group, control) or IsDisabledControlJustPressed(group, control) then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function isDown(control)
+        for group = 0, 2 do
+            if IsControlPressed(group, control) or IsDisabledControlPressed(group, control) then
+                return true
+            end
+        end
+        return false
+    end
+
+    local enterHeld = false
+
+    if wasVisible then
+        SetNuiFocus(false, false)
+        NUI.send('setVisible', {
+            visible = false,
+            screen = reopenScreen,
+        })
+    end
+
+    if captureMode == 'selfie' then
+        selfieState = startPhotoSelfieSetup(ped)
+    else
+        SetFollowPedCamViewMode(4)
+    end
+
+    local helpText = 'Press ENTER to take photo. ESC/BACKSPACE/DELETE to cancel.'
+
+    while running do
+        Wait(0)
+
+        if not DoesEntityExist(ped) then
+            break
+        end
+
+        if captureMode == 'selfie' then
+            local camPos = GetOffsetFromEntityInWorldCoords(ped, 0.0, 1.15, 0.7)
+            SetCamCoord(selfieState.cam, camPos.x, camPos.y, camPos.z)
+            PointCamAtEntity(selfieState.cam, ped, 0.0, 0.0, 0.65, true)
+        else
+            SetFollowPedCamViewMode(4)
+        end
+
+        BeginTextCommandDisplayHelp('STRING')
+        AddTextComponentSubstringPlayerName(helpText)
+        EndTextCommandDisplayHelp(0, false, false, -1)
+
+        if GetGameTimer() < inputUnlockAt then
+            goto continue
+        end
+
+        local enterDown =
+            isDown(18) or
+            isDown(176) or
+            isDown(191) or
+            isDown(201)
+
+        local pressedEnter = (not enterHeld and enterDown)
+            or justPressed(18)
+            or justPressed(176)
+            or justPressed(191)
+            or justPressed(201)
+
+        enterHeld = enterDown
+
+        if pressedEnter then
+            Debug.debug(('[photo] Enter detected, requesting screenshot (quality=%s)...'):format(captureQuality))
+            local shotData = nil
+            local captureDone = false
+
+            exports['screenshot-basic']:requestScreenshot({
+                encoding = 'jpg',
+                quality = captureQuality,
+            }, function(data)
+                shotData = data
+                captureDone = true
+                local dataType = type(data)
+                local dataLen = dataType == 'string' and #data or -1
+                Debug.debug(('[photo] screenshot callback type=%s len=%s'):format(dataType, dataLen))
+            end)
+
+            local timeoutAt = GetGameTimer() + 5000
+            while not captureDone and GetGameTimer() < timeoutAt do
+                Wait(0)
+            end
+
+            local normalized = normalizeShotData(shotData)
+            if type(normalized) == 'string' and normalized ~= '' then
+                images[#images + 1] = normalized
+                Debug.debug(('[photo] normalized screenshot accepted len=%s'):format(#normalized))
+            else
+                Debug.debug('[photo] screenshot was empty/invalid after normalization')
+            end
+
+            running = false
+        elseif justPressed(200) or justPressed(177) or justPressed(178) then
+            running = false
+        end
+
+        ::continue::
+    end
+
+    if selfieState and selfieState.cam then
+        RenderScriptCams(false, false, 0, true, true)
+        SetCamActive(selfieState.cam, false)
+        DestroyCam(selfieState.cam, false)
+    end
+    deleteEntitySafe(selfieState and selfieState.phone or nil)
+    ClearPedSecondaryTask(ped)
+    SetFollowPedCamViewMode(previousViewMode)
+
+    if wasVisible then
+        SetNuiFocus(true, true)
+        NUI.send('setScreen', { screen = reopenScreen })
+        NUI.send('setVisible', {
+            visible = true,
+            screen = reopenScreen,
+        })
+    end
+
+    Debug.debug(('[photo] returning images count=%s'):format(#images))
+    cb({ ok = true, images = images })
+end)
 
 
 

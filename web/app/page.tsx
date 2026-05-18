@@ -1,20 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { fetchNui, useNuiEvent } from "@/lib/useNui";
 import { Sidebar } from "./tablet/components/sidebar";
 import { Topbar } from "./tablet/components/topbar";
 import DashboardView from "./tablet/components/dashboard-view";
-import IncidentsView from "./tablet/components/views/incidents-view";
+import BlackboardView from "./tablet/components/views/blackboard-view";
 import DispatchView from "./tablet/components/views/dispatch-view";
-import PersonsView from "./tablet/components/views/persons-view";
-import VehiclesView from "./tablet/components/views/vehicles-view";
-import ReportsView from "./tablet/components/views/reports-view";
+import ChatView from "./tablet/components/views/chat-view";
+import BoloView from "./tablet/components/views/bolo-view";
 import WarrantsView from "./tablet/components/views/warrants-view";
 import PenaltiesView from "./tablet/components/views/penalties-view";
-import BoloView from "./tablet/components/views/bolo-view";
+import PersonsView from "./tablet/components/views/persons-view";
+import VehiclesView from "./tablet/components/views/vehicles-view";
+import ProfileView from "./tablet/components/views/profile-view";
+import LiveMapView from "./tablet/components/views/livemap-view";
 import SettingsView from "./tablet/components/views/settings-view";
-import MapView from "./tablet/components/views/map-view";
+import ShiftsView from "./tablet/components/views/shifts-view";
 import { defaultMockupBranding, defaultMockupModules } from "./tablet/lib/mockup-config";
 import { createTranslator, normalizeLocale, type SupportedLocale } from "./tablet/lib/i18n";
 
@@ -38,21 +40,40 @@ type NuiBrandingPayload = {
   accent?: string;
   greeting?: string;
   dateLabel?: string;
+  logoUrl?: string;
 };
 
 type NuiMetaPayload = {
   locale?: string;
+  framework?: string;
   modules?: Record<string, boolean>;
   branding?: NuiBrandingPayload;
   translations?: Record<string, string>;
   translationsByLocale?: Record<string, Record<string, string>>;
   mdt?: {
+    player_name_mode?: "fullname" | "firstname" | "lastname";
     allow_map_style_change?: boolean;
     default_map_style?: string;
+    chat?: {
+      auto_delete_after_minutes?: number;
+    };
+    branding?: {
+      title_template?: string;
+      logo_url?: string;
+      job_overrides?: Record<string, { title?: string; logo_url?: string }>;
+    };
   };
   akteModels?: {
     person?: { fields?: AkteFieldSchema[]; data_fields?: DataFieldSchema[] };
     vehicle?: { fields?: AkteFieldSchema[]; data_fields?: DataFieldSchema[] };
+    job_models?: Record<
+      string,
+      {
+        shared_with?: string[];
+        person?: { fields?: AkteFieldSchema[]; data_fields?: DataFieldSchema[] };
+        vehicle?: { fields?: AkteFieldSchema[]; data_fields?: DataFieldSchema[] };
+      }
+    >;
   };
 };
 
@@ -102,6 +123,13 @@ type AkteSyncPayload = {
   akte?: PersonAkte | VehicleAkte;
 };
 
+type ClockPayload = {
+  hour?: number;
+  minute?: number;
+  period?: "morning" | "evening";
+  label?: string;
+};
+
 type DutyState = {
   enabled?: boolean;
   onDuty?: boolean;
@@ -120,6 +148,100 @@ type SearchSuggestion = {
   query: string;
 };
 
+type DashboardActivity = {
+  id: string;
+  kind: "system" | "duty" | "person" | "vehicle";
+  title: string;
+  detail: string;
+  timestamp: string;
+};
+
+type ProfileData = {
+  name: string;
+  imageUrl: string;
+};
+
+type ChatMessage = {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: string;
+  avatarUrl?: string;
+  gradeDisplay?: string;
+};
+
+const CHAT_AUTO_DELETE_DISABLED = 0;
+
+type BoardPost = {
+  id: string;
+  title: string;
+  body: string;
+  images: string[];
+  author: string;
+  createdAt: string;
+};
+
+type ShiftRecord = {
+  id: string;
+  title: string;
+  note: string;
+  createdAt: string;
+};
+
+type PlayerUiPayload = {
+  name?: string;
+  firstname?: string;
+  lastname?: string;
+  gradeDisplay?: string;
+  gradeLevel?: number;
+  gradeCount?: number;
+};
+
+type IncidentRecord = {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  severity: "low" | "medium" | "high";
+  status: "open" | "investigating" | "closed";
+  linkedPersons: string[];
+  linkedVehicles: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+type BoloRecord = {
+  id: string;
+  title: string;
+  description: string;
+  priority: "low" | "medium" | "high";
+  status: "active" | "resolved";
+  linkedPersons: string[];
+  linkedVehicles: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+const STORAGE_KEYS = {
+  profile: "tg_mdt_profile",
+  chat: "tg_mdt_chat_messages",
+  incidents: "tg_mdt_incidents",
+  bolos: "tg_mdt_bolos",
+  boardPosts: "tg_mdt_board_posts",
+  shifts: "tg_mdt_shifts",
+};
+
+const DEFAULT_PROFILE: ProfileData = {
+  name: "",
+  imageUrl: "",
+};
+
+const DEFAULT_CHAT_MESSAGES: ChatMessage[] = [];
+const DEFAULT_INCIDENTS: IncidentRecord[] = [];
+const DEFAULT_BOLOS: BoloRecord[] = [];
+const DEFAULT_BOARD_POSTS: BoardPost[] = [];
+const DEFAULT_SHIFTS: ShiftRecord[] = [];
+
 const MAP_STYLE_KEY = "tg_mdt_map_style";
 
 function normalizeMapStyle(value?: string): MapStyle {
@@ -130,8 +252,72 @@ function isMapStyle(value?: string | null): value is MapStyle {
   return value === "styleAtlas" || value === "styleGrid" || value === "styleSatelite";
 }
 
+function createId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function loadJsonArray<T>(key: string, fallback: T[]): T[] {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function loadJsonObject<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeJobKey(job?: string): string {
+  return typeof job === "string" ? job.trim().toLowerCase() : "";
+}
+
+function resolveJobAkteModels(meta: NuiMetaPayload, job?: string) {
+  const basePerson = meta.akteModels?.person;
+  const baseVehicle = meta.akteModels?.vehicle;
+  const byJob = meta.akteModels?.job_models || {};
+  const viewerJob = normalizeJobKey(job);
+
+  if (viewerJob && byJob[viewerJob]) {
+    return {
+      person: byJob[viewerJob].person || basePerson,
+      vehicle: byJob[viewerJob].vehicle || baseVehicle,
+    };
+  }
+
+  if (viewerJob) {
+    for (const [_, cfg] of Object.entries(byJob)) {
+      if (!cfg || !Array.isArray(cfg.shared_with)) continue;
+      const isShared = cfg.shared_with.some((entry) => normalizeJobKey(entry) === viewerJob);
+      if (isShared) {
+        return {
+          person: cfg.person || basePerson,
+          vehicle: cfg.vehicle || baseVehicle,
+        };
+      }
+    }
+  }
+
+  return {
+    person: basePerson,
+    vehicle: baseVehicle,
+  };
+}
+
 export default function Home() {
-  const [isHandshakeDone, setHandshakeDone] = useState(false);
+  const [isHandshakeDone, setHandshakeDone] = useState(true);
   const [isVisible, setVisible] = useState(false);
   const [activeScreen, setActiveScreen] = useState<string | null>(null);
   const [screenData, setScreenData] = useState<Record<string, unknown>>({});
@@ -142,6 +328,91 @@ export default function Home() {
   const [isMapStyleReady, setMapStyleReady] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [isDutyBusy, setDutyBusy] = useState(false);
+  const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([]);
+  const [profileData, setProfileData] = useState<ProfileData>(DEFAULT_PROFILE);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(DEFAULT_CHAT_MESSAGES);
+  const [incidentRecords, setIncidentRecords] = useState<IncidentRecord[]>(DEFAULT_INCIDENTS);
+  const [boloRecords, setBoloRecords] = useState<BoloRecord[]>(DEFAULT_BOLOS);
+  const [boardPosts, setBoardPosts] = useState<BoardPost[]>(DEFAULT_BOARD_POSTS);
+  const [shiftRecords, setShiftRecords] = useState<ShiftRecord[]>(DEFAULT_SHIFTS);
+  const seededActivityRef = useRef(false);
+  const previousDutyRef = useRef<boolean | null>(null);
+  const previousAkteSyncRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const storedProfile = loadJsonObject<ProfileData>(STORAGE_KEYS.profile, DEFAULT_PROFILE);
+    const storedChat = loadJsonArray<ChatMessage>(STORAGE_KEYS.chat, DEFAULT_CHAT_MESSAGES);
+    const storedIncidents = loadJsonArray<IncidentRecord>(STORAGE_KEYS.incidents, DEFAULT_INCIDENTS);
+    const storedBolos = loadJsonArray<BoloRecord>(STORAGE_KEYS.bolos, DEFAULT_BOLOS);
+    const storedBoardPosts = loadJsonArray<BoardPost>(STORAGE_KEYS.boardPosts, DEFAULT_BOARD_POSTS);
+    const storedShifts = loadJsonArray<ShiftRecord>(STORAGE_KEYS.shifts, DEFAULT_SHIFTS);
+
+    setProfileData((prev) => ({
+      ...prev,
+      ...storedProfile,
+    }));
+    setChatMessages(storedChat);
+    setIncidentRecords(storedIncidents);
+    setBoloRecords(storedBolos);
+    setBoardPosts(storedBoardPosts);
+    setShiftRecords(storedShifts);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(profileData));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [profileData]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.chat, JSON.stringify(chatMessages));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [chatMessages]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.incidents, JSON.stringify(incidentRecords));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [incidentRecords]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.bolos, JSON.stringify(boloRecords));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [boloRecords]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.boardPosts, JSON.stringify(boardPosts));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [boardPosts]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.shifts, JSON.stringify(shiftRecords));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [shiftRecords]);
 
   useEffect(() => {
     let isMounted = true;
@@ -184,6 +455,51 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isHandshakeDone) return;
+
+    let isCancelled = false;
+
+    const loadBootstrap = async () => {
+      try {
+        const bootstrap = await fetchNui<{
+          persons?: PersonRecord[];
+          vehicles?: VehicleRecord[];
+          akteBootstrap?: {
+            personAkten?: Record<string, PersonAkte>;
+            vehicleAkten?: Record<string, VehicleAkte>;
+          };
+        }>("getTabletBootstrap", {});
+
+        if (isCancelled || !bootstrap) return;
+
+        if (Array.isArray(bootstrap.persons)) {
+          setScreenData((prev) => ({ ...prev, persons: bootstrap.persons }));
+        }
+
+        if (Array.isArray(bootstrap.vehicles)) {
+          setScreenData((prev) => ({ ...prev, vehicles: bootstrap.vehicles }));
+        }
+
+        if (bootstrap.akteBootstrap?.personAkten) {
+          setScreenData((prev) => ({ ...prev, personAkten: bootstrap.akteBootstrap?.personAkten }));
+        }
+
+        if (bootstrap.akteBootstrap?.vehicleAkten) {
+          setScreenData((prev) => ({ ...prev, vehicleAkten: bootstrap.akteBootstrap?.vehicleAkten }));
+        }
+      } catch {
+        // Keep the UI usable even if the proxy callback is unavailable.
+      }
+    };
+
+    void loadBootstrap();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isHandshakeDone]);
+
   useNuiEvent<NuiVisibilityPayload>("setVisible", (data) => {
     setVisible(Boolean(data?.visible));
     setActiveScreen(data?.screen ?? null);
@@ -210,6 +526,8 @@ export default function Home() {
   const current_modules = typedMeta.modules || defaultMockupModules;
   const allowMapStyleChange = Boolean(typedMeta.mdt?.allow_map_style_change);
   const baseMapStyle = normalizeMapStyle(typedMeta.mdt?.default_map_style);
+  const chatAutoDeleteAfterMinutes = Number(typedMeta.mdt?.chat?.auto_delete_after_minutes ?? CHAT_AUTO_DELETE_DISABLED);
+  const chatAutoDeleteMs = chatAutoDeleteAfterMinutes > 0 ? chatAutoDeleteAfterMinutes * 60 * 1000 : 0;
   const baseLocale = normalizeLocale(typedMeta.locale);
   const activeLocale = localeOverride || baseLocale;
   const activeMapStyle = allowMapStyleChange ? (mapStyleOverride || baseMapStyle) : baseMapStyle;
@@ -220,11 +538,25 @@ export default function Home() {
     translationsByLocale.en ||
     typedMeta.translations;
 
-  const branding = {
-    ...defaultMockupBranding,
-    ...(typedMeta.branding as NuiBrandingPayload | undefined),
-    accent: accentOverride || typedMeta.branding?.accent || defaultMockupBranding.accent,
-  };
+  useEffect(() => {
+    if (chatAutoDeleteMs <= 0) return;
+
+    const pruneExpiredChatMessages = () => {
+      setChatMessages((prev) => {
+        const now = Date.now();
+        const next = prev.filter((message) => {
+          const createdAt = Date.parse(message.createdAt);
+          if (Number.isNaN(createdAt)) return true;
+          return now - createdAt < chatAutoDeleteMs;
+        });
+        return next.length === prev.length ? prev : next;
+      });
+    };
+
+    pruneExpiredChatMessages();
+    const interval = window.setInterval(pruneExpiredChatMessages, Math.min(chatAutoDeleteMs, 60 * 1000));
+    return () => window.clearInterval(interval);
+  }, [chatAutoDeleteMs]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -310,19 +642,63 @@ export default function Home() {
     () => createTranslator(activeLocale, activeTranslations),
     [activeLocale, activeTranslations]
   );
+  const clockData = (screenData?.clock as ClockPayload | undefined) || undefined;
   const dutyState = ((screenData?.duty as DutyState | undefined) || { onDuty: true }) as DutyState;
+  const sessionData = (screenData?.session as { job?: string } | undefined) || {};
+  const sessionJob = normalizeJobKey(sessionData.job);
   const player_data =
-    screenData?.player || { name: t("tablet.player.unknown_user"), gradeDisplay: "" };
+    ((screenData?.player as PlayerUiPayload | undefined) || { name: t("tablet.player.unknown_user"), gradeDisplay: "" }) as PlayerUiPayload;
   const actorName =
     typeof (player_data as { name?: unknown })?.name === "string" &&
     ((player_data as { name?: string }).name || "").trim() !== ""
       ? ((player_data as { name?: string }).name as string)
       : t("tablet.player.unknown_user");
+  const fallbackNameParts = actorName.trim().split(/\s+/).filter(Boolean);
+  const fallbackFirstName = fallbackNameParts[0] || "";
+  const fallbackLastName = fallbackNameParts.length > 1 ? fallbackNameParts[fallbackNameParts.length - 1] : "";
+  const playerFirstName = typeof player_data.firstname === "string" ? player_data.firstname.trim() : fallbackFirstName;
+  const playerLastName = typeof player_data.lastname === "string" ? player_data.lastname.trim() : fallbackLastName;
+  const playerNameMode = typedMeta.mdt?.player_name_mode || "fullname";
+  const greetingName =
+    playerNameMode === "firstname" && playerFirstName !== ""
+      ? playerFirstName
+      : playerNameMode === "lastname" && playerLastName !== ""
+        ? playerLastName
+        : actorName;
+  const jobBrandingOverrides = sessionJob ? typedMeta.mdt?.branding?.job_overrides?.[sessionJob] : undefined;
+  const jobDisplayName = sessionJob !== "" ? sessionJob.toUpperCase() : "TG";
+  const computedBrandTitle =
+    (jobBrandingOverrides?.title || typedMeta.mdt?.branding?.title_template || "{job} MDT").replace("{job}", jobDisplayName);
+  const computedBrandLogo = jobBrandingOverrides?.logo_url || typedMeta.mdt?.branding?.logo_url || "";
+  const branding = {
+    ...defaultMockupBranding,
+    ...(typedMeta.branding as NuiBrandingPayload | undefined),
+    name: computedBrandTitle,
+    logoUrl: computedBrandLogo,
+    accent: accentOverride || typedMeta.branding?.accent || defaultMockupBranding.accent,
+    greeting:
+      clockData?.period === "evening"
+        ? t("tablet.dashboard.greeting_evening", { name: greetingName })
+        : t("tablet.dashboard.greeting_morning", { name: greetingName }),
+    dateLabel: clockData?.label || typedMeta.branding?.dateLabel || defaultMockupBranding.dateLabel,
+    timeLabel: clockData?.label || typedMeta.branding?.dateLabel || defaultMockupBranding.dateLabel,
+  };
   const actorGrade =
     typeof (player_data as { gradeDisplay?: unknown })?.gradeDisplay === "string"
       ? (((player_data as { gradeDisplay?: string }).gradeDisplay as string) || "").trim()
       : "";
-  const actorLabel = actorGrade !== "" ? `${actorName} (${actorGrade})` : actorName;
+  const actorGradeLevel =
+    typeof (player_data as { gradeLevel?: unknown })?.gradeLevel === "number"
+      ? ((player_data as { gradeLevel?: number }).gradeLevel as number)
+      : null;
+  const actorGradeCount =
+    typeof (player_data as { gradeCount?: unknown })?.gradeCount === "number"
+      ? ((player_data as { gradeCount?: number }).gradeCount as number)
+      : null;
+  const boardAdminThreshold = actorGradeCount !== null ? Math.max(0, actorGradeCount - 2) : 2;
+  const isBoardAdmin = actorGradeLevel !== null ? actorGradeLevel >= boardAdminThreshold : false;
+  const profileName = profileData.name.trim() !== "" ? profileData.name.trim() : actorName;
+  const actorLabel = actorGrade !== "" ? `${profileName} (${actorGrade})` : profileName;
   const mapData = (screenData?.map as Record<string, unknown> | undefined) || {};
   const mapMarkers = Array.isArray(mapData.markers)
     ? (mapData.markers as Array<{ x: number; y: number; label?: string }>)
@@ -340,10 +716,111 @@ export default function Home() {
   const akteSyncData = (screenData?.akteSync as AkteSyncPayload | undefined) || undefined;
   const personAkteSync = akteSyncData?.kind === "person" ? akteSyncData : undefined;
   const vehicleAkteSync = akteSyncData?.kind === "vehicle" ? akteSyncData : undefined;
-  const personAkteFields = typedMeta.akteModels?.person?.fields || [];
-  const vehicleAkteFields = typedMeta.akteModels?.vehicle?.fields || [];
-  const personDataFields = typedMeta.akteModels?.person?.data_fields || [];
-  const vehicleDataFields = typedMeta.akteModels?.vehicle?.data_fields || [];
+  const resolvedAkteModels = resolveJobAkteModels(typedMeta, sessionJob);
+  const personAkteFields = resolvedAkteModels.person?.fields || [];
+  const vehicleAkteFields = resolvedAkteModels.vehicle?.fields || [];
+  const personDataFields = resolvedAkteModels.person?.data_fields || [];
+  const vehicleDataFields = resolvedAkteModels.vehicle?.data_fields || [];
+  const createActivity = (activity: Omit<DashboardActivity, "id" | "timestamp"> & { timestamp?: string }) => ({
+    id: `${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+    timestamp: activity.timestamp || new Date().toISOString(),
+    ...activity,
+  });
+
+  useEffect(() => {
+    const currentDuty = Boolean(dutyState?.onDuty);
+    if (previousDutyRef.current === null) {
+      previousDutyRef.current = currentDuty;
+      return;
+    }
+
+    if (previousDutyRef.current !== currentDuty) {
+      previousDutyRef.current = currentDuty;
+      setRecentActivity((prev) =>
+        [
+          createActivity({
+            kind: "duty",
+            title: currentDuty ? t("tablet.dashboard.activity.duty_on") : t("tablet.dashboard.activity.duty_off"),
+            detail: actorLabel,
+          }),
+          ...prev,
+        ].slice(0, 6)
+      );
+    }
+  }, [actorLabel, dutyState?.onDuty, t]);
+
+  useEffect(() => {
+    if (!akteSyncData) return;
+
+    const recordKey = akteSyncData.kind === "person" ? `person:${akteSyncData.identifier || ""}` : `vehicle:${akteSyncData.plate || ""}`;
+    const syncSignature = `${recordKey}:${JSON.stringify(akteSyncData.akte || {})}`;
+    if (previousAkteSyncRef.current === syncSignature) return;
+    previousAkteSyncRef.current = syncSignature;
+
+    const changedFields = Object.keys((akteSyncData.akte as Record<string, string>) || {});
+    const fieldCount = changedFields.length;
+    const fieldLabel = fieldCount === 1 ? "field" : "fields";
+    const personName = personsData.find((person) => person.identifier === akteSyncData.identifier)?.name || akteSyncData.identifier || t("tablet.persons.not_available");
+    const vehiclePlate = vehiclesData.find((vehicle) => vehicle.plate === akteSyncData.plate)?.plate || akteSyncData.plate || t("tablet.vehicles.not_available");
+
+    setRecentActivity((prev) => {
+      const nextEntry = createActivity({
+        kind: akteSyncData.kind === "person" ? "person" : "vehicle",
+        title:
+          akteSyncData.kind === "person"
+            ? t("tablet.dashboard.activity.person_updated")
+            : t("tablet.dashboard.activity.vehicle_updated"),
+        detail:
+          akteSyncData.kind === "person"
+            ? `${personName} • ${fieldCount} ${fieldLabel} • ${actorLabel}`
+            : `${vehiclePlate} • ${fieldCount} ${fieldLabel} • ${actorLabel}`,
+      });
+
+      return [nextEntry, ...prev].slice(0, 6);
+    });
+  }, [akteSyncData, actorLabel, personsData, t, vehiclesData]);
+
+  useEffect(() => {
+    if (seededActivityRef.current) return;
+    if (personsData.length === 0 && vehiclesData.length === 0) return;
+
+    seededActivityRef.current = true;
+    setRecentActivity((prev) =>
+      [
+        createActivity({
+          kind: "system",
+          title: t("tablet.dashboard.activity.dashboard_synced"),
+          detail: `${personsData.length} people • ${vehiclesData.length} vehicles`,
+        }),
+        ...prev,
+      ].slice(0, 6)
+    );
+  }, [personsData.length, t, vehiclesData.length]);
+
+  const dashboardData = {
+    personsCount: personsData.length,
+    vehiclesCount: vehiclesData.length,
+    personAktenCount: Object.keys(personAktenData || {}).length,
+    vehicleAktenCount: Object.keys(vehicleAktenData || {}).length,
+    enabledModulesCount: Object.values(current_modules || {}).filter((value) => value !== false).length,
+    totalModulesCount: Object.keys(current_modules || {}).length,
+    dutyState,
+    actorName: profileName,
+    actorImageUrl: profileData.imageUrl,
+    recentActivity,
+    recentChat: chatMessages.slice(0, 5),
+    recentIncidents: incidentRecords.slice().sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 4),
+    recentBolos: boloRecords.slice().sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 4),
+    boardPosts,
+    shifts: shiftRecords,
+    boardAdmin: isBoardAdmin,
+  };
+  const sidebarProfileData = {
+    ...player_data,
+    name: profileName,
+    imageUrl: profileData.imageUrl,
+    gradeDisplay: actorGrade,
+  };
   const rootStyle = {
     "--mdt-accent-primary": branding.accent || defaultMockupBranding.accent || "#ff9100",
   } as CSSProperties;
@@ -429,6 +906,15 @@ export default function Home() {
   const handleSearchSelect = (id: string) => {
     const selected = searchSuggestions.find((entry) => entry.id === id);
     if (!selected) return;
+
+    if (typeof window !== "undefined") {
+      if (selected.targetScreen === "persons" && id.startsWith("person:")) {
+        window.localStorage.setItem("tg_mdt_selected_person", id.slice("person:".length));
+      } else if (selected.targetScreen === "vehicles" && id.startsWith("vehicle:")) {
+        window.localStorage.setItem("tg_mdt_selected_vehicle", id.slice("vehicle:".length));
+      }
+    }
+
     setGlobalSearch(selected.query);
     setActiveScreen(selected.targetScreen);
   };
@@ -436,8 +922,177 @@ export default function Home() {
   const handleSearchSubmit = () => {
     if (searchSuggestions.length === 0) return;
     const best = searchSuggestions[0];
-    setGlobalSearch(best.query);
-    setActiveScreen(best.targetScreen);
+    handleSearchSelect(best.id);
+  };
+
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      fetchNui("hideUI", {}).catch(() => setVisible(false));
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isVisible]);
+
+  const updateProfile = (patch: Partial<ProfileData>) => {
+    setProfileData((prev) => ({
+      ...prev,
+      ...patch,
+    }));
+  };
+
+  const captureProfilePhoto = async (mode: "standard" | "selfie" = "standard") => {
+    const result = await fetchNui<{ ok?: boolean; images?: string[] }>("openAktePhotoMode", {
+      kind: "person",
+      screen: "profile",
+      mode,
+    }).catch(() => null);
+
+    if (!result?.ok || !Array.isArray(result.images) || result.images.length === 0) return;
+
+    const nextImage = result.images[result.images.length - 1];
+    if (typeof nextImage === "string" && nextImage.trim() !== "") {
+      updateProfile({ imageUrl: nextImage.trim() });
+    }
+  };
+
+  const sendChatMessage = (text: string) => {
+    const trimmed = text.trim();
+    if (trimmed === "") return;
+
+    setChatMessages((prev) => [
+      {
+        id: createId("chat"),
+        author: profileName,
+        text: trimmed,
+        createdAt: new Date().toISOString(),
+        avatarUrl: profileData.imageUrl,
+        gradeDisplay: actorGrade,
+      },
+      ...prev,
+    ].slice(0, 60));
+  };
+
+  const deleteChatMessage = (messageId: string) => {
+    setChatMessages((prev) => prev.filter((message) => message.id !== messageId));
+  };
+
+  const createIncident = (incident: Omit<IncidentRecord, "id" | "createdAt" | "updatedAt">) => {
+    const timestamp = new Date().toISOString();
+    const nextIncident: IncidentRecord = {
+      id: createId("incident"),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      ...incident,
+    };
+    setIncidentRecords((prev) => [nextIncident, ...prev]);
+    const activity: DashboardActivity = {
+      id: createId("activity"),
+      kind: "system",
+      title: t("tablet.incidents.new_incident"),
+      detail: nextIncident.title,
+      timestamp,
+    };
+    setRecentActivity((prev) => [
+      activity,
+      ...prev,
+    ].slice(0, 6));
+  };
+
+  const updateIncident = (id: string, patch: Partial<IncidentRecord>) => {
+    setIncidentRecords((prev) =>
+      prev.map((incident) =>
+        incident.id === id
+          ? {
+              ...incident,
+              ...patch,
+              updatedAt: new Date().toISOString(),
+            }
+          : incident
+      )
+    );
+  };
+
+  const deleteIncident = (id: string) => {
+    setIncidentRecords((prev) => prev.filter((incident) => incident.id !== id));
+  };
+
+  const createBolo = (bolo: Omit<BoloRecord, "id" | "createdAt" | "updatedAt">) => {
+    const timestamp = new Date().toISOString();
+    const nextBolo: BoloRecord = {
+      id: createId("bolo"),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      ...bolo,
+    };
+    setBoloRecords((prev) => [nextBolo, ...prev]);
+    const activity: DashboardActivity = {
+      id: createId("activity"),
+      kind: "system",
+      title: t("tablet.bolo.title"),
+      detail: nextBolo.title,
+      timestamp,
+    };
+    setRecentActivity((prev) => [
+      activity,
+      ...prev,
+    ].slice(0, 6));
+  };
+
+  const updateBolo = (id: string, patch: Partial<BoloRecord>) => {
+    setBoloRecords((prev) =>
+      prev.map((bolo) =>
+        bolo.id === id
+          ? {
+              ...bolo,
+              ...patch,
+              updatedAt: new Date().toISOString(),
+            }
+          : bolo
+      )
+    );
+  };
+
+  const deleteBolo = (id: string) => {
+    setBoloRecords((prev) => prev.filter((bolo) => bolo.id !== id));
+  };
+
+  const createBoardPost = (post: Omit<BoardPost, "id" | "createdAt" | "author">) => {
+    if (!isBoardAdmin) return;
+    const timestamp = new Date().toISOString();
+    const nextPost: BoardPost = {
+      id: createId("board-post"),
+      author: profileName,
+      createdAt: timestamp,
+      ...post,
+    };
+    setBoardPosts((prev) => [nextPost, ...prev].slice(0, 20));
+  };
+
+  const captureBoardImage = async () => {
+    if (!isBoardAdmin) return null;
+    const result = await fetchNui<{ ok?: boolean; images?: string[] }>("openAktePhotoMode", {
+      kind: "person",
+      screen: "dashboard",
+    }).catch(() => null);
+
+    if (!result?.ok || !Array.isArray(result.images) || result.images.length === 0) return null;
+    const nextImage = result.images[result.images.length - 1];
+    return typeof nextImage === "string" && nextImage.trim() !== "" ? nextImage.trim() : null;
+  };
+
+  const createShift = (shift: Omit<ShiftRecord, "id" | "createdAt">) => {
+    const timestamp = new Date().toISOString();
+    const nextShift: ShiftRecord = {
+      id: createId("shift"),
+      createdAt: timestamp,
+      ...shift,
+    };
+    setShiftRecords((prev) => [nextShift, ...prev].slice(0, 20));
   };
 
   // show absolutely nothing until NUI handshake is done.
@@ -455,10 +1110,11 @@ export default function Home() {
             <Sidebar 
               currentView={activeScreen || "dashboard"} 
               modules={current_modules}
-              playerData={player_data}
+              playerData={sidebarProfileData}
               dutyState={dutyState}
               branding={branding}
               t={t}
+              onOpenProfile={() => setActiveScreen("profile")}
               onScreenChange={(screen) => setActiveScreen(screen)}
             />
 
@@ -475,14 +1131,54 @@ export default function Home() {
                 dutyState={dutyState}
                 isDutyBusy={isDutyBusy}
                 onToggleDuty={handleToggleDuty}
-                onOpenSettings={() => setActiveScreen("settings")}
                 onClose={() => fetchNui("hideUI", {}).catch(() => setVisible(false))}
               />
               
               <div className="flex-1 overflow-hidden p-6">
-                {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView branding={branding} modules={current_modules} t={t} />}
-                {activeScreen === "incidents" && <IncidentsView t={t} />}
-                {activeScreen === "dispatch" && <DispatchView t={t} />}
+                {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView branding={branding} modules={current_modules} data={dashboardData} onSendChat={sendChatMessage} onTakeBoardImage={captureBoardImage} onCreateBoardPost={createBoardPost} onCreateShift={createShift} t={t} />}
+                {activeScreen === "blackboard" && (
+                  <BlackboardView
+                    t={t}
+                    boardPosts={boardPosts}
+                    boardAdmin={isBoardAdmin}
+                    onTakeBoardImage={captureBoardImage}
+                    onCreateBoardPost={createBoardPost}
+                  />
+                )}
+                {activeScreen === "profile" && (
+                  <ProfileView
+                    t={t}
+                    profile={{
+                      name: profileData.name || actorName,
+                      imageUrl: profileData.imageUrl,
+                      gradeDisplay: actorGrade,
+                    }}
+                    onSave={updateProfile}
+                    onCapturePhoto={captureProfilePhoto}
+                  />
+                )}
+                {activeScreen === "dispatch" && (
+                  <DispatchView
+                    t={t}
+                    incidents={incidentRecords}
+                    persons={personsData}
+                    vehicles={vehiclesData}
+                    onCreateIncident={createIncident}
+                    onUpdateIncident={updateIncident}
+                    onDeleteIncident={deleteIncident}
+                  />
+                )}
+                {activeScreen === "chat" && (
+                  <ChatView
+                    t={t}
+                    messages={chatMessages}
+                    onSend={sendChatMessage}
+                    onDeleteMessage={deleteChatMessage}
+                    actorName={profileName}
+                    actorImageUrl={profileData.imageUrl}
+                    currentUserName={profileName}
+                  />
+                )}
                 {activeScreen === "persons" && (
                   <PersonsView
                     t={t}
@@ -493,6 +1189,8 @@ export default function Home() {
                     akteSync={personAkteSync}
                     akteFields={personAkteFields}
                     dataFields={personDataFields}
+                    incidents={incidentRecords}
+                    bolos={boloRecords}
                   />
                 )}
                 {activeScreen === "vehicles" && (
@@ -505,22 +1203,28 @@ export default function Home() {
                     akteSync={vehicleAkteSync}
                     akteFields={vehicleAkteFields}
                     dataFields={vehicleDataFields}
+                    incidents={incidentRecords}
+                    bolos={boloRecords}
                   />
                 )}
-                {activeScreen === "reports" && <ReportsView t={t} />}
                 {activeScreen === "warrants" && <WarrantsView t={t} />}
                 {activeScreen === "penalties" && <PenaltiesView t={t} />}
-                {activeScreen === "bolo" && <BoloView t={t} />}
-                {activeScreen === "map" && (
-                  <MapView
+                {activeScreen === "bolo" && (
+                  <BoloView
                     t={t}
-                    accent={branding.accent || defaultMockupBranding.accent || "#ff9100"}
-                    mapStyle={activeMapStyle}
-                    markers={mapMarkers}
-                    playerPosition={playerPosition}
+                    bolos={boloRecords}
+                    persons={personsData}
+                    vehicles={vehiclesData}
+                    onCreate={createBolo}
+                    onUpdate={updateBolo}
+                    onDelete={deleteBolo}
                   />
                 )}
-                {activeScreen === "settings" && (
+                {activeScreen === "livemap" && <LiveMapView t={t} />}
+                {activeScreen === "shifts" && (
+                  <ShiftsView t={t} shifts={shiftRecords} boardAdmin={isBoardAdmin} onCreateShift={createShift} />
+                )}
+                {activeScreen === "administration" && (
                   <SettingsView
                     t={t}
                     locale={activeLocale}

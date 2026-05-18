@@ -45,6 +45,25 @@ type AkteSyncPayload = {
   akte?: Record<string, string>;
 };
 
+type RelatedIncident = {
+  id: string;
+  title: string;
+  location: string;
+  severity: string;
+  status: string;
+  linkedPersons: string[];
+  linkedVehicles: string[];
+};
+
+type RelatedBolo = {
+  id: string;
+  title: string;
+  priority: string;
+  status: string;
+  linkedPersons: string[];
+  linkedVehicles: string[];
+};
+
 type AkteNote = {
   id: string;
   text: string;
@@ -320,6 +339,8 @@ export default function PersonsView({
   akteSync,
   akteFields,
   dataFields,
+  incidents,
+  bolos,
 }: {
   t: TFunction;
   actorName?: string;
@@ -329,6 +350,8 @@ export default function PersonsView({
   akteSync?: AkteSyncPayload;
   akteFields?: AkteField[];
   dataFields?: DataField[];
+  incidents?: RelatedIncident[];
+  bolos?: RelatedBolo[];
 }) {
   const resolvedFields = akteFields && akteFields.length > 0 ? akteFields : FALLBACK_FIELDS;
   const resolvedDataFields = dataFields && dataFields.length > 0 ? dataFields : FALLBACK_DATA_FIELDS;
@@ -458,6 +481,8 @@ export default function PersonsView({
         ...defaultAkte,
       }
     : defaultAkte;
+  const currentSearchState = String(currentAkte.searchStatus || currentAkte.searchedAt || "").trim();
+  const isSelectedSearched = currentSearchState !== "" && currentSearchState !== "none";
 
   const personImages = decodeImages(currentAkte[imageFieldKey] ?? "");
   const allNotes = useMemo(
@@ -466,6 +491,8 @@ export default function PersonsView({
   );
   const activeNotes = allNotes.filter((note) => !isNoteExpired(note));
   const expiredNotesCount = allNotes.length - activeNotes.length;
+  const relatedIncidents = (incidents || []).filter((incident) => incident.linkedPersons.includes(selectedPerson?.identifier || ""));
+  const relatedBolos = (bolos || []).filter((bolo) => bolo.linkedPersons.includes(selectedPerson?.identifier || ""));
   const activeImage = personImages[activeImageIndex] || personImages[0] || "";
   const activeImageIsDataUrl = activeImage.startsWith("data:");
   const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
@@ -520,6 +547,12 @@ export default function PersonsView({
   const saveAkte = () => {
     if (!selectedPerson) return;
     persistAkte(selectedPerson.identifier, currentAkte);
+  };
+
+  const setSelectedPersonSearchState = (searched: boolean) => {
+    if (!selectedPerson) return;
+    updateAkteField("searchStatus", searched ? "searched" : "", true);
+    updateAkteField("searchedAt", searched ? new Date().toISOString() : "", true);
   };
 
   useEffect(() => {
@@ -733,17 +766,31 @@ export default function PersonsView({
           ) : (
             <div className="space-y-2">
               {filteredPersons.map((person) => (
-                <button
-                  key={person.identifier}
-                  type="button"
-                  onClick={() => setSelectedIdentifier(person.identifier)}
-                  className="w-full p-3 text-left rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] hover:bg-[rgba(255,255,255,0.03)] transition-colors"
-                >
-                  <p className="text-sm text-white font-medium">{person.name}</p>
-                  <p className="text-xs text-[var(--mdt-text-muted)] mt-1">
-                    {person.job || t("tablet.persons.not_available")}
-                  </p>
-                </button>
+                (() => {
+                  const personAkte = aktenByPerson[person.identifier] || defaultAkte;
+                  const isSearched = String(personAkte.searchStatus || personAkte.searchedAt || "").trim() !== "";
+
+                  return (
+                    <button
+                      key={person.identifier}
+                      type="button"
+                      onClick={() => setSelectedIdentifier(person.identifier)}
+                      className="w-full p-3 text-left rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] hover:bg-[rgba(255,255,255,0.03)] transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm text-white font-medium truncate">{person.name}</p>
+                        {isSearched && (
+                          <span className="rounded-full border border-[rgba(255,145,0,0.35)] bg-[rgba(255,145,0,0.12)] px-2 py-0.5 text-[10px] font-semibold text-[var(--mdt-accent-primary)]">
+                            SEARCHED
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--mdt-text-muted)] mt-1">
+                        {person.job || t("tablet.persons.not_available")}
+                      </p>
+                    </button>
+                  );
+                })()
               ))}
             </div>
           )}
@@ -759,7 +806,12 @@ export default function PersonsView({
           <ArrowLeft className="w-4 h-4" />
           {t("tablet.actions.back")}
         </Button>
-        <Button onClick={saveAkte}>{t("tablet.form.save_akte")}</Button>
+        <div className="flex items-center gap-2">
+          <Button variant={isSelectedSearched ? "ghost" : "primary"} onClick={() => setSelectedPersonSearchState(!isSelectedSearched)}>
+            {isSelectedSearched ? "Clear SEARCHED" : "Mark SEARCHED"}
+          </Button>
+          <Button onClick={saveAkte}>{t("tablet.form.save_akte")}</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
@@ -767,6 +819,11 @@ export default function PersonsView({
           <div>
             <p className="text-xs uppercase tracking-wider text-[var(--mdt-text-muted)]">{t("tablet.persons.detail_title")}</p>
             <h4 className="text-2xl text-white font-semibold mt-1">{selectedPerson.name}</h4>
+            {isSelectedSearched && (
+              <span className="mt-2 inline-flex rounded-full border border-[rgba(255,145,0,0.35)] bg-[rgba(255,145,0,0.12)] px-3 py-1 text-xs font-semibold text-[var(--mdt-accent-primary)]">
+                SEARCHED
+              </span>
+            )}
           </div>
 
           {resolvedDataFields.map((field) => {
@@ -970,6 +1027,40 @@ export default function PersonsView({
                   />
                 )}
                 <Button onClick={addNote}>{t("tablet.notes.add")}</Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-xs mdt-muted">{t("tablet.persons.related")}</label>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 space-y-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--mdt-text-muted)]">{t("tablet.incidents.recent_list")}</p>
+                {relatedIncidents.length === 0 ? (
+                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
+                ) : (
+                  relatedIncidents.map((incident) => (
+                    <div key={incident.id} className="text-xs rounded-xl bg-white/5 p-2">
+                      <p className="text-white font-medium">{incident.title}</p>
+                      <p className="text-[var(--mdt-text-muted)]">{incident.location} • {incident.severity} • {incident.status}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 space-y-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--mdt-text-muted)]">{t("tablet.bolo.title")}</p>
+                {relatedBolos.length === 0 ? (
+                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
+                ) : (
+                  relatedBolos.map((bolo) => (
+                    <div key={bolo.id} className="text-xs rounded-xl bg-white/5 p-2">
+                      <p className="text-white font-medium">{bolo.title}</p>
+                      <p className="text-[var(--mdt-text-muted)]">{bolo.priority} • {bolo.status}</p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

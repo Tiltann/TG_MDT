@@ -79,6 +79,77 @@ end
 
 local MODEL_HASH_NAMES = ((Config.AkteModels or {}).vehicle_model_names) or {}
 
+---@param job any
+---@return string
+local function normalizeJobName(job)
+    if type(job) ~= 'string' then
+        return ''
+    end
+
+    return string.lower((job:gsub('^%s+', ''):gsub('%s+$', '')))
+end
+
+---@param src number|nil
+---@return string
+local function getViewerJobName(src)
+    if type(src) ~= 'number' then
+        return ''
+    end
+
+    if not Framework or not Framework.Server or type(Framework.Server.getJob) ~= 'function' then
+        return ''
+    end
+
+    return normalizeJobName(Framework.Server.getJob(src))
+end
+
+---@param modelRoot table
+---@param viewerJob string
+---@return string|nil
+---@return table|nil
+local function resolveSharedJobOwner(modelRoot, viewerJob)
+    if viewerJob == '' then
+        return nil, nil
+    end
+
+    local jobModels = type(modelRoot.job_models) == 'table' and modelRoot.job_models or {}
+    for ownerJob, config in pairs(jobModels) do
+        if type(config) == 'table' and type(config.shared_with) == 'table' then
+            for i = 1, #config.shared_with do
+                if normalizeJobName(config.shared_with[i]) == viewerJob then
+                    return ownerJob, config
+                end
+            end
+        end
+    end
+
+    return nil, nil
+end
+
+---@param modelRoot table
+---@param kind string
+---@param src number|nil
+---@return table
+local function resolveAkteModelForViewer(modelRoot, kind, src)
+    local viewerJob = getViewerJobName(src)
+    local jobModels = type(modelRoot.job_models) == 'table' and modelRoot.job_models or {}
+
+    if viewerJob ~= '' and type(jobModels[viewerJob]) == 'table' and type(jobModels[viewerJob][kind]) == 'table' then
+        return jobModels[viewerJob][kind]
+    end
+
+    local _, sharedConfig = resolveSharedJobOwner(modelRoot, viewerJob)
+    if type(sharedConfig) == 'table' and type(sharedConfig[kind]) == 'table' then
+        return sharedConfig[kind]
+    end
+
+    if type(modelRoot[kind]) == 'table' then
+        return modelRoot[kind]
+    end
+
+    return {}
+end
+
 ---@param jobLabel any
 ---@param gradeLabel any
 ---@param gradeNumber any
@@ -243,15 +314,18 @@ local function resolveFieldDefaultValue(kind, field)
 end
 
 ---@param kind string
+---@param src number|nil
 ---@return table
-local function getAkteModel(kind)
-    return ((Config.AkteModels or {})[kind] or {})
+local function getAkteModel(kind, src)
+    local models = Config.AkteModels or {}
+    return resolveAkteModelForViewer(models, kind, src)
 end
 
 ---@param kind string
+---@param src number|nil
 ---@return table
-local function getAkteFieldMap(kind)
-    local model = getAkteModel(kind)
+local function getAkteFieldMap(kind, src)
+    local model = getAkteModel(kind, src)
     local map = {}
     for _, field in ipairs((model.fields or {})) do
         if type(field.key) == 'string' and field.key ~= '' then
@@ -262,9 +336,10 @@ local function getAkteFieldMap(kind)
 end
 
 ---@param kind string
+---@param src number|nil
 ---@return table
-local function defaultAkteFromModel(kind)
-    local model = getAkteModel(kind)
+local function defaultAkteFromModel(kind, src)
+    local model = getAkteModel(kind, src)
     local defaults = {}
     for _, field in ipairs((model.fields or {})) do
         if type(field.key) == 'string' and field.key ~= '' then
@@ -288,9 +363,10 @@ local function normalizeModelName(model)
 end
 
 ---@param kind string
+---@param src number|nil
 ---@return table
-local function getAkteDataFields(kind)
-    local model = getAkteModel(kind)
+local function getAkteDataFields(kind, src)
+    local model = getAkteModel(kind, src)
     return model.data_fields or {}
 end
 
@@ -353,10 +429,11 @@ end
 
 ---@param kind 'person'|'vehicle'
 ---@param record table
+---@param src number|nil
 ---@return table
-local function applyDataFields(kind, record)
+local function applyDataFields(kind, record, src)
     local output = record or {}
-    for _, field in ipairs(getAkteDataFields(kind)) do
+    for _, field in ipairs(getAkteDataFields(kind, src)) do
         if type(field.key) == 'string' and field.key ~= '' then
             output[field.key] = resolveDataFieldValue(kind, field, output)
         end
@@ -364,12 +441,14 @@ local function applyDataFields(kind, record)
     return output
 end
 
-local function defaultPersonAkte()
-    return defaultAkteFromModel('person')
+---@param src number|nil
+local function defaultPersonAkte(src)
+    return defaultAkteFromModel('person', src)
 end
 
-local function defaultVehicleAkte()
-    return defaultAkteFromModel('vehicle')
+---@param src number|nil
+local function defaultVehicleAkte(src)
+    return defaultAkteFromModel('vehicle', src)
 end
 
 ---@param target table
@@ -384,9 +463,10 @@ end
 ---@param kind 'person'|'vehicle'
 ---@param current table
 ---@param incoming table
+---@param src number|nil
 ---@return table
-local function applyEditableAkteFields(kind, current, incoming)
-    local fieldMap = getAkteFieldMap(kind)
+local function applyEditableAkteFields(kind, current, incoming, src)
+    local fieldMap = getAkteFieldMap(kind, src)
     local merged = current or {}
     if type(incoming) ~= 'table' then
         return merged
@@ -405,10 +485,11 @@ end
 ---@param kind 'person'|'vehicle'
 ---@param decoded table|nil
 ---@param defaults table
+---@param src number|nil
 ---@return table
-local function normalizeAkteToSchema(kind, decoded, defaults)
+local function normalizeAkteToSchema(kind, decoded, defaults, src)
     local result = {}
-    local fieldMap = getAkteFieldMap(kind)
+    local fieldMap = getAkteFieldMap(kind, src)
 
     for key, defaultValue in pairs(defaults or {}) do
         local value = decoded and decoded[key] or nil
@@ -452,9 +533,10 @@ end
 
 --- Build framework defaults for a person Akte.
 ---@param identifier string
+---@param src number|nil
 ---@return table
-local function buildPersonAkteDefaults(identifier)
-    local defaults = defaultPersonAkte()
+local function buildPersonAkteDefaults(identifier, src)
+    local defaults = defaultPersonAkte(src)
 
     if Framework.name == 'esx' then
         local row = SQL.single([[
@@ -500,9 +582,10 @@ end
 
 --- Build framework defaults for a vehicle Akte.
 ---@param plate string
+---@param src number|nil
 ---@return table
-local function buildVehicleAkteDefaults(plate)
-    local defaults = defaultVehicleAkte()
+local function buildVehicleAkteDefaults(plate, src)
+    local defaults = defaultVehicleAkte(src)
 
     if Framework.name == 'esx' then
         local row = SQL.single([[
@@ -543,26 +626,29 @@ local function buildVehicleAkteDefaults(plate)
 end
 
 ---@param identifier string
+---@param src number|nil
 ---@return table
-local function getPersonAkte(identifier)
-    local defaults = buildPersonAkteDefaults(identifier)
+local function getPersonAkte(identifier, src)
+    local defaults = buildPersonAkteDefaults(identifier, src)
     local row = SQL.single('SELECT data FROM tg_mdt_person_akten WHERE identifier = ? LIMIT 1', { identifier })
     local decoded = row and decodeObject(row.data) or nil
-    return normalizeAkteToSchema('person', decoded, defaults)
+    return normalizeAkteToSchema('person', decoded, defaults, src)
 end
 
 ---@param plate string
+---@param src number|nil
 ---@return table
-local function getVehicleAkte(plate)
-    local defaults = buildVehicleAkteDefaults(plate)
+local function getVehicleAkte(plate, src)
+    local defaults = buildVehicleAkteDefaults(plate, src)
     local row = SQL.single('SELECT data FROM tg_mdt_vehicle_akten WHERE plate = ? LIMIT 1', { plate })
     local decoded = row and decodeObject(row.data) or nil
-    return normalizeAkteToSchema('vehicle', decoded, defaults)
+    return normalizeAkteToSchema('vehicle', decoded, defaults, src)
 end
 
 --- Fetch persons from active framework data source.
+---@param src number|nil
 ---@return table
-local function getPersonsFromFramework()
+local function getPersonsFromFramework(src)
     if Framework.name == 'esx' then
         local rows = SQL.query([[ 
             SELECT u.identifier, u.firstname, u.lastname, u.dateofbirth, u.sex, u.job, u.job_grade,
@@ -590,7 +676,7 @@ local function getPersonsFromFramework()
                 job = formatJobDisplay(row.job_label or row.job, row.job_grade_label, row.job_grade),
                 address = nil,
             }
-            persons[#persons] = applyDataFields('person', persons[#persons])
+            persons[#persons] = applyDataFields('person', persons[#persons], src)
         end
         return persons
     end
@@ -646,7 +732,7 @@ local function getPersonsFromFramework()
                 job = formatJobDisplay(jobLabel, gradeLabel, gradeNumber),
                 address = charinfo and (charinfo.address or charinfo.street) or nil,
             }
-            persons[#persons] = applyDataFields('person', persons[#persons])
+            persons[#persons] = applyDataFields('person', persons[#persons], src)
         end
         return persons
     end
@@ -667,15 +753,16 @@ local function getPersonsFromFramework()
                 job = Framework.Server.getJob(src),
                 address = nil,
             }
-            persons[#persons] = applyDataFields('person', persons[#persons])
+            persons[#persons] = applyDataFields('person', persons[#persons], src)
         end
     end
     return persons
 end
 
 --- Fetch vehicles from active framework data source.
+---@param src number|nil
 ---@return table
-local function getVehiclesFromFramework()
+local function getVehiclesFromFramework(src)
     if Framework.name == 'esx' then
         local rows = SQL.query([[
             SELECT ov.plate, ov.owner, ov.vehicle, u.firstname, u.lastname
@@ -695,7 +782,7 @@ local function getVehiclesFromFramework()
                 model = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model) or nil),
                 state = nil,
             }
-            vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles])
+            vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles], src)
         end
         return vehicles
     end
@@ -726,7 +813,7 @@ local function getVehiclesFromFramework()
                 model = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model) or nil),
                 state = row.state,
             }
-            vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles])
+            vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles], src)
         end
         return vehicles
     end
@@ -759,34 +846,34 @@ end)
 
 
 -- ── Persons callback (framework-backed) ────────────────────
-lib.callback.register('TG_MDT:getPersons', function(_src)
-    local persons = getPersonsFromFramework()
+lib.callback.register('TG_MDT:getPersons', function(src)
+    local persons = getPersonsFromFramework(src)
     Debug.debug(('Persons callback: returned %s records'):format(#persons))
     return persons
 end)
 
 -- ── Vehicles callback (framework-backed) ───────────────────
-lib.callback.register('TG_MDT:getVehicles', function(_src)
-    local vehicles = getVehiclesFromFramework()
+lib.callback.register('TG_MDT:getVehicles', function(src)
+    local vehicles = getVehiclesFromFramework(src)
     Debug.debug(('Vehicles callback: returned %s records'):format(#vehicles))
     return vehicles
 end)
 
 -- ── Akte callbacks (db-backed + live sync) ────────────────
-lib.callback.register('TG_MDT:getAkteBootstrap', function(_src)
+lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
     local personRows = SQL.query('SELECT identifier, data FROM tg_mdt_person_akten', {})
     local vehicleRows = SQL.query('SELECT plate, data FROM tg_mdt_vehicle_akten', {})
 
     local personAkten = {}
     for i = 1, #personRows do
         local row = personRows[i]
-        personAkten[row.identifier] = normalizeAkteToSchema('person', decodeObject(row.data), defaultPersonAkte())
+        personAkten[row.identifier] = normalizeAkteToSchema('person', decodeObject(row.data), defaultPersonAkte(src), src)
     end
 
     local vehicleAkten = {}
     for i = 1, #vehicleRows do
         local row = vehicleRows[i]
-        vehicleAkten[row.plate] = normalizeAkteToSchema('vehicle', decodeObject(row.data), defaultVehicleAkte())
+        vehicleAkten[row.plate] = normalizeAkteToSchema('vehicle', decodeObject(row.data), defaultVehicleAkte(src), src)
     end
 
     return {
@@ -795,19 +882,19 @@ lib.callback.register('TG_MDT:getAkteBootstrap', function(_src)
     }
 end)
 
-lib.callback.register('TG_MDT:getPersonAkte', function(_src, identifier)
+lib.callback.register('TG_MDT:getPersonAkte', function(src, identifier)
     if type(identifier) ~= 'string' or identifier == '' then
-        return defaultPersonAkte()
+        return defaultPersonAkte(src)
     end
-    return getPersonAkte(identifier)
+    return getPersonAkte(identifier, src)
 end)
 
-lib.callback.register('TG_MDT:savePersonAkte', function(_src, identifier, akte)
+lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte)
     if type(identifier) ~= 'string' or identifier == '' then
         return nil
     end
 
-    local merged = applyEditableAkteFields('person', getPersonAkte(identifier), akte)
+    local merged = applyEditableAkteFields('person', getPersonAkte(identifier, src), akte, src)
 
     SQL.execute(
         'INSERT INTO tg_mdt_person_akten (identifier, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',
@@ -823,19 +910,19 @@ lib.callback.register('TG_MDT:savePersonAkte', function(_src, identifier, akte)
     return merged
 end)
 
-lib.callback.register('TG_MDT:getVehicleAkte', function(_src, plate)
+lib.callback.register('TG_MDT:getVehicleAkte', function(src, plate)
     if type(plate) ~= 'string' or plate == '' then
-        return defaultVehicleAkte()
+        return defaultVehicleAkte(src)
     end
-    return getVehicleAkte(plate)
+    return getVehicleAkte(plate, src)
 end)
 
-lib.callback.register('TG_MDT:saveVehicleAkte', function(_src, plate, akte)
+lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte)
     if type(plate) ~= 'string' or plate == '' then
         return nil
     end
 
-    local merged = applyEditableAkteFields('vehicle', getVehicleAkte(plate), akte)
+    local merged = applyEditableAkteFields('vehicle', getVehicleAkte(plate, src), akte, src)
 
     SQL.execute(
         'INSERT INTO tg_mdt_vehicle_akten (plate, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',

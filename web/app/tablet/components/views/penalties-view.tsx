@@ -13,7 +13,7 @@ export default function PenaltiesView({ t }: { t: TFunction }) {
   return (
     <div className="h-full flex flex-col gap-4">
       <div>
-        <h3 className="text-xl card-title">{t("tablet.sidebar.penalties")}</h3>
+        <h3 className="text-xl card-title">{t("tablet.sidebar.penalty_catalog")}</h3>
         <p className="card-sub mt-1">{t("tablet.penalties.subtitle")}</p>
       </div>
 

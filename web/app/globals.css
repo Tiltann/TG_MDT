@@ -4,6 +4,8 @@
 :root {
   --background: transparent;
   --foreground: #e7edf5;
+  --app-font-sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --app-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   
   /* Modular Theme Colors */
   --mdt-bg-base: #11141a;       /* Darkest background */
@@ -27,8 +29,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,7 +42,7 @@
 
 body {
   color: var(--foreground);
-  font-family: var(--font-geist-sans), sans-serif;
+  font-family: var(--app-font-sans);
   overflow: hidden;
 }
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { Home, RadioReceiver, Users, Car, FileText, Briefcase, MessageSquare, CalendarDays, Scale, Bell, LayoutDashboard } from "lucide-react";
+import { Home, RadioReceiver, Users, Car, BookOpen, MessageSquare, CalendarDays, Scale, Bell } from "lucide-react";
 import type { TFunction } from "../lib/i18n";
 
 type Branding = {
   name?: string;
   subtitle?: string;
   accent?: string;
+  logoUrl?: string;
 };
 
 type DutyState = {
@@ -17,6 +18,7 @@ export function Sidebar({
   currentView,
   modules,
   onScreenChange,
+  onOpenProfile,
   playerData,
   dutyState,
   branding,
@@ -25,6 +27,7 @@ export function Sidebar({
   currentView: string;
   modules: Record<string, boolean>;
   onScreenChange: (screen: string) => void;
+  onOpenProfile: () => void;
   playerData: any;
   dutyState: DutyState;
   branding: Branding;
@@ -32,13 +35,13 @@ export function Sidebar({
 }) {
   const menu_items = [
     { id: "dashboard", label: t("tablet.sidebar.dashboard"), icon: Home },
+    { id: "blackboard", label: t("tablet.sidebar.blackboard"), icon: BookOpen },
     { id: "dispatch", label: t("tablet.sidebar.dispatch"), icon: RadioReceiver },
     { id: "persons", label: t("tablet.sidebar.persons"), icon: Users },
     { id: "vehicles", label: t("tablet.sidebar.vehicles"), icon: Car },
-    { id: "reports", label: t("tablet.sidebar.reports"), icon: FileText },
-    { id: "incidents", label: t("tablet.sidebar.incidents"), icon: Briefcase },
-    { id: "penalties", label: t("tablet.sidebar.penalties"), icon: Scale },
-    { id: "map", label: t("tablet.sidebar.map"), icon: LayoutDashboard },
+    { id: "warrants", label: t("tablet.sidebar.warrants"), icon: Bell },
+    { id: "penalties", label: t("tablet.sidebar.penalty_catalog"), icon: Scale },
+    { id: "livemap", label: t("tablet.sidebar.livemap"), icon: BookOpen },
     { id: "chat", label: t("tablet.sidebar.chat"), icon: MessageSquare },
     { id: "shifts", label: t("tablet.sidebar.shifts"), icon: CalendarDays },
     { id: "administration", label: t("tablet.sidebar.administration"), icon: Bell },
@@ -51,8 +54,13 @@ export function Sidebar({
     <aside className="w-72 bg-[var(--mdt-bg-base)] border-r border-[var(--mdt-border)] flex flex-col justify-between p-4 flex-shrink-0">
       <div>
         <div className="flex items-center gap-3 mb-8 px-2">
-          <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white font-semibold" style={{ boxShadow: `0 0 0 1px ${accent}22 inset` }}>
-            {branding.name?.slice(0, 2)?.toUpperCase() || "TG"}
+          <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white font-semibold overflow-hidden" style={{ boxShadow: `0 0 0 1px ${accent}22 inset` }}>
+            {branding.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={branding.logoUrl} alt={branding.name || "MDT"} className="h-full w-full object-cover" />
+            ) : (
+              branding.name?.slice(0, 2)?.toUpperCase() || "TG"
+            )}
           </div>
           <div>
             <h1 className="text-white font-bold text-base tracking-wide">{branding.name || "TG MDT"}</h1>
@@ -89,12 +97,21 @@ export function Sidebar({
 
       {/* User Profile / Quick Actions */}
       <div>
-        <div className="bg-[var(--mdt-bg-panel)] rounded-xl p-4 border border-[var(--mdt-border)]">
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="w-full bg-[var(--mdt-bg-panel)] rounded-xl p-4 border border-[var(--mdt-border)] text-left hover:bg-white/5 transition-colors"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/8 overflow-hidden flex-shrink-0 border border-white/10">
-              <div className="w-full h-full bg-white/5 flex items-center justify-center text-white">
-                {playerData?.name?.charAt(0) || "U"}
-              </div>
+              {playerData?.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={playerData.imageUrl} alt={playerData?.name || "profile"} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-white/5 flex items-center justify-center text-white">
+                  {playerData?.name?.charAt(0) || "U"}
+                </div>
+              )}
             </div>
             <div>
               <p className="text-white font-medium text-sm truncate w-32">
@@ -113,7 +130,7 @@ export function Sidebar({
               </div>
             </div>
           </div>
-        </div>
+        </button>
 
       </div>
     </aside>

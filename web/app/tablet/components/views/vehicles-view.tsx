@@ -42,6 +42,25 @@ type AkteSyncPayload = {
   akte?: Record<string, string>;
 };
 
+type RelatedIncident = {
+  id: string;
+  title: string;
+  location: string;
+  severity: string;
+  status: string;
+  linkedPersons: string[];
+  linkedVehicles: string[];
+};
+
+type RelatedBolo = {
+  id: string;
+  title: string;
+  priority: string;
+  status: string;
+  linkedPersons: string[];
+  linkedVehicles: string[];
+};
+
 type AkteNote = {
   id: string;
   text: string;
@@ -296,6 +315,8 @@ export default function VehiclesView({
   akteSync,
   akteFields,
   dataFields,
+  incidents,
+  bolos,
 }: {
   t: TFunction;
   actorName?: string;
@@ -305,6 +326,8 @@ export default function VehiclesView({
   akteSync?: AkteSyncPayload;
   akteFields?: AkteField[];
   dataFields?: DataField[];
+  incidents?: RelatedIncident[];
+  bolos?: RelatedBolo[];
 }) {
   const resolvedFields = akteFields && akteFields.length > 0 ? akteFields : FALLBACK_FIELDS;
   const resolvedDataFields = dataFields && dataFields.length > 0 ? dataFields : FALLBACK_DATA_FIELDS;
@@ -435,6 +458,8 @@ export default function VehiclesView({
   );
   const activeNotes = allNotes.filter((note) => !isNoteExpired(note));
   const expiredNotesCount = allNotes.length - activeNotes.length;
+  const relatedIncidents = (incidents || []).filter((incident) => incident.linkedVehicles.includes(selectedVehicle?.plate || ""));
+  const relatedBolos = (bolos || []).filter((bolo) => bolo.linkedVehicles.includes(selectedVehicle?.plate || ""));
   const activeImage = vehicleImages[activeImageIndex] || vehicleImages[0] || "";
   const activeImageIsDataUrl = activeImage.startsWith("data:");
   const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
@@ -936,6 +961,40 @@ export default function VehiclesView({
                   />
                 )}
                 <Button onClick={addNote}>{t("tablet.notes.add")}</Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-xs mdt-muted">{t("tablet.vehicles.related")}</label>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 space-y-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--mdt-text-muted)]">{t("tablet.incidents.recent_list")}</p>
+                {relatedIncidents.length === 0 ? (
+                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
+                ) : (
+                  relatedIncidents.map((incident) => (
+                    <div key={incident.id} className="text-xs rounded-xl bg-white/5 p-2">
+                      <p className="text-white font-medium">{incident.title}</p>
+                      <p className="text-[var(--mdt-text-muted)]">{incident.location} • {incident.severity} • {incident.status}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 space-y-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--mdt-text-muted)]">{t("tablet.bolo.title")}</p>
+                {relatedBolos.length === 0 ? (
+                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
+                ) : (
+                  relatedBolos.map((bolo) => (
+                    <div key={bolo.id} className="text-xs rounded-xl bg-white/5 p-2">
+                      <p className="text-white font-medium">{bolo.title}</p>
+                      <p className="text-[var(--mdt-text-muted)]">{bolo.priority} • {bolo.status}</p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

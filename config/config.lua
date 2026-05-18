@@ -28,6 +28,7 @@ Config.MDT = {
         'police',
         'sheriff',
         'fbi',
+        'ambulance',
     },
 
     -- Default screen opened by the tablet module.
@@ -44,6 +45,35 @@ Config.MDT = {
         -- JPEG quality used by screenshot-basic (range 0.1 - 1.0).
         -- 1.0 = best quality / biggest payload.
         screenshot_quality = 1,
+    },
+
+    -- Chat behavior.
+    chat = {
+        -- Automatically delete chat messages after this many minutes.
+        -- 0 disables auto-delete.
+        auto_delete_after_minutes = 0,
+    },
+
+    -- Which part of the RP name is used in dashboard greetings.
+    -- Supported: fullname | firstname | lastname
+    player_name_mode = 'fullname',
+
+    -- Sidebar branding options.
+    branding = {
+        -- Available placeholder: {job}
+        -- Example output for police job: "POLICE MDT"
+        title_template = '{job} MDT',
+
+        -- Optional logo image for the top-left sidebar block.
+        -- Use a data URL or https URL. Empty = initials fallback.
+        logo_url = '',
+
+        -- Optional job-specific overrides.
+        -- job_overrides = {
+        --     police = { title = 'LSPD MDT', logo_url = 'https://example.com/lspd.png' },
+        --     sheriff = { title = 'BCSO MDT', logo_url = 'https://example.com/bcso.png' },
+        -- },
+        job_overrides = {},
     },
 
     -- Allow users to switch the live map tile style from the settings page.

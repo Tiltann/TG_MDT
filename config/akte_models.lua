@@ -41,6 +41,22 @@
 --    ctx.key    -> field key
 --    ctx.field  -> full field table
 --    ctx.record -> current framework record
+--
+--  job_models (optional):
+--    Define job-specific Akte schemas and share access with other jobs.
+--    Structure:
+--      job_models = {
+--        police = {
+--          shared_with = { 'sheriff' },
+--          person = { data_fields = {...}, fields = {...} },
+--          vehicle = { data_fields = {...}, fields = {...} },
+--        }
+--      }
+--
+--    Rules:
+--      - If a player's job has its own schema, it is used.
+--      - Otherwise, if job is listed in another schema's shared_with, that schema is used.
+--      - Otherwise fallback to default person/vehicle schemas below.
 -- ============================================================
 
 Config = Config or {}
@@ -250,5 +266,30 @@ Config.AkteModels = Config.AkteModels or {
                 editable = true,
             },
         },
+    },
+
+    -- Optional per-job schema overrides + share rules.
+    -- Keep empty to use default schemas for all jobs.
+    job_models = {
+        -- Example:
+        -- police = {
+        --     shared_with = { 'sheriff' },
+        --     person = {
+        --         data_fields = {
+        --             { key = 'name', label_key = 'tablet.persons.field.name', source = 'name' },
+        --         },
+        --         fields = {
+        --             { key = 'notes', label_key = 'tablet.persons.akte.notes', type = 'textarea', default = '', editable = true },
+        --         },
+        --     },
+        --     vehicle = {
+        --         data_fields = {
+        --             { key = 'model', label_key = 'tablet.vehicles.field.model', source = 'model', fallback = '-' },
+        --         },
+        --         fields = {
+        --             { key = 'notes', label_key = 'tablet.vehicles.akte.notes', type = 'textarea', default = '', editable = true },
+        --         },
+        --     },
+        -- },
     },
 }
