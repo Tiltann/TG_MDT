@@ -797,6 +797,21 @@ local personsCache = { data = nil, timestamp = 0 }
 local vehiclesCache = { data = nil, timestamp = 0 }
 local CACHE_TTL = 30000
 
+local saveRateLimiter = {}
+local SAVE_COOLDOWN = 1000
+
+local function canSave(src)
+    local now = GetGameTimer()
+    local last = saveRateLimiter[src] or 0
+    
+    if (now - last) < SAVE_COOLDOWN then
+        return false
+    end
+    
+    saveRateLimiter[src] = now
+    return true
+end
+
 --- Fetch persons from active framework data source.
 ---@param src number|nil
 ---@return table
@@ -1161,6 +1176,11 @@ lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, c
         return nil
     end
     
+    if not canSave(src) then
+        Debug.warn(('Rate limit exceeded for person akte save: Player %s'):format(src))
+        return nil
+    end
+    
     if type(identifier) ~= 'string' or identifier == '' then
         return nil
     end
@@ -1205,6 +1225,11 @@ end)
 lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compartment)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized vehicle akte save: Player %s'):format(src))
+        return nil
+    end
+    
+    if not canSave(src) then
+        Debug.warn(('Rate limit exceeded for vehicle akte save: Player %s'):format(src))
         return nil
     end
     
