@@ -51,9 +51,9 @@ export function Sidebar({
   const isOnDuty = dutyState?.onDuty !== false;
 
   return (
-    <aside className="w-72 bg-[var(--mdt-bg-base)] border-r border-[var(--mdt-border)] flex flex-col justify-between p-4 flex-shrink-0">
-      <div>
-        <div className="flex items-center gap-3 mb-8 px-2">
+    <aside className="flex h-full w-[23rem] flex-shrink-0 flex-col border-r border-[var(--mdt-border)] bg-[var(--mdt-bg-base)] p-5">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="mb-8 flex items-center gap-3 px-2">
           <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white font-semibold overflow-hidden" style={{ boxShadow: `0 0 0 1px ${accent}22 inset` }}>
             {branding.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -68,7 +68,7 @@ export function Sidebar({
           </div>
         </div>
 
-        <nav className="space-y-1">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-2">
           {menu_items.map((item) => {
             // Check if feature module is enabled (or if it's the base dashboard)
             const is_enabled = item.id === "dashboard" || modules[item.id] !== false;
@@ -96,7 +96,7 @@ export function Sidebar({
       </div>
 
       {/* User Profile / Quick Actions */}
-      <div>
+      <div className="mt-4 shrink-0">
         <button
           type="button"
           onClick={onOpenProfile}

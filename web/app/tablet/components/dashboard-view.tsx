@@ -270,7 +270,6 @@ export function DashboardView({
             </div>
             <h2 className="text-3xl lg:text-5xl font-bold leading-tight tracking-tight text-white">
               {branding.greeting || t("tablet.dashboard.greeting_default")}
-              {actor_name !== t("tablet.player.unknown_user") && <span className="text-[var(--mdt-accent-primary)]"> {actor_name}</span>}
             </h2>
             <p className="max-w-xl text-sm lg:text-base leading-relaxed text-white/60">
               {t("tablet.dashboard.overview_subtitle")}
