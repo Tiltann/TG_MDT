@@ -248,11 +248,42 @@ function Duty.toggleState(src, options)
     return Duty.setState(src, not current.onDuty, options)
 end
 
+local function hasAccess(src)
+    if not Framework or not Framework.Server or type(Framework.Server.getJob) ~= 'function' then
+        return false
+    end
+    
+    local ok, job = pcall(Framework.Server.getJob, src)
+    if not ok or not job then return false end
+    
+    local allowed = (Config.MDT and Config.MDT.allowed_jobs) or {}
+    if #allowed == 0 then return true end
+    
+    local job_lower = string.lower(job)
+    for i = 1, #allowed do
+        if string.lower(allowed[i]) == job_lower then
+            return true
+        end
+    end
+    
+    return false
+end
+
 lib.callback.register('TG_MDT:getDutyState', function(src)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized duty state access: Player %s'):format(src))
+        return { enabled = false, onDuty = false, reason = 'unauthorized' }
+    end
+    
     return Duty.getState(src)
 end)
 
 lib.callback.register('TG_MDT:setDutyState', function(src, payload)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized duty state change: Player %s'):format(src))
+        return { enabled = false, onDuty = false, reason = 'unauthorized' }
+    end
+    
     local onDuty = type(payload) == 'table' and payload.onDuty == true or false
     local state = Duty.setState(src, onDuty, payload)
 
@@ -266,6 +297,11 @@ lib.callback.register('TG_MDT:setDutyState', function(src, payload)
 end)
 
 lib.callback.register('TG_MDT:toggleDuty', function(src, payload)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized duty toggle: Player %s'):format(src))
+        return { enabled = false, onDuty = false, reason = 'unauthorized' }
+    end
+    
     local state = Duty.toggleState(src, payload)
 
     local cfg = getDutyConfig()
