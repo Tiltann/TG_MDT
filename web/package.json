@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "sync:map": "rm -rf public/map && cp -r map public/map",
-    "prebuild": "bun run sync:map",
+    "prebuild": "node scripts/copy-map.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
