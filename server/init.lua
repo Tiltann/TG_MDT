@@ -1194,6 +1194,8 @@ lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, c
         { storageKey, json.encode(merged) }
     )
 
+    akteBootstrapCache[scope] = nil
+    
     local players = GetPlayers()
     for i = 1, #players do
         local targetSrc = tonumber(players[i])
@@ -1246,6 +1248,8 @@ lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compa
         { storageKey, json.encode(merged) }
     )
 
+    akteBootstrapCache[scope] = nil
+    
     local players = GetPlayers()
     for i = 1, #players do
         local targetSrc = tonumber(players[i])
