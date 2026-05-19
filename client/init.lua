@@ -274,6 +274,23 @@ end)
 
 RegisterNetEvent('TG_MDT:akteUpdated', function(payload)
 	if type(payload) ~= 'table' then return end
+	
+	if type(payload.kind) ~= 'string' or (payload.kind ~= 'person' and payload.kind ~= 'vehicle') then
+		return
+	end
+	
+	if payload.kind == 'person' and (type(payload.identifier) ~= 'string' or payload.identifier == '') then
+		return
+	end
+	
+	if payload.kind == 'vehicle' and (type(payload.plate) ~= 'string' or payload.plate == '') then
+		return
+	end
+	
+	if type(payload.akte) ~= 'table' then
+		return
+	end
+	
 	NUI.send('setData', {
 		key = 'akteSync',
 		value = payload,
