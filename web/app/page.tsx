@@ -516,12 +516,13 @@ export default function Home() {
   }, [isHandshakeDone]);
 
   useNuiEvent<NuiVisibilityPayload>("setVisible", (data) => {
-    setVisible(Boolean(data?.visible));
-    setActiveScreen(data?.screen ?? null);
+    const nextVisible = Boolean(data?.visible);
+    setVisible(nextVisible);
+    setActiveScreen(data?.screen ?? (nextVisible ? "tablet" : null));
   });
 
   useNuiEvent<NuiScreenPayload>("setScreen", (data) => {
-    setActiveScreen(data?.screen ?? null);
+    setActiveScreen(data?.screen ?? "tablet");
   });
 
   useNuiEvent<NuiDataPayload>("setData", (data) => {
@@ -534,7 +535,7 @@ export default function Home() {
 
   // Fallback for browser dev mode to always show UI
   const is_browser = typeof window !== "undefined" && !("invokeNative" in window);
-  const show_ui = is_browser || (isVisible && activeScreen !== null);
+  const show_ui = is_browser || isVisible || activeScreen !== null;
 
   const meta = (screenData?.meta as any) || {};
   const typedMeta = meta as NuiMetaPayload;
