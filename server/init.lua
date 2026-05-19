@@ -50,6 +50,37 @@ local function checkMapTiles()
     return marker ~= nil
 end
 
+-- ══════════════════════════════════════════════════════════
+-- PERMISSION CHECK
+-- ══════════════════════════════════════════════════════════
+
+local allowedJobsCache = nil
+
+--- Check if player has MDT access based on job.
+---@param src number Player server ID
+---@return boolean has_access True if player job is in allowed_jobs
+local function hasAccess(src)
+    local job = Framework.Server.getJob(src)
+    if not job then return false end
+    
+    if not allowedJobsCache then
+        local allowed = Config.MDT.allowed_jobs or {}
+        if #allowed == 0 then
+            allowedJobsCache = 'all'
+        else
+            allowedJobsCache = {}
+            for i = 1, #allowed do
+                allowedJobsCache[string.lower(allowed[i])] = true
+            end
+        end
+    end
+    
+    if allowedJobsCache == 'all' then return true end
+    return allowedJobsCache[string.lower(job)] == true
+end
+
+-- ══════════════════════════════════════════════════════════
+
 --- Build a display name from row values.
 ---@param firstname string|nil
 ---@param lastname string|nil
@@ -933,6 +964,15 @@ end
 ---@param value string
 ---@return string[]
 local function getAkteCompartmentsForRow(tableName, columnName, value)
+    local validTables = {
+        tg_mdt_person_akten = { identifier = true },
+        tg_mdt_vehicle_akten = { plate = true }
+    }
+    
+    if not validTables[tableName] or not validTables[tableName][columnName] then
+        return {}
+    end
+    
     local query = ('SELECT %s FROM %s WHERE %s = ? OR %s LIKE ?'):format(columnName, tableName, columnName, columnName)
     local rows = SQL.query(query, { value, ('%%::%s'):format(value) })
     local scopes = {}
@@ -977,6 +1017,11 @@ end)
 
 -- ── Persons callback (framework-backed) ────────────────────
 lib.callback.register('TG_MDT:getPersons', function(src)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized MDT access attempt: Player %s'):format(src))
+        return {}
+    end
+    
     local persons = getPersonsFromFramework(src)
     Debug.debug(('Persons callback: returned %s records'):format(#persons))
     return persons
@@ -984,6 +1029,11 @@ end)
 
 -- ── Vehicles callback (framework-backed) ───────────────────
 lib.callback.register('TG_MDT:getVehicles', function(src)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized MDT access attempt: Player %s'):format(src))
+        return {}
+    end
+    
     local vehicles = getVehiclesFromFramework(src)
     Debug.debug(('Vehicles callback: returned %s records'):format(#vehicles))
     return vehicles
@@ -991,6 +1041,11 @@ end)
 
 -- ── Akte callbacks (db-backed + live sync) ────────────────
 lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized akte bootstrap attempt: Player %s'):format(src))
+        return { personAkten = {}, vehicleAkten = {} }
+    end
+    
     local scope = getAkteScope(src)
     local personRows = SQL.query('SELECT identifier, data FROM tg_mdt_person_akten', {})
     local vehicleRows = SQL.query('SELECT plate, data FROM tg_mdt_vehicle_akten', {})
@@ -1019,7 +1074,12 @@ lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
     }
 end)
 
-lib.callback.register('TG_MDT:getAkteCompartments', function(_, kind, value)
+lib.callback.register('TG_MDT:getAkteCompartments', function(src, kind, value)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized compartments access: Player %s'):format(src))
+        return {}
+    end
+    
     if kind == 'vehicle' and type(value) == 'string' and value ~= '' then
         return getAkteCompartmentsForRow('tg_mdt_vehicle_akten', 'plate', value)
     end
@@ -1032,6 +1092,11 @@ lib.callback.register('TG_MDT:getAkteCompartments', function(_, kind, value)
 end)
 
 lib.callback.register('TG_MDT:getPersonAkte', function(src, identifier, compartment)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized person akte access: Player %s'):format(src))
+        return defaultPersonAkte(src)
+    end
+    
     if type(identifier) ~= 'string' or identifier == '' then
         return defaultPersonAkte(src)
     end
@@ -1039,6 +1104,11 @@ lib.callback.register('TG_MDT:getPersonAkte', function(src, identifier, compartm
 end)
 
 lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, compartment)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized person akte save: Player %s'):format(src))
+        return nil
+    end
+    
     if type(identifier) ~= 'string' or identifier == '' then
         return nil
     end
@@ -1063,6 +1133,11 @@ lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, c
 end)
 
 lib.callback.register('TG_MDT:getVehicleAkte', function(src, plate, compartment)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized vehicle akte access: Player %s'):format(src))
+        return defaultVehicleAkte(src)
+    end
+    
     if type(plate) ~= 'string' or plate == '' then
         return defaultVehicleAkte(src)
     end
@@ -1070,6 +1145,11 @@ lib.callback.register('TG_MDT:getVehicleAkte', function(src, plate, compartment)
 end)
 
 lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compartment)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized vehicle akte save: Player %s'):format(src))
+        return nil
+    end
+    
     if type(plate) ~= 'string' or plate == '' then
         return nil
     end
