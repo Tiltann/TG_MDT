@@ -162,6 +162,8 @@ export function DashboardView({
   const recent_bolos = data?.recentBolos || [];
   const board_posts = data?.boardPosts || [];
   const shifts = data?.shifts || [];
+  const greeting_text = branding.greeting || t("tablet.dashboard.greeting_default");
+  const greeting_parts = actor_name !== t("tablet.player.unknown_user") ? greeting_text.split(actor_name) : [greeting_text];
 
   const [board_title, setBoardTitle] = useState("");
   const [board_body, setBoardBody] = useState("");
@@ -259,7 +261,7 @@ export function DashboardView({
   };
 
   return (
-    <div className="h-full flex flex-col gap-6 overflow-hidden">
+    <div className="h-full min-h-0 overflow-y-auto pr-3 pb-2 flex flex-col gap-6">
       <div className="relative shrink-0 overflow-hidden rounded-[28px] border border-white/5 bg-[linear-gradient(135deg,rgba(14,17,23,0.98),rgba(10,12,16,0.94))] p-6 lg:p-8 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,145,0,0.14),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.08),transparent_38%)]" />
         <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
@@ -269,7 +271,15 @@ export function DashboardView({
               {branding.subtitle || t("tablet.branding.subtitle")}
             </div>
             <h2 className="text-3xl lg:text-5xl font-bold leading-tight tracking-tight text-white">
-              {branding.greeting || t("tablet.dashboard.greeting_default")}
+              {greeting_parts.length > 1 ? (
+                <>
+                  {greeting_parts[0]}
+                  <span className="text-[var(--mdt-accent-primary)]">{actor_name}</span>
+                  {greeting_parts.slice(1).join(actor_name)}
+                </>
+              ) : (
+                greeting_text
+              )}
             </h2>
             <p className="max-w-xl text-sm lg:text-base leading-relaxed text-white/60">
               {t("tablet.dashboard.overview_subtitle")}
@@ -303,7 +313,7 @@ export function DashboardView({
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden pr-3 pb-2 space-y-6">
+      <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <div className="xl:col-span-2 space-y-6">
             <Card className="overflow-hidden border border-white/5 bg-[linear-gradient(180deg,rgba(16,19,26,0.98),rgba(11,13,17,0.94))]">
