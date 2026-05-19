@@ -1174,12 +1174,18 @@ lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, c
         { storageKey, json.encode(merged) }
     )
 
-    TriggerClientEvent('TG_MDT:akteUpdated', -1, {
-        kind = 'person',
-        identifier = identifier,
-        compartment = scope,
-        akte = merged,
-    })
+    local players = GetPlayers()
+    for i = 1, #players do
+        local targetSrc = tonumber(players[i])
+        if targetSrc and hasAccess(targetSrc) then
+            TriggerClientEvent('TG_MDT:akteUpdated', targetSrc, {
+                kind = 'person',
+                identifier = identifier,
+                compartment = scope,
+                akte = merged,
+            })
+        end
+    end
 
     return merged
 end)
@@ -1215,12 +1221,18 @@ lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compa
         { storageKey, json.encode(merged) }
     )
 
-    TriggerClientEvent('TG_MDT:akteUpdated', -1, {
-        kind = 'vehicle',
-        plate = plate,
-        compartment = scope,
-        akte = merged,
-    })
+    local players = GetPlayers()
+    for i = 1, #players do
+        local targetSrc = tonumber(players[i])
+        if targetSrc and hasAccess(targetSrc) then
+            TriggerClientEvent('TG_MDT:akteUpdated', targetSrc, {
+                kind = 'vehicle',
+                plate = plate,
+                compartment = scope,
+                akte = merged,
+            })
+        end
+    end
 
     return merged
 end)
