@@ -163,9 +163,13 @@ end)
 
 CreateThread(function()
     while true do
-        Wait(0)
-        if _visible and IsControlJustPressed(0, CONTROL_ESCAPE) then
-            NUI.hide()
+        if _visible then
+            Wait(0)
+            if IsControlJustPressed(0, CONTROL_ESCAPE) then
+                NUI.hide()
+            end
+        else
+            Wait(500)
         end
     end
 end)

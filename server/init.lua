@@ -644,6 +644,16 @@ local function ensureAkteTables()
             updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
     ]], {})
+    
+    SQL.execute([[
+        CREATE INDEX IF NOT EXISTS idx_person_akten_identifier 
+        ON tg_mdt_person_akten(identifier)
+    ]], {})
+    
+    SQL.execute([[
+        CREATE INDEX IF NOT EXISTS idx_vehicle_akten_plate 
+        ON tg_mdt_vehicle_akten(plate)
+    ]], {})
 end
 
 --- Build framework defaults for a person Akte.
@@ -783,10 +793,19 @@ local function getVehicleAkte(plate, src, compartment)
     return normalizeAkteToSchema('vehicle', decoded, defaults, src)
 end
 
+local personsCache = { data = nil, timestamp = 0 }
+local vehiclesCache = { data = nil, timestamp = 0 }
+local CACHE_TTL = 30000
+
 --- Fetch persons from active framework data source.
 ---@param src number|nil
 ---@return table
 local function getPersonsFromFramework(src)
+    local now = GetGameTimer()
+    if personsCache.data and (now - personsCache.timestamp) < CACHE_TTL then
+        return personsCache.data
+    end
+    
     if Framework.name == 'esx' then
         local rows = SQL.query([[ 
             SELECT u.identifier, u.firstname, u.lastname, u.dateofbirth, u.sex, u.job, u.job_grade,
@@ -816,6 +835,8 @@ local function getPersonsFromFramework(src)
             }
             persons[#persons] = applyDataFields('person', persons[#persons], src)
         end
+        personsCache.data = persons
+        personsCache.timestamp = now
         return persons
     end
 
@@ -872,6 +893,8 @@ local function getPersonsFromFramework(src)
             }
             persons[#persons] = applyDataFields('person', persons[#persons], src)
         end
+        personsCache.data = persons
+        personsCache.timestamp = now
         return persons
     end
 
@@ -894,6 +917,8 @@ local function getPersonsFromFramework(src)
             persons[#persons] = applyDataFields('person', persons[#persons], src)
         end
     end
+    personsCache.data = persons
+    personsCache.timestamp = now
     return persons
 end
 
@@ -901,6 +926,11 @@ end
 ---@param src number|nil
 ---@return table
 local function getVehiclesFromFramework(src)
+    local now = GetGameTimer()
+    if vehiclesCache.data and (now - vehiclesCache.timestamp) < CACHE_TTL then
+        return vehiclesCache.data
+    end
+    
     if Framework.name == 'esx' then
         local rows = SQL.query([[
             SELECT ov.plate, ov.owner, ov.vehicle, u.firstname, u.lastname
@@ -922,6 +952,8 @@ local function getVehiclesFromFramework(src)
             }
             vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles], src)
         end
+        vehiclesCache.data = vehicles
+        vehiclesCache.timestamp = now
         return vehicles
     end
 
@@ -953,9 +985,13 @@ local function getVehiclesFromFramework(src)
             }
             vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles], src)
         end
+        vehiclesCache.data = vehicles
+        vehiclesCache.timestamp = now
         return vehicles
     end
 
+    vehiclesCache.data = {}
+    vehiclesCache.timestamp = now
     return {}
 end
 
@@ -1039,6 +1075,9 @@ lib.callback.register('TG_MDT:getVehicles', function(src)
     return vehicles
 end)
 
+local akteBootstrapCache = {}
+local AKTE_CACHE_TTL = 60000
+
 -- ── Akte callbacks (db-backed + live sync) ────────────────
 lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
     if not hasAccess(src) then
@@ -1047,6 +1086,12 @@ lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
     end
     
     local scope = getAkteScope(src)
+    local now = GetGameTimer()
+    
+    if akteBootstrapCache[scope] and (now - akteBootstrapCache[scope].timestamp) < AKTE_CACHE_TTL then
+        return akteBootstrapCache[scope].data
+    end
+    
     local personRows = SQL.query('SELECT identifier, data FROM tg_mdt_person_akten', {})
     local vehicleRows = SQL.query('SELECT plate, data FROM tg_mdt_vehicle_akten', {})
 
@@ -1068,10 +1113,17 @@ lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
         end
     end
 
-    return {
+    local result = {
         personAkten = personAkten,
         vehicleAkten = vehicleAkten,
     }
+    
+    akteBootstrapCache[scope] = {
+        data = result,
+        timestamp = now
+    }
+    
+    return result
 end)
 
 lib.callback.register('TG_MDT:getAkteCompartments', function(src, kind, value)

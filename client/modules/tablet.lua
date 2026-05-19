@@ -76,11 +76,16 @@ local function buildAllowedJobLookup()
     return lookup
 end
 
+local allowedJobLookupCache = nil
+
 --- Whether current player can use the tablet.
 ---@return boolean
 ---@return string|nil
 local function canOpenTablet()
-    local lookup = buildAllowedJobLookup()
+    if not allowedJobLookupCache then
+        allowedJobLookupCache = buildAllowedJobLookup()
+    end
+    local lookup = allowedJobLookupCache
     Debug.debug('canOpenTablet: evaluating access', {
         allowed_jobs = (Config.MDT and Config.MDT.allowed_jobs) or {},
     })

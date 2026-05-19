@@ -58,11 +58,11 @@ local function buildClockData()
 end
 
 
-local locale_dictionary = loadLocaleDictionary(Config.Locale)
 local translations_by_locale = {
 	en = loadLocaleDictionary('en'),
 	de = loadLocaleDictionary('de'),
 }
+local locale_dictionary = translations_by_locale[Config.Locale] or translations_by_locale.en
 
 ---@param key string
 ---@param fallback string
