@@ -812,6 +812,25 @@ local function canSave(src)
     return true
 end
 
+local function safeJsonEncode(data)
+    if type(data) ~= 'table' then 
+        return '{}' 
+    end
+    
+    local ok, encoded = pcall(json.encode, data)
+    if not ok then
+        Debug.error('JSON encode failed - circular reference or invalid data')
+        return '{}'
+    end
+    
+    if #encoded > 65535 then
+        Debug.warn('Akte data exceeds size limit, rejecting save')
+        return nil
+    end
+    
+    return encoded
+end
+
 --- Fetch persons from active framework data source.
 ---@param src number|nil
 ---@return table
@@ -1181,17 +1200,24 @@ lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, c
         return nil
     end
     
-    if type(identifier) ~= 'string' or identifier == '' then
+    if type(identifier) ~= 'string' or identifier == '' or #identifier > 80 then
+        Debug.warn(('Invalid identifier for person akte save: Player %s'):format(src))
         return nil
     end
 
     local scope = resolveRequestedAkteScope(src, compartment)
     local merged = applyEditableAkteFields('person', getPersonAkte(identifier, src, scope), akte, src)
     local storageKey = buildAkteStorageKey(scope, identifier)
+    
+    local encoded = safeJsonEncode(merged)
+    if not encoded then
+        Debug.error(('Failed to encode person akte data: Player %s'):format(src))
+        return nil
+    end
 
     SQL.execute(
         'INSERT INTO tg_mdt_person_akten (identifier, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',
-        { storageKey, json.encode(merged) }
+        { storageKey, encoded }
     )
 
     akteBootstrapCache[scope] = nil
@@ -1235,17 +1261,24 @@ lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compa
         return nil
     end
     
-    if type(plate) ~= 'string' or plate == '' then
+    if type(plate) ~= 'string' or plate == '' or #plate > 20 then
+        Debug.warn(('Invalid plate for vehicle akte save: Player %s'):format(src))
         return nil
     end
 
     local scope = resolveRequestedAkteScope(src, compartment)
     local merged = applyEditableAkteFields('vehicle', getVehicleAkte(plate, src, scope), akte, src)
     local storageKey = buildAkteStorageKey(scope, plate)
+    
+    local encoded = safeJsonEncode(merged)
+    if not encoded then
+        Debug.error(('Failed to encode vehicle akte data: Player %s'):format(src))
+        return nil
+    end
 
     SQL.execute(
         'INSERT INTO tg_mdt_vehicle_akten (plate, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',
-        { storageKey, json.encode(merged) }
+        { storageKey, encoded }
     )
 
     akteBootstrapCache[scope] = nil
