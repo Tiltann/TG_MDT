@@ -348,6 +348,8 @@ export default function PersonsView({
   incidents,
   bolos,
   akteScope,
+  meta,
+  viewerJob,
 }: {
   t: TFunction;
   actorName?: string;
@@ -360,6 +362,8 @@ export default function PersonsView({
   incidents?: RelatedIncident[];
   bolos?: RelatedBolo[];
   akteScope?: string;
+  meta?: any;
+  viewerJob?: string;
 }) {
   const resolvedFields = akteFields && akteFields.length > 0 ? akteFields : FALLBACK_FIELDS;
   const resolvedDataFields = dataFields && dataFields.length > 0 ? dataFields : FALLBACK_DATA_FIELDS;
@@ -370,7 +374,6 @@ export default function PersonsView({
 
   const [selectedIdentifier, setSelectedIdentifier] = useState<string | null>(null);
   const [aktenByPerson, setAktenByPerson] = useState<Record<string, PersonAkte>>({});
-  const [personCompartments, setPersonCompartments] = useState<CompartmentOption[]>([]);
   const [selectedCompartment, setSelectedCompartment] = useState(baseScope);
   const [shareTarget, setShareTarget] = useState("");
   const [captureBusy, setCaptureBusy] = useState(false);
@@ -397,32 +400,50 @@ export default function PersonsView({
     return "notes";
   }, [resolvedFields]);
 
-  useEffect(() => {
-    if (!selectedPerson) {
-      setPersonCompartments([]);
-      setSelectedCompartment(baseScope);
-      setShareTarget("");
-      return;
+  const allowedJobs = useMemo(() => {
+    const jobs = meta?.mdt?.allowed_jobs || [];
+    if (jobs.length === 0) {
+      return [baseScope];
+    }
+    return jobs;
+  }, [meta, baseScope]);
+
+  const departmentTabs = useMemo<CompartmentOption[]>(() => {
+    return allowedJobs.map((job: string) => ({
+      value: job.toLowerCase(),
+      label: job.toUpperCase(),
+    }));
+  }, [allowedJobs]);
+
+  const hasAccessToJobTab = (targetJob: string) => {
+    const allowed = meta?.mdt?.allowed_jobs || [];
+    if (allowed.length === 0) return true;
+
+    if (!viewerJob) return false;
+    const normViewer = viewerJob.trim().toLowerCase();
+    const normTarget = targetJob.trim().toLowerCase();
+
+    if (normViewer === normTarget) return true;
+
+    const jobModels = meta?.akteModels?.job_models || {};
+    const targetConfig = jobModels[normTarget];
+    if (targetConfig) {
+      const jobs = Array.isArray(targetConfig.jobs) ? targetConfig.jobs.map((j: string) => j.trim().toLowerCase()) : [];
+      const sharedWith = Array.isArray(targetConfig.shared_with) ? targetConfig.shared_with.map((s: string) => s.trim().toLowerCase()) : [];
+      if (jobs.includes(normViewer) || sharedWith.includes(normViewer)) {
+        return true;
+      }
     }
 
-    setPersonCompartments([{ value: baseScope, label: baseScope.toUpperCase() }]);
-    setSelectedCompartment(baseScope);
-    setShareTarget("");
+    const viewerConfig = jobModels[normViewer];
+    if (viewerConfig) {
+      const viewerCompartment = (viewerConfig.compartment || normViewer).trim().toLowerCase();
+      const targetCompartment = (targetConfig?.compartment || normTarget).trim().toLowerCase();
+      if (viewerCompartment === targetCompartment) return true;
+    }
 
-    fetchNui<string[]>("getAkteCompartments", { kind: "person", value: selectedPerson.identifier })
-      .then((result) => {
-        const scopes = Array.isArray(result)
-          ? result.filter((entry) => typeof entry === "string" && entry.trim() !== "")
-          : [];
-        const unique = [baseScope, ...scopes.map((entry) => entry.trim().toLowerCase())].filter(
-          (entry, index, self) => self.indexOf(entry) === index
-        );
-        setPersonCompartments(unique.map((entry) => ({ value: entry, label: entry.toUpperCase() })));
-      })
-      .catch(() => {
-        // Keep the current scope tab when the compartment lookup is unavailable.
-      });
-  }, [baseScope, selectedIdentifier]);
+    return false;
+  };
 
   useEffect(() => {
     setAktenByPerson((prev) => {
@@ -610,17 +631,13 @@ export default function PersonsView({
     if (!selectedPerson) return;
     const target = shareTarget.trim().toLowerCase();
     if (target === "" || target === selectedCompartment) return;
-    persistAkte(selectedPerson.identifier, currentAkte);
+
     fetchNui<PersonAkte>("savePersonAkte", {
       identifier: selectedPerson.identifier,
       akte: currentAkte,
       compartment: target,
     }).then((saved) => {
       if (!saved) return;
-      setPersonCompartments((prev) => {
-        if (prev.some((entry) => entry.value === target)) return prev;
-        return [...prev, { value: target, label: target.toUpperCase() }];
-      });
       setAktenByPerson((prev) => ({
         ...prev,
         [akteKey(selectedPerson.identifier, target)]: {
@@ -643,13 +660,6 @@ export default function PersonsView({
     setActiveImageIndex(0);
     setManualImageUrl("");
   }, [selectedIdentifier]);
-
-  useEffect(() => {
-    setPersonCompartments((prev) => {
-      if (prev.some((entry) => entry.value === baseScope)) return prev;
-      return [{ value: baseScope, label: baseScope.toUpperCase() }, ...prev];
-    });
-  }, [baseScope]);
 
   useEffect(() => {
     if (activeImageIndex < personImages.length) return;
@@ -938,7 +948,7 @@ export default function PersonsView({
 
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] p-2">
             <div className="flex flex-wrap gap-2">
-              {personCompartments.map((option) => (
+              {departmentTabs.map((option) => (
                 <button
                   key={option.value}
                   type="button"
@@ -955,300 +965,335 @@ export default function PersonsView({
             </div>
 
             <div className="ml-auto flex flex-wrap items-center gap-2">
-              <input
+              <select
                 value={shareTarget}
                 onChange={(event) => setShareTarget(event.target.value)}
-                className="min-w-[180px] rounded-md border border-[var(--mdt-border)] bg-[var(--mdt-bg-base)] px-3 py-2 text-sm text-white"
-                placeholder="share with... AMBULANCE"
-              />
+                className="min-w-[180px] rounded-md border border-[var(--mdt-border)] bg-[var(--mdt-bg-base)] px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[var(--mdt-accent-primary)]"
+              >
+                <option value="">{t("tablet.actions.select_department") || "Select department..."}</option>
+                {allowedJobs
+                  .filter((job: string) => job.toLowerCase() !== selectedCompartment.toLowerCase())
+                  .map((job: string) => (
+                    <option key={job} value={job.toLowerCase()}>
+                      {job.toUpperCase()}
+                    </option>
+                  ))}
+              </select>
               <Button variant="ghost" onClick={shareCurrentAkte} disabled={shareTarget.trim() === ""}>
                 Share with
               </Button>
             </div>
           </div>
 
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <label className="block text-xs mdt-muted">{t("tablet.persons.akte.image")}</label>
-              <Button onClick={capturePersonImage} disabled={captureBusy}>
-                {captureBusy ? t("tablet.akte.capture_image_busy") : t("tablet.akte.capture_image")}
-              </Button>
+          {!hasAccessToJobTab(selectedCompartment) ? (
+            <div className="relative overflow-hidden rounded-md border border-[var(--mdt-border)] bg-black/40 backdrop-blur-xl p-8 py-16 flex flex-col items-center justify-center text-center space-y-4 animate-pulse">
+              <div className="w-16 h-16 rounded-full bg-[rgba(255,145,0,0.1)] border border-[rgba(255,145,0,0.3)] flex items-center justify-center shadow-lg shadow-[rgba(255,145,0,0.05)]">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-8 h-8 text-[var(--mdt-accent-primary)]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div className="space-y-2">
+                <h5 className="text-lg font-semibold text-white tracking-wide">
+                  Access Restricted
+                </h5>
+                <p className="text-xs text-[var(--mdt-text-muted)] max-w-sm">
+                  Your department does not have the clearance level required to view or edit files in the <span className="text-[var(--mdt-accent-primary)] font-medium uppercase">{selectedCompartment}</span> database.
+                </p>
+              </div>
             </div>
-
-            {personImages.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" onClick={retakeCurrentImage} disabled={captureBusy}>
-                  {t("tablet.akte.retake_image")}
-                </Button>
-                <Button variant="ghost" onClick={deleteCurrentImage} disabled={captureBusy}>
-                  {t("tablet.akte.delete_image")}
-                </Button>
-              </div>
-            )}
-
-            {activeImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={activeImage}
-                alt={selectedPerson.name || t("tablet.player.unknown_user")}
-                onClick={() => setFullscreenImage(activeImage)}
-                className="w-full h-64 md:h-72 object-cover rounded-md border border-[var(--mdt-border)] cursor-zoom-in"
-              />
-            ) : (
-              <div className="h-32 rounded-md border border-dashed border-[var(--mdt-border)] flex items-center justify-center text-xs text-[var(--mdt-text-muted)]">
-                {t("tablet.akte.image_hint")}
-              </div>
-            )}
-
-            {personImages.length > 0 && (
-              <>
-                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.photos_count", { count: personImages.length })}</p>
-                <div className="grid grid-cols-4 gap-2">
-                  {personImages.map((image, index) => (
-                    <button
-                      key={`${image}-${index}`}
-                      type="button"
-                      onClick={() => {
-                        if (index === activeImageIndex) {
-                          setFullscreenImage(image);
-                          return;
-                        }
-                        setActiveImageIndex(index);
-                      }}
-                      className={`rounded-md overflow-hidden border ${index === activeImageIndex ? "border-white" : "border-[var(--mdt-border)]"}`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={image} alt={`${selectedPerson.name || "person"}-${index + 1}`} className="w-full h-16 object-cover" />
-                    </button>
-                  ))}
+          ) : (
+            <>
+              <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="block text-xs mdt-muted">{t("tablet.persons.akte.image")}</label>
+                  <Button onClick={capturePersonImage} disabled={captureBusy}>
+                    {captureBusy ? t("tablet.akte.capture_image_busy") : t("tablet.akte.capture_image")}
+                  </Button>
                 </div>
 
-                {activeImageIsDataUrl ? (
-                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.url_hidden")}</p>
-                ) : (
-                  <div>
-                    <label className="block text-xs mdt-muted mb-1">{t("tablet.akte.image_url")}</label>
-                    <input
-                      value={activeImageIsHttpUrl ? activeImage : ""}
-                      onChange={(event) => updateCurrentHttpImageUrl(event.target.value)}
-                      className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
-                      placeholder="https://..."
-                    />
+                {personImages.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" onClick={retakeCurrentImage} disabled={captureBusy}>
+                      {t("tablet.akte.retake_image")}
+                    </Button>
+                    <Button variant="ghost" onClick={deleteCurrentImage} disabled={captureBusy}>
+                      {t("tablet.akte.delete_image")}
+                    </Button>
                   </div>
                 )}
-              </>
-            )}
 
-            <div>
-              <label className="block text-xs mdt-muted mb-1">{t("tablet.akte.add_https_url")}</label>
-              <div className="flex items-center gap-2">
-                <input
-                  value={manualImageUrl}
-                  onChange={(event) => setManualImageUrl(event.target.value)}
-                  className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-                  placeholder="https://..."
-                />
-                <Button onClick={addManualHttpImage}>{t("tablet.akte.add_url")}</Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <label className="block text-xs mdt-muted">{t("tablet.persons.akte.notes")}</label>
-              {expiredNotesCount > 0 && (
-                <span className="text-xs text-[var(--mdt-text-muted)]">
-                  {t("tablet.notes.expired_hidden", { count: expiredNotesCount })}
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-2 max-h-44 overflow-auto">
-              {activeNotes.length === 0 ? (
-                <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
-              ) : (
-                activeNotes.map((note) => (
-                  <div key={note.id} className="rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-2">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-xs text-[var(--mdt-text-muted)]">
-                        {note.author} - posted {formatRelativeTime(note.createdAt)}
-                        {note.expiresAt ? ` | removing ${formatRelativeTime(note.expiresAt)}` : ""}
-                      </p>
-                      <button
-                        type="button"
-                        className="text-xs text-red-300 hover:text-red-200"
-                        onClick={() => removeNote(note.id)}
-                      >
-                        {t("tablet.notes.remove")}
-                      </button>
-                    </div>
-                    <div className="text-sm text-white whitespace-pre-wrap break-words prose prose-invert max-w-none prose-p:my-1 prose-li:my-0">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.text}</ReactMarkdown>
-                    </div>
+                {activeImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={activeImage}
+                    alt={selectedPerson.name || t("tablet.player.unknown_user")}
+                    onClick={() => setFullscreenImage(activeImage)}
+                    className="w-full h-64 md:h-72 object-cover rounded-md border border-[var(--mdt-border)] cursor-zoom-in"
+                  />
+                ) : (
+                  <div className="h-32 rounded-md border border-dashed border-[var(--mdt-border)] flex items-center justify-center text-xs text-[var(--mdt-text-muted)]">
+                    {t("tablet.akte.image_hint")}
                   </div>
-                ))
-              )}
-            </div>
+                )}
 
-            <div className="space-y-2">
-              <p className="text-xs text-[var(--mdt-text-muted)]">Markdown supported (headings, lists, **bold**, links, checklists).</p>
-              <textarea
-                value={newNoteText}
-                onChange={(event) => setNewNoteText(event.target.value)}
-                rows={3}
-                className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-                placeholder={t("tablet.notes.placeholder")}
-              />
-              {newNoteText.trim() !== "" && (
-                <div className="rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-2">
-                  <p className="text-xs text-[var(--mdt-text-muted)] mb-1">Preview</p>
-                  <div className="text-sm text-white prose prose-invert max-w-none prose-p:my-1 prose-li:my-0">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{newNoteText}</ReactMarkdown>
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center gap-2 flex-wrap">
-                <select
-                  value={newNoteExpiryMode}
-                  onChange={(event) => setNewNoteExpiryMode(event.target.value as ExpiryMode)}
-                  className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-                >
-                  <option value="none">{t("tablet.notes.expiry.none")}</option>
-                  <option value="relative">Duration</option>
-                  <option value="custom">Date & time</option>
-                </select>
-
-                {newNoteExpiryMode === "relative" && (
+                {personImages.length > 0 && (
                   <>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={newNoteExpiryAmount}
-                      onChange={(event) => setNewNoteExpiryAmount(event.target.value)}
-                      className="w-24 p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-                    />
-                    <select
-                      value={newNoteExpiryUnit}
-                      onChange={(event) => setNewNoteExpiryUnit(event.target.value as ExpiryUnit)}
-                      className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
-                    >
-                      <option value="minutes">Minutes</option>
-                      <option value="hours">Hours</option>
-                      <option value="days">Days</option>
-                    </select>
+                    <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.photos_count", { count: personImages.length })}</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {personImages.map((image, index) => (
+                        <button
+                          key={`${image}-${index}`}
+                          type="button"
+                          onClick={() => {
+                            if (index === activeImageIndex) {
+                              setFullscreenImage(image);
+                              return;
+                            }
+                            setActiveImageIndex(index);
+                          }}
+                          className={`rounded-md overflow-hidden border ${index === activeImageIndex ? "border-white" : "border-[var(--mdt-border)]"}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={image} alt={`${selectedPerson.name || "person"}-${index + 1}`} className="w-full h-16 object-cover" />
+                        </button>
+                      ))}
+                    </div>
+
+                    {activeImageIsDataUrl ? (
+                      <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.akte.url_hidden")}</p>
+                    ) : (
+                      <div>
+                        <label className="block text-xs mdt-muted mb-1">{t("tablet.akte.image_url")}</label>
+                        <input
+                          value={activeImageIsHttpUrl ? activeImage : ""}
+                          onChange={(event) => updateCurrentHttpImageUrl(event.target.value)}
+                          className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                          placeholder="https://..."
+                        />
+                      </div>
+                    )}
                   </>
                 )}
 
-                {newNoteExpiryMode === "custom" && (
-                  <input
-                    type="datetime-local"
-                    value={newNoteCustomAt}
-                    onChange={(event) => setNewNoteCustomAt(event.target.value)}
-                    className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                <div>
+                  <label className="block text-xs mdt-muted mb-1">{t("tablet.akte.add_https_url")}</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={manualImageUrl}
+                      onChange={(event) => setManualImageUrl(event.target.value)}
+                      className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                      placeholder="https://..."
+                    />
+                    <Button onClick={addManualHttpImage}>{t("tablet.akte.add_url")}</Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="block text-xs mdt-muted">{t("tablet.persons.akte.notes")}</label>
+                  {expiredNotesCount > 0 && (
+                    <span className="text-xs text-[var(--mdt-text-muted)]">
+                      {t("tablet.notes.expired_hidden", { count: expiredNotesCount })}
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-2 max-h-44 overflow-auto">
+                  {activeNotes.length === 0 ? (
+                    <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
+                  ) : (
+                    activeNotes.map((note) => (
+                      <div key={note.id} className="rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-2">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <p className="text-xs text-[var(--mdt-text-muted)]">
+                            {note.author} - posted {formatRelativeTime(note.createdAt)}
+                            {note.expiresAt ? ` | removing ${formatRelativeTime(note.expiresAt)}` : ""}
+                          </p>
+                          <button
+                            type="button"
+                            className="text-xs text-red-300 hover:text-red-200"
+                            onClick={() => removeNote(note.id)}
+                          >
+                            {t("tablet.notes.remove")}
+                          </button>
+                        </div>
+                        <div className="text-sm text-white whitespace-pre-wrap break-words prose prose-invert max-w-none prose-p:my-1 prose-li:my-0">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.text}</ReactMarkdown>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs text-[var(--mdt-text-muted)]">Markdown supported (headings, lists, **bold**, links, checklists).</p>
+                  <textarea
+                    value={newNoteText}
+                    onChange={(event) => setNewNoteText(event.target.value)}
+                    rows={3}
+                    className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                    placeholder={t("tablet.notes.placeholder")}
                   />
-                )}
-                <Button onClick={addNote}>{t("tablet.notes.add")}</Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <label className="block text-xs mdt-muted">{t("tablet.persons.related")}</label>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 space-y-2">
-                <p className="text-xs uppercase tracking-[0.2em] text-[var(--mdt-text-muted)]">{t("tablet.incidents.recent_list")}</p>
-                {relatedIncidents.length === 0 ? (
-                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
-                ) : (
-                  relatedIncidents.map((incident) => (
-                    <div key={incident.id} className="text-xs rounded-xl bg-white/5 p-2">
-                      <p className="text-white font-medium">{incident.title}</p>
-                      <p className="text-[var(--mdt-text-muted)]">{incident.location} • {incident.severity} • {incident.status}</p>
+                  {newNoteText.trim() !== "" && (
+                    <div className="rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-2">
+                      <p className="text-xs text-[var(--mdt-text-muted)] mb-1">Preview</p>
+                      <div className="text-sm text-white prose prose-invert max-w-none prose-p:my-1 prose-li:my-0">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{newNoteText}</ReactMarkdown>
+                      </div>
                     </div>
-                  ))
-                )}
-              </div>
-              <div className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 space-y-2">
-                <p className="text-xs uppercase tracking-[0.2em] text-[var(--mdt-text-muted)]">{t("tablet.bolo.title")}</p>
-                {relatedBolos.length === 0 ? (
-                  <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
-                ) : (
-                  relatedBolos.map((bolo) => (
-                    <div key={bolo.id} className="text-xs rounded-xl bg-white/5 p-2">
-                      <p className="text-white font-medium">{bolo.title}</p>
-                      <p className="text-[var(--mdt-text-muted)]">{bolo.priority} • {bolo.status}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={newNoteExpiryMode}
+                      onChange={(event) => setNewNoteExpiryMode(event.target.value as ExpiryMode)}
+                      className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                    >
+                      <option value="none">{t("tablet.notes.expiry.none")}</option>
+                      <option value="relative">Duration</option>
+                      <option value="custom">Date & time</option>
+                    </select>
 
-          <div className="grid grid-cols-2 gap-3">
-            {resolvedFields
-              .filter((field) => field.type !== "textarea" && field.key !== imageFieldKey)
-              .map((field) => {
-                const label = field.label_key ? t(field.label_key) : field.key;
-                const editable = field.editable !== false;
-                const value = currentAkte[field.key] ?? field.default ?? "";
+                    {newNoteExpiryMode === "relative" && (
+                      <>
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={newNoteExpiryAmount}
+                          onChange={(event) => setNewNoteExpiryAmount(event.target.value)}
+                          className="w-24 p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                        />
+                        <select
+                          value={newNoteExpiryUnit}
+                          onChange={(event) => setNewNoteExpiryUnit(event.target.value as ExpiryUnit)}
+                          className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                        >
+                          <option value="minutes">Minutes</option>
+                          <option value="hours">Hours</option>
+                          <option value="days">Days</option>
+                        </select>
+                      </>
+                    )}
 
-                if (field.type === "select") {
+                    {newNoteExpiryMode === "custom" && (
+                      <input
+                        type="datetime-local"
+                        value={newNoteCustomAt}
+                        onChange={(event) => setNewNoteCustomAt(event.target.value)}
+                        className="p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white"
+                      />
+                    )}
+                    <Button onClick={addNote}>{t("tablet.notes.add")}</Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="block text-xs mdt-muted">{t("tablet.persons.related")}</label>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 space-y-2">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--mdt-text-muted)]">{t("tablet.incidents.recent_list")}</p>
+                    {relatedIncidents.length === 0 ? (
+                      <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
+                    ) : (
+                      relatedIncidents.map((incident) => (
+                        <div key={incident.id} className="text-xs rounded-xl bg-white/5 p-2">
+                          <p className="text-white font-medium">{incident.title}</p>
+                          <p className="text-[var(--mdt-text-muted)]">{incident.location} • {incident.severity} • {incident.status}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 space-y-2">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--mdt-text-muted)]">{t("tablet.bolo.title")}</p>
+                    {relatedBolos.length === 0 ? (
+                      <p className="text-xs text-[var(--mdt-text-muted)]">{t("tablet.notes.none")}</p>
+                    ) : (
+                      relatedBolos.map((bolo) => (
+                        <div key={bolo.id} className="text-xs rounded-xl bg-white/5 p-2">
+                          <p className="text-white font-medium">{bolo.title}</p>
+                          <p className="text-[var(--mdt-text-muted)]">{bolo.priority} • {bolo.status}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {resolvedFields
+                  .filter((field) => field.type !== "textarea" && field.key !== imageFieldKey)
+                  .map((field) => {
+                    const label = field.label_key ? t(field.label_key) : field.key;
+                    const editable = field.editable !== false;
+                    const value = currentAkte[field.key] ?? field.default ?? "";
+
+                    if (field.type === "select") {
+                      return (
+                        <div key={field.key}>
+                          <label className="block text-xs mdt-muted mb-1">{label}</label>
+                          <select
+                            value={value}
+                            disabled={!editable}
+                            onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
+                            className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                          >
+                            {(field.options || []).map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label_key ? t(option.label_key) : option.label || option.value}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={field.key}>
+                        <label className="block text-xs mdt-muted mb-1">{label}</label>
+                        <input
+                          value={value}
+                          disabled={!editable}
+                          onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
+                          className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {resolvedFields
+                .filter((field) => field.type === "textarea" && field.key !== notesFieldKey)
+                .map((field) => {
+                  const label = field.label_key ? t(field.label_key) : field.key;
+                  const editable = field.editable !== false;
+                  const value = currentAkte[field.key] ?? field.default ?? "";
+
                   return (
                     <div key={field.key}>
                       <label className="block text-xs mdt-muted mb-1">{label}</label>
-                      <select
+                      <textarea
                         value={value}
                         disabled={!editable}
                         onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
+                        rows={6}
                         className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
-                      >
-                        {(field.options || []).map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label_key ? t(option.label_key) : option.label || option.value}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   );
-                }
-
-                return (
-                  <div key={field.key}>
-                    <label className="block text-xs mdt-muted mb-1">{label}</label>
-                    <input
-                      value={value}
-                      disabled={!editable}
-                      onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
-                      className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
-                    />
-                  </div>
-                );
-              })}
-          </div>
-
-          {resolvedFields
-            .filter((field) => field.type === "textarea" && field.key !== notesFieldKey)
-            .map((field) => {
-              const label = field.label_key ? t(field.label_key) : field.key;
-              const editable = field.editable !== false;
-              const value = currentAkte[field.key] ?? field.default ?? "";
-
-              return (
-                <div key={field.key}>
-                  <label className="block text-xs mdt-muted mb-1">{label}</label>
-                  <textarea
-                    value={value}
-                    disabled={!editable}
-                    onChange={(event) => updateAkteField(field.key, event.target.value, editable)}
-                    rows={6}
-                    className="w-full p-2 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-white disabled:opacity-60"
-                  />
-                </div>
-              );
-            })}
+                })}
+            </>
+          )}
         </Card>
       </div>
 

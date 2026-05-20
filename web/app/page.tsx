@@ -57,6 +57,7 @@ type NuiMetaPayload = {
     chat?: {
       auto_delete_after_minutes?: number;
     };
+    allowed_jobs?: string[];
     branding?: {
       title_template?: string;
       logo_url?: string;
@@ -1211,6 +1212,8 @@ export default function Home() {
                     incidents={incidentRecords}
                     bolos={boloRecords}
                     akteScope={activeAkteCompartment}
+                    meta={typedMeta}
+                    viewerJob={sessionJob}
                   />
                 )}
                 {activeScreen === "vehicles" && (
@@ -1226,6 +1229,8 @@ export default function Home() {
                     incidents={incidentRecords}
                     bolos={boloRecords}
                     akteScope={activeAkteCompartment}
+                    meta={typedMeta}
+                    viewerJob={sessionJob}
                   />
                 )}
                 {activeScreen === "warrants" && <WarrantsView t={t} />}
