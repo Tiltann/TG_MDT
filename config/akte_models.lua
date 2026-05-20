@@ -494,7 +494,7 @@ if type(Config.MDT) == 'table' and type(Config.MDT.departments) == 'table' then
 
     for deptKey, deptCfg in pairs(Config.MDT.departments) do
         if type(deptCfg) == 'table' and type(deptCfg.jobs) == 'table' then
-            local comp = deptKey:lower()
+            local comp = type(deptCfg.compartment) == 'string' and deptCfg.compartment:lower() or deptKey:lower()
             local label = deptCfg.label or deptKey:upper()
 
             -- Register compartment and jobs in job_models
@@ -516,6 +516,22 @@ if type(Config.MDT) == 'table' and type(Config.MDT.departments) == 'table' then
                 model.compartment = comp
                 model.person = model.person or basePerson
                 model.vehicle = model.vehicle or baseVehicle
+
+                -- Merge/populate shared_with from department configurations
+                if type(deptCfg.shared_with) == 'table' then
+                    model.shared_with = model.shared_with or {}
+                    local sharedSeen = {}
+                    for _, s in ipairs(model.shared_with) do
+                        sharedSeen[s:lower()] = true
+                    end
+                    for _, s in ipairs(deptCfg.shared_with) do
+                        local sLower = s:lower()
+                        if not sharedSeen[sLower] then
+                            sharedSeen[sLower] = true
+                            table.insert(model.shared_with, s)
+                        end
+                    end
+                end
                 
                 -- Merge jobs list
                 model.jobs = model.jobs or {}

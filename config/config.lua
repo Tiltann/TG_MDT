@@ -23,17 +23,6 @@ Config.Debug = {
 -- ── MDT ───────────────────────────────────────────────────
 
 Config.MDT = {
-    -- Jobs that are allowed to access the MDT tablet.
-    -- (This list is dynamically populated below/in akte_models.lua from Config.MDT.departments jobs)
-    -- allowed_jobs = {
-    --     'police',
-    --     'sheriff',
-    --     'fbi',
-    --     'ambulance',
-    --     'mdt',
-    --     'mechanic',
-    -- },
-
     -- Agency Departments Configuration
     -- Group jobs under distinct departments/compartments.
     -- Jobs in the same department share the same database compartment and see/edit
@@ -48,6 +37,7 @@ Config.MDT = {
             label = 'DoJ',
             jobs = { 'mdt' },
             logo_url = 'doj.png',
+            shared_with = { 'police', 'sheriff' },
         },
         mechanic = {
             label = 'Mechanics',
