@@ -466,25 +466,56 @@ Config.AkteModels = Config.AkteModels or {
     },
 }
 
--- ── Dynamic Compartment Sharing Hydration ──────────────────
--- Process Config.MDT.shared_departments to dynamically hydrate job_models
-if type(Config.MDT) == 'table' and type(Config.MDT.shared_departments) == 'table' then
+-- ── Dynamic Department/Agency Hydration ────────────────────
+-- Processes Config.MDT.departments to automatically:
+-- 1. Hydrate job_models (compartment scopes and job sharing)
+-- 2. Build branding overrides (title templates based on the agency label)
+if type(Config.MDT) == 'table' and type(Config.MDT.departments) == 'table' then
     Config.AkteModels.job_models = Config.AkteModels.job_models or {}
-    for _, share in ipairs(Config.MDT.shared_departments) do
-        if type(share) == 'table' and type(share.compartment) == 'string' and type(share.jobs) == 'table' then
-            local comp = share.compartment:lower()
-            -- We want to register both:
-            -- 1. The compartment key itself
-            -- 2. Each job key listed under the compartment so that they are directly resolvable by job name
+    Config.MDT.branding = Config.MDT.branding or {}
+    Config.MDT.branding.job_overrides = Config.MDT.branding.job_overrides or {}
+
+    -- Automatically populate Config.MDT.allowed_jobs from Config.MDT.departments
+    Config.MDT.allowed_jobs = {}
+    local allowedSeen = {}
+    for _, deptCfg in pairs(Config.MDT.departments) do
+        if type(deptCfg) == 'table' and type(deptCfg.jobs) == 'table' then
+            for _, job in ipairs(deptCfg.jobs) do
+                local jobLower = job:lower()
+                if not allowedSeen[jobLower] then
+                    allowedSeen[jobLower] = true
+                    table.insert(Config.MDT.allowed_jobs, jobLower)
+                end
+            end
+        end
+    end
+
+    local titleTemplate = Config.MDT.branding.title_template or '{job} MDT'
+
+    for deptKey, deptCfg in pairs(Config.MDT.departments) do
+        if type(deptCfg) == 'table' and type(deptCfg.jobs) == 'table' then
+            local comp = deptKey:lower()
+            local label = deptCfg.label or deptKey:upper()
+
+            -- Register compartment and jobs in job_models
             local targets = { comp }
-            for _, job in ipairs(share.jobs) do
+            for _, job in ipairs(deptCfg.jobs) do
                 table.insert(targets, job:lower())
             end
+
+            -- Ensure we have a base model schema for this department
+            -- If it was manually defined as 'pd', 'mdt', or 'mechanic' inside job_models, we reuse it.
+            -- Otherwise, they fall back to default schemas.
+            local baseSchema = Config.AkteModels.job_models[comp] or {}
+            local basePerson = baseSchema.person
+            local baseVehicle = baseSchema.vehicle
 
             for _, key in ipairs(targets) do
                 Config.AkteModels.job_models[key] = Config.AkteModels.job_models[key] or {}
                 local model = Config.AkteModels.job_models[key]
                 model.compartment = comp
+                model.person = model.person or basePerson
+                model.vehicle = model.vehicle or baseVehicle
                 
                 -- Merge jobs list
                 model.jobs = model.jobs or {}
@@ -492,7 +523,7 @@ if type(Config.MDT) == 'table' and type(Config.MDT.shared_departments) == 'table
                 for _, job in ipairs(model.jobs) do
                     jobsSeen[job:lower()] = true
                 end
-                for _, job in ipairs(share.jobs) do
+                for _, job in ipairs(deptCfg.jobs) do
                     local jLower = job:lower()
                     if not jobsSeen[jLower] then
                         jobsSeen[jLower] = true
@@ -500,7 +531,21 @@ if type(Config.MDT) == 'table' and type(Config.MDT.shared_departments) == 'table
                     end
                 end
             end
+
+            -- Dynamic branding overrides for the agency/department
+            for _, job in ipairs(deptCfg.jobs) do
+                local jobLower = job:lower()
+                local resolvedTitle = titleTemplate:gsub('{job}', label)
+                
+                Config.MDT.branding.job_overrides[jobLower] = Config.MDT.branding.job_overrides[jobLower] or {}
+                local override = Config.MDT.branding.job_overrides[jobLower]
+                override.title = override.title or resolvedTitle
+                if deptCfg.logo_url then
+                    override.logo_url = override.logo_url or deptCfg.logo_url
+                end
+            end
         end
     end
 end
+
 

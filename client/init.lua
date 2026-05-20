@@ -402,6 +402,7 @@ function TG_MDT_sendInitialState()
 			akteModels           = akteModels,
 			mdt = {
 				allowed_jobs           = mdtCfg.allowed_jobs,
+				departments            = mdtCfg.departments,
 				player_name_mode       = mdtCfg.player_name_mode,
 				allow_map_style_change = mdtCfg.allow_map_style_change,
 				default_map_style      = mdtCfg.default_map_style,

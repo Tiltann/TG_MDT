@@ -24,24 +24,36 @@ Config.Debug = {
 
 Config.MDT = {
     -- Jobs that are allowed to access the MDT tablet.
-    allowed_jobs = {
-        'police',
-        'sheriff',
-        'fbi',
-        'ambulance',
-        'mdt',
-        'mechanic',
-    },
+    -- (This list is dynamically populated below/in akte_models.lua from Config.MDT.departments jobs)
+    -- allowed_jobs = {
+    --     'police',
+    --     'sheriff',
+    --     'fbi',
+    --     'ambulance',
+    --     'mdt',
+    --     'mechanic',
+    -- },
 
-    -- Compartment sharing configuration
-    -- Allows two or more agencies/jobs to share the same default database compartment
-    -- and view/edit each other's records by default.
-    -- In this example, 'police' and 'sheriff' share 'lspd' compartment records.
-    shared_departments = {
-        -- {
-        --     compartment = 'lspd',
-        --     jobs = { 'police', 'sheriff' },
-        -- }
+    -- Agency Departments Configuration
+    -- Group jobs under distinct departments/compartments.
+    -- Jobs in the same department share the same database compartment and see/edit
+    -- each other's records. It also automatically sets their sidebar branding title.
+    departments = {
+        pd = {
+            label = 'LSPD',
+            jobs = { 'police', 'sheriff' },
+            logo_url = 'lspd.png',
+        },
+        mdt = {
+            label = 'DoJ',
+            jobs = { 'mdt' },
+            logo_url = 'doj.png',
+        },
+        mechanic = {
+            label = 'Mechanics',
+            jobs = { 'mechanic' },
+            logo_url = 'mechanic.png',
+        },
     },
 
     -- Default screen opened by the tablet module.

@@ -8,7 +8,11 @@ author 'TG (Lucentix, Tiltann, BillyG, DominikVatoo)'
 
 shared_scripts {
     '@ox_lib/init.lua',
-    'config/*.lua',
+    'config/config.lua',
+    'config/akte_models.lua',
+    'config/commands.lua',
+    'config/logs.lua',
+    'config/modules.lua',
     'shared/debug.lua',
     'shared/framework/init.lua',
     'shared/framework/esx.lua',

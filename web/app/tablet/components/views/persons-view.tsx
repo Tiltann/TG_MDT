@@ -49,6 +49,7 @@ type AkteSyncPayload = {
 type CompartmentOption = {
   value: string;
   label: string;
+  logoUrl?: string;
 };
 
 type RelatedIncident = {
@@ -408,38 +409,59 @@ export default function PersonsView({
     return jobs;
   }, [meta, baseScope]);
 
-  const departmentTabs = useMemo<CompartmentOption[]>(() => {
-    return allowedJobs.map((job: string) => ({
-      value: job.toLowerCase(),
-      label: job.toUpperCase(),
-    }));
-  }, [allowedJobs]);
+  const departments = meta?.mdt?.departments;
 
-  const hasAccessToJobTab = (targetJob: string) => {
-    const allowed = meta?.mdt?.allowed_jobs || [];
-    if (allowed.length === 0) return true;
+  const departmentTabs = useMemo<CompartmentOption[]>(() => {
+    if (!departments || Object.keys(departments).length === 0) {
+      return allowedJobs.map((job: string) => ({
+        value: job.toLowerCase(),
+        label: job.toUpperCase(),
+      }));
+    }
+    return Object.entries(departments).map(([deptKey, deptCfg]: [string, any]) => ({
+      value: deptKey.toLowerCase(),
+      label: deptCfg.label || deptKey.toUpperCase(),
+      logoUrl: deptCfg.logo_url,
+    }));
+  }, [departments, allowedJobs]);
+
+  const hasAccessToJobTab = (targetDeptKey: string) => {
+    const normTarget = targetDeptKey.trim().toLowerCase();
+
+    if (!departments || Object.keys(departments).length === 0) {
+      const allowed = meta?.mdt?.allowed_jobs || [];
+      if (allowed.length === 0) return true;
+      if (!viewerJob) return false;
+      return allowed.map((j: string) => j.toLowerCase()).includes(viewerJob.trim().toLowerCase());
+    }
 
     if (!viewerJob) return false;
     const normViewer = viewerJob.trim().toLowerCase();
-    const normTarget = targetJob.trim().toLowerCase();
 
-    if (normViewer === normTarget) return true;
-
-    const jobModels = meta?.akteModels?.job_models || {};
-    const targetConfig = jobModels[normTarget];
-    if (targetConfig) {
-      const jobs = Array.isArray(targetConfig.jobs) ? targetConfig.jobs.map((j: string) => j.trim().toLowerCase()) : [];
-      const sharedWith = Array.isArray(targetConfig.shared_with) ? targetConfig.shared_with.map((s: string) => s.trim().toLowerCase()) : [];
-      if (jobs.includes(normViewer) || sharedWith.includes(normViewer)) {
-        return true;
-      }
+    // 1. Direct department membership
+    const targetDept = departments[normTarget];
+    if (targetDept) {
+      const deptJobs = Array.isArray(targetDept.jobs)
+        ? targetDept.jobs.map((j: string) => j.trim().toLowerCase())
+        : [];
+      if (deptJobs.includes(normViewer)) return true;
     }
 
+    // 2. Compartment/job sharing fallback
+    const jobModels = meta?.akteModels?.job_models || {};
     const viewerConfig = jobModels[normViewer];
-    if (viewerConfig) {
-      const viewerCompartment = (viewerConfig.compartment || normViewer).trim().toLowerCase();
-      const targetCompartment = (targetConfig?.compartment || normTarget).trim().toLowerCase();
-      if (viewerCompartment === targetCompartment) return true;
+    const viewerCompartment = (viewerConfig?.compartment || normViewer).trim().toLowerCase();
+    const targetCompartment = (jobModels[normTarget]?.compartment || normTarget).trim().toLowerCase();
+    if (viewerCompartment === targetCompartment) return true;
+
+    const targetConfig = jobModels[normTarget] || jobModels[targetCompartment];
+    if (targetConfig) {
+      const sharedWith = Array.isArray(targetConfig.shared_with)
+        ? targetConfig.shared_with.map((s: string) => s.trim().toLowerCase())
+        : [];
+      if (sharedWith.includes(normViewer) || sharedWith.includes(viewerCompartment)) {
+        return true;
+      }
     }
 
     return false;
@@ -953,13 +975,20 @@ export default function PersonsView({
                   key={option.value}
                   type="button"
                   onClick={() => setSelectedCompartment(option.value)}
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                     option.value === selectedCompartment
                       ? "border-[var(--mdt-accent-primary)] bg-[rgba(255,145,0,0.15)] text-[var(--mdt-accent-primary)]"
                       : "border-[var(--mdt-border)] bg-[rgba(255,255,255,0.03)] text-[var(--mdt-text-muted)] hover:text-white"
                   }`}
                 >
-                  {option.label}
+                  {option.logoUrl && (
+                    <img
+                      src={option.logoUrl}
+                      alt={option.label}
+                      className="h-3.5 w-3.5 object-contain"
+                    />
+                  )}
+                  <span>{option.label}</span>
                 </button>
               ))}
             </div>
@@ -971,11 +1000,11 @@ export default function PersonsView({
                 className="min-w-[180px] rounded-md border border-[var(--mdt-border)] bg-[var(--mdt-bg-base)] px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[var(--mdt-accent-primary)]"
               >
                 <option value="">{t("tablet.actions.select_department") || "Select department..."}</option>
-                {allowedJobs
-                  .filter((job: string) => job.toLowerCase() !== selectedCompartment.toLowerCase())
-                  .map((job: string) => (
-                    <option key={job} value={job.toLowerCase()}>
-                      {job.toUpperCase()}
+                {departmentTabs
+                  .filter((opt) => opt.value !== selectedCompartment)
+                  .map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
               </select>
@@ -985,30 +1014,57 @@ export default function PersonsView({
             </div>
           </div>
 
-          {!hasAccessToJobTab(selectedCompartment) ? (
-            <div className="relative overflow-hidden rounded-md border border-[var(--mdt-border)] bg-black/40 backdrop-blur-xl p-8 py-16 flex flex-col items-center justify-center text-center space-y-4 animate-pulse">
-              <div className="w-16 h-16 rounded-full bg-[rgba(255,145,0,0.1)] border border-[rgba(255,145,0,0.3)] flex items-center justify-center shadow-lg shadow-[rgba(255,145,0,0.05)]">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-8 h-8 text-[var(--mdt-accent-primary)]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
+          {!hasAccessToJobTab(selectedCompartment) ? (() => {
+            const targetDept = departments ? departments[selectedCompartment] : null;
+            const deptLogo = targetDept?.logo_url;
+            const deptLabel = targetDept?.label || selectedCompartment.toUpperCase();
+            return (
+              <div className="relative overflow-hidden rounded-md border border-[var(--mdt-border)] bg-black/40 backdrop-blur-xl p-8 py-16 flex flex-col items-center justify-center text-center space-y-4 animate-pulse">
+                {deptLogo ? (
+                  <div className="relative w-20 h-20 mb-2 flex items-center justify-center">
+                    <img
+                      src={deptLogo}
+                      alt={deptLabel}
+                      className="w-16 h-16 object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.2)] animate-pulse"
+                    />
+                    <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-[var(--mdt-accent-primary)] border border-black flex items-center justify-center shadow-md">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-3.5 h-3.5 text-black"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-[rgba(255,145,0,0.1)] border border-[rgba(255,145,0,0.3)] flex items-center justify-center shadow-lg shadow-[rgba(255,145,0,0.05)]">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-8 h-8 text-[var(--mdt-accent-primary)]"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <h5 className="text-lg font-semibold text-white tracking-wide">
+                    Access Restricted
+                  </h5>
+                  <p className="text-xs text-[var(--mdt-text-muted)] max-w-sm">
+                    Your department does not have the clearance level required to view or edit files in the <span className="text-[var(--mdt-accent-primary)] font-medium uppercase">{deptLabel}</span> database.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <h5 className="text-lg font-semibold text-white tracking-wide">
-                  Access Restricted
-                </h5>
-                <p className="text-xs text-[var(--mdt-text-muted)] max-w-sm">
-                  Your department does not have the clearance level required to view or edit files in the <span className="text-[var(--mdt-accent-primary)] font-medium uppercase">{selectedCompartment}</span> database.
-                </p>
-              </div>
-            </div>
-          ) : (
+            );
+          })() : (
             <>
               <div className="p-3 rounded-md border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.01)] space-y-3">
                 <div className="flex items-center justify-between gap-3">

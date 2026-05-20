@@ -58,6 +58,7 @@ type NuiMetaPayload = {
       auto_delete_after_minutes?: number;
     };
     allowed_jobs?: string[];
+    departments?: Record<string, { label: string; jobs: string[]; logo_url?: string }>;
     branding?: {
       title_template?: string;
       logo_url?: string;
