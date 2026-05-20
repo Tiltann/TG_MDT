@@ -58,13 +58,15 @@ export default function LiveMapView({ t }: { t: TFunction }) {
         {/* @ts-expect-error: Custom element not in JSX.IntrinsicElements */}
         <gta-v-map
           style={{ width: "100%", height: "60vh", minHeight: 400, borderRadius: "0.75rem", display: "block" }}
-          tilebaseurl="/map/styleAtlas"
-          defaultstyle="atlas"
-          minzoom={0}
-          maxzoom={5}
+          tile-base-url="map"
+          atlas-url="map/styleAtlas/{z}/{x}/{y}.jpg"
+          satellite-url="map/styleAtlas/{z}/{x}/{y}.jpg"
+          grid-url="map/styleAtlas/{z}/{x}/{y}.jpg"
+          default-style="atlas"
+          min-zoom={0}
+          max-zoom={5}
           zoom={1}
-          maxbounds="[[0,0],[6144,6144]]"
-          maxboundsviscosity={1}
+          max-bounds-viscosity={1}
         />
       </Card>
     </div>
