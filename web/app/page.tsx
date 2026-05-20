@@ -16,7 +16,6 @@ import VehiclesView from "./tablet/components/views/vehicles-view";
 import ProfileView from "./tablet/components/views/profile-view";
 import LiveMapView from "./tablet/components/views/livemap-view";
 import SettingsView from "./tablet/components/views/settings-view";
-import ShiftsView from "./tablet/components/views/shifts-view";
 import { defaultMockupBranding, defaultMockupModules } from "./tablet/lib/mockup-config";
 import { createTranslator, normalizeLocale, type SupportedLocale } from "./tablet/lib/i18n";
 
@@ -335,6 +334,11 @@ function resolveJobAkteModels(meta: NuiMetaPayload, job?: string) {
   };
 }
 
+function normalizeScreenId(screen?: string | null): string | null {
+  if (!screen) return null;
+  return screen === "shifts" ? "chat" : screen;
+}
+
 export default function Home() {
   const [isHandshakeDone, setHandshakeDone] = useState(true);
   const [isVisible, setVisible] = useState(false);
@@ -523,11 +527,11 @@ export default function Home() {
   useNuiEvent<NuiVisibilityPayload>("setVisible", (data) => {
     const nextVisible = Boolean(data?.visible);
     setVisible(nextVisible);
-    setActiveScreen(data?.screen ?? (nextVisible ? "tablet" : null));
+    setActiveScreen(normalizeScreenId(data?.screen) ?? (nextVisible ? "tablet" : null));
   });
 
   useNuiEvent<NuiScreenPayload>("setScreen", (data) => {
-    setActiveScreen(data?.screen ?? "tablet");
+    setActiveScreen(normalizeScreenId(data?.screen) ?? "tablet");
   });
 
   useNuiEvent<NuiDataPayload>("setData", (data) => {
@@ -1164,16 +1168,6 @@ export default function Home() {
     return typeof nextImage === "string" && nextImage.trim() !== "" ? nextImage.trim() : null;
   };
 
-  const createShift = (shift: Omit<ShiftRecord, "id" | "createdAt">) => {
-    const timestamp = new Date().toISOString();
-    const nextShift: ShiftRecord = {
-      id: createId("shift"),
-      createdAt: timestamp,
-      ...shift,
-    };
-    setShiftRecords((prev) => [nextShift, ...prev].slice(0, 20));
-  };
-
   // show absolutely nothing until NUI handshake is done.
   if (!isHandshakeDone && !is_browser) return null;
 
@@ -1194,7 +1188,7 @@ export default function Home() {
               branding={branding}
               t={t}
               onOpenProfile={() => setActiveScreen("profile")}
-              onScreenChange={(screen) => setActiveScreen(screen)}
+              onScreenChange={(screen) => setActiveScreen(normalizeScreenId(screen))}
             />
 
             {/* Main Content Area */}
@@ -1234,8 +1228,7 @@ export default function Home() {
                       onSendChat={sendChatMessage}
                       onTakeBoardImage={captureBoardImage}
                       onCreateBoardPost={createBoardPost}
-                      onCreateShift={createShift}
-                      onShortcutNavigate={(screen) => setActiveScreen(screen)}
+                      onShortcutNavigate={(screen) => setActiveScreen(normalizeScreenId(screen))}
                       t={t}
                     />
                   )}
@@ -1332,9 +1325,6 @@ export default function Home() {
                     />
                   )}
                   {activeScreen === "livemap" && <LiveMapView t={t} />}
-                  {activeScreen === "shifts" && (
-                    <ShiftsView t={t} shifts={shiftRecords} boardAdmin={isBoardAdmin} onCreateShift={createShift} />
-                  )}
                   {activeScreen === "settings" && (
                     <SettingsView
                       t={t}

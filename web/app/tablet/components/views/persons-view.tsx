@@ -755,10 +755,11 @@ export default function PersonsView({
         message: `identifier=${identifier} rawMax=${rawLongest} optimizedMax=${optimizedLongest} limit=${MAX_IMAGE_DATA_URL_LENGTH}`,
       });
 
-      const serverAkte = await fetchNui<PersonAkte>("getPersonAkte", { identifier });
+      const scopeKey = akteKey(identifier, selectedCompartment);
+      const serverAkte = await fetchNui<PersonAkte>("getPersonAkte", { identifier, compartment: selectedCompartment });
       const localAkte: PersonAkte = {
         ...defaultAkte,
-        ...(aktenByPerson[identifier] || {}),
+        ...(aktenByPerson[scopeKey] || {}),
       };
       const serverImages = decodeImages(serverAkte?.[imageFieldKey] ?? "");
       const localImages = decodeImages(localAkte[imageFieldKey] ?? "");
@@ -780,7 +781,7 @@ export default function PersonsView({
 
       setAktenByPerson((prev) => ({
         ...prev,
-        [identifier]: nextAkte,
+        [scopeKey]: nextAkte,
       }));
       persistAkte(identifier, nextAkte);
       setActiveImageIndex(Math.max(0, merged.length - 1));

@@ -87,7 +87,6 @@ type DashboardData = {
     description: string;
   }>;
   boardPosts?: BoardPost[];
-  shifts?: ShiftRecord[];
 };
 
 type DashboardShortcutScreen = "persons" | "vehicles" | "penalties" | "chat";
@@ -144,7 +143,6 @@ export function DashboardView({
   onSendChat,
   onTakeBoardImage,
   onCreateBoardPost,
-  onCreateShift,
   onShortcutNavigate,
 }: {
   branding: Branding;
@@ -154,7 +152,6 @@ export function DashboardView({
   onSendChat?: (text: string) => void;
   onTakeBoardImage?: () => Promise<string | null>;
   onCreateBoardPost?: (post: { title: string; body: string; images: string[] }) => void;
-  onCreateShift?: (shift: { title: string; note: string }) => void;
   onShortcutNavigate?: (screen: DashboardShortcutScreen) => void;
 }) {
   const isOnDuty = Boolean(data?.dutyState?.onDuty);
@@ -167,17 +164,13 @@ export function DashboardView({
   const recentIncidents = data?.recentIncidents || [];
   const recentBolos = data?.recentBolos || [];
   const boardPosts = data?.boardPosts || [];
-  const shifts = data?.shifts || [];
   const accent = branding.accent || "#ff9100";
 
   const [boardTitle, setBoardTitle] = useState("");
   const [boardBody, setBoardBody] = useState("");
   const [boardImages, setBoardImages] = useState<string[]>([]);
-  const [shiftTitle, setShiftTitle] = useState("");
-  const [shiftNote, setShiftNote] = useState("");
   const [chatDraft, setChatDraft] = useState("");
   const [boardBusy, setBoardBusy] = useState(false);
-  const [shiftBusy, setShiftBusy] = useState(false);
 
   const handleTakeBoardImage = async () => {
     if (!boardAdmin || !onTakeBoardImage) return;
@@ -204,23 +197,6 @@ export function DashboardView({
     setBoardTitle("");
     setBoardBody("");
     setBoardImages([]);
-  };
-
-  const handleCreateShift = () => {
-    if (!boardAdmin) return;
-
-    const title = shiftTitle.trim();
-    const note = shiftNote.trim();
-    if (!title) return;
-
-    setShiftBusy(true);
-    try {
-      onCreateShift?.({ title, note });
-      setShiftTitle("");
-      setShiftNote("");
-    } finally {
-      setShiftBusy(false);
-    }
   };
 
   const handleSendChat = () => {
@@ -523,71 +499,55 @@ export function DashboardView({
             </div>
           </Card>
 
-          {/* Active Shifts Service Log */}
+          {/* Live Chat Panel */}
           <Card className="overflow-hidden border border-zinc-800/80 bg-zinc-950/40 rounded-3xl flex-1 flex flex-col justify-between shadow-lg">
             <div className="flex items-center justify-between border-b border-zinc-800/80 p-5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500">{t("tablet.sidebar.shifts")}</p>
-                <h4 className="mt-0.5 text-base font-bold text-white tracking-tight">{t("tablet.shifts.log_title")}</h4>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500">{t("tablet.sidebar.live_chat", undefined, t("tablet.sidebar.chat"))}</p>
+                <h4 className="mt-0.5 text-base font-bold text-white tracking-tight">{t("tablet.chat.title")}</h4>
               </div>
             </div>
 
             <div className="space-y-2.5 p-5 overflow-y-auto max-h-[14rem] scrollbar-thin scrollbar-thumb-zinc-800">
-              {shifts.length === 0 ? (
+              {recentChat.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-zinc-800 bg-white/[0.01] p-5 text-center text-xs text-zinc-500 italic">
-                  {t("tablet.shifts.log_empty")}
+                  {t("tablet.chat.empty")}
                 </div>
               ) : (
-                shifts.slice(0, 3).map((sh) => (
+                recentChat.slice(0, 6).map((message) => (
                   <div 
-                    key={sh.id} 
+                    key={message.id} 
                     className="rounded-xl border border-zinc-800 bg-zinc-900/20 p-3 flex justify-between items-start hover:border-zinc-700 transition-all"
                   >
                     <div className="min-w-0 pr-2">
-                      <p className="text-xs font-bold text-white truncate">{sh.title}</p>
-                      <p className="mt-0.5 text-[10px] text-zinc-500 truncate">{sh.note || t("tablet.shifts.log_note_fallback")}</p>
+                      <p className="text-xs font-bold text-white truncate">{message.author}</p>
+                      <p className="mt-0.5 text-[10px] text-zinc-500 truncate">{message.text}</p>
                     </div>
-                    <span className="text-[9px] text-zinc-600 font-bold shrink-0">{formatRelativeTime(sh.createdAt, t)}</span>
+                    <span className="text-[9px] text-zinc-600 font-bold shrink-0">{formatRelativeTime(message.createdAt, t)}</span>
                   </div>
                 ))
               )}
             </div>
 
-            {boardAdmin && (
-              <div className="border-t border-zinc-800/80 bg-zinc-900/10 p-5">
-                <div className="space-y-2">
-                  <input
-                    value={shiftTitle}
-                    onChange={(event) => setShiftTitle(event.target.value)}
-                    placeholder={t("tablet.shifts.input_title_placeholder")}
-                    className="w-full rounded-xl border border-zinc-800/80 bg-black/35 px-3 py-2 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
-                  />
-                  <textarea
-                    value={shiftNote}
-                    onChange={(event) => setShiftNote(event.target.value)}
-                    placeholder={t("tablet.shifts.input_note_placeholder")}
-                    rows={1}
-                    className="w-full resize-none rounded-xl border border-zinc-800/80 bg-black/35 px-3 py-2 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
-                  />
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button 
-                      variant="ghost" 
-                      className="h-8 text-[11px] rounded-lg"
-                      onClick={() => { setShiftTitle(""); setShiftNote(""); }}
-                    >
-                      {t("tablet.actions.clear")}
-                    </Button>
-                    <Button 
-                      onClick={handleCreateShift} 
-                      disabled={shiftBusy || !shiftTitle.trim()} 
-                      className="h-8 text-[11px] rounded-lg px-3 bg-zinc-200 hover:bg-white text-black transition-colors"
-                    >
-                      {t("tablet.shifts.add_entry")}
-                    </Button>
-                  </div>
-                </div>
+            <div className="border-t border-zinc-800/80 bg-zinc-900/10 p-5">
+              <div className="flex gap-2">
+                <input
+                  value={chatDraft}
+                  onChange={(event) => setChatDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleSendChat();
+                    }
+                  }}
+                  placeholder={t("tablet.chat.placeholder")}
+                  className="w-full rounded-xl border border-zinc-800/80 bg-black/35 px-3 py-2 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
+                />
+                <Button onClick={handleSendChat} disabled={!chatDraft.trim()} className="h-8 text-[11px] rounded-lg px-3">
+                  {t("tablet.chat.send")}
+                </Button>
               </div>
-            )}
+            </div>
           </Card>
         </div>
       </div>

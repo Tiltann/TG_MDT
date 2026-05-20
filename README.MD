@@ -19,14 +19,14 @@ Ein Tablet ingame, das jede Fraktion bekommt. Jede Fraktion sieht nur ihre eigen
 ### Features (geplant)
 
 - 🔐 **Login** per Charakter
-- 📊 **Dashboard** mit eigenen Einsätzen, News und Schichtstatus
+- 📊 **Dashboard** mit eigenen Einsätzen, News und Statusübersicht
 - 👤 **Personenakte** — Suche nach Name, ID oder Kennzeichen inkl. Foto, Strafregister, Krankenakte, Führerscheine, Waffenschein
 - 🚗 **Fahrzeugakte** — Halter, Versicherung, Vermerke, Status
 - 📝 **Berichte** schreiben und abrufen (Einsatz, Strafanzeige, Behandlung — je nach Fraktion)
 - ⚖️ **Strafkatalog / Bußgeldkatalog** mit direkter Ausstellung
 - 🗺️ **Live-Map** mit Kollegen und Markern (Einsatzorte, POIs)
 - 📡 **Funk** zwischen Mitgliedern
-- 📅 **Dienstplan & Schichten**
+- 💬 **Live-Chat** für direkte Kommunikation im MDT
 - 🛠️ **Admin- / Leitungsbereich** — Mitglieder, Ränge, Rechte verwalten
 - 🔔 **Benachrichtigungen** (neuer Einsatz, neue Akte, etc.)
 
@@ -109,14 +109,14 @@ An in-game tablet that every faction gets. Each faction only sees its own stuff,
 ### Features (planned)
 
 - 🔐 **Login** per character
-- 📊 **Dashboard** with own calls, news and shift status
+- 📊 **Dashboard** with own calls, news and status overview
 - 👤 **Person records** — search by name, ID or license plate, incl. photo, criminal record, medical record, driver's licenses, weapon license
 - 🚗 **Vehicle records** — owner, insurance, notes, status
 - 📝 **Reports** — create and retrieve (call reports, charges, treatment — per faction)
 - ⚖️ **Penalty / fine catalog** with direct issuance
 - 🗺️ **Live map** with colleagues and markers (incidents, POIs)
 - 📡 **Radio / internal chat** between members
-- 📅 **Shift planner**
+- 💬 **Live chat** for direct MDT communication
 - 🛠️ **Admin / leadership area** — manage members, ranks, permissions
 - 🔔 **Notifications** (new call, new record, etc.)
 

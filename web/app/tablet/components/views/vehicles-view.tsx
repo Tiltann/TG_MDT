@@ -714,10 +714,11 @@ export default function VehiclesView({
         message: `plate=${plate} rawMax=${rawLongest} optimizedMax=${optimizedLongest} limit=${MAX_IMAGE_DATA_URL_LENGTH}`,
       });
 
-      const serverAkte = await fetchNui<VehicleAkte>("getVehicleAkte", { plate });
+      const scopeKey = akteKey(plate, selectedCompartment);
+      const serverAkte = await fetchNui<VehicleAkte>("getVehicleAkte", { plate, compartment: selectedCompartment });
       const localAkte: VehicleAkte = {
         ...defaultAkte,
-        ...(aktenByVehicle[plate] || {}),
+        ...(aktenByVehicle[scopeKey] || {}),
       };
       const serverImages = decodeImages(serverAkte?.[imageFieldKey] ?? "");
       const localImages = decodeImages(localAkte[imageFieldKey] ?? "");
@@ -739,7 +740,7 @@ export default function VehiclesView({
 
       setAktenByVehicle((prev) => ({
         ...prev,
-        [plate]: nextAkte,
+        [scopeKey]: nextAkte,
       }));
       persistAkte(plate, nextAkte);
       setActiveImageIndex(Math.max(0, merged.length - 1));
