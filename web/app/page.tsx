@@ -185,12 +185,6 @@ type BoardPost = {
   createdAt: string;
 };
 
-type ShiftRecord = {
-  id: string;
-  title: string;
-  note: string;
-  createdAt: string;
-};
 
 type PlayerUiPayload = {
   name?: string;
@@ -234,7 +228,6 @@ const STORAGE_KEYS = {
   incidents: "tg_mdt_incidents",
   bolos: "tg_mdt_bolos",
   boardPosts: "tg_mdt_board_posts",
-  shifts: "tg_mdt_shifts",
 };
 
 const DEFAULT_PROFILE: ProfileData = {
@@ -246,7 +239,6 @@ const DEFAULT_CHAT_MESSAGES: ChatMessage[] = [];
 const DEFAULT_INCIDENTS: IncidentRecord[] = [];
 const DEFAULT_BOLOS: BoloRecord[] = [];
 const DEFAULT_BOARD_POSTS: BoardPost[] = [];
-const DEFAULT_SHIFTS: ShiftRecord[] = [];
 
 const MAP_STYLE_KEY = "tg_mdt_map_style";
 
@@ -357,7 +349,6 @@ export default function Home() {
   const [incidentRecords, setIncidentRecords] = useState<IncidentRecord[]>(DEFAULT_INCIDENTS);
   const [boloRecords, setBoloRecords] = useState<BoloRecord[]>(DEFAULT_BOLOS);
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>(DEFAULT_BOARD_POSTS);
-  const [shiftRecords, setShiftRecords] = useState<ShiftRecord[]>(DEFAULT_SHIFTS);
   const [startupValidationError, setStartupValidationError] = useState<StartupValidationError | null>(null);
   const seededActivityRef = useRef(false);
   const previousDutyRef = useRef<boolean | null>(null);
@@ -371,8 +362,6 @@ export default function Home() {
     const storedIncidents = loadJsonArray<IncidentRecord>(STORAGE_KEYS.incidents, DEFAULT_INCIDENTS);
     const storedBolos = loadJsonArray<BoloRecord>(STORAGE_KEYS.bolos, DEFAULT_BOLOS);
     const storedBoardPosts = loadJsonArray<BoardPost>(STORAGE_KEYS.boardPosts, DEFAULT_BOARD_POSTS);
-    const storedShifts = loadJsonArray<ShiftRecord>(STORAGE_KEYS.shifts, DEFAULT_SHIFTS);
-
     setProfileData((prev) => ({
       ...prev,
       ...storedProfile,
@@ -381,7 +370,6 @@ export default function Home() {
     setIncidentRecords(storedIncidents);
     setBoloRecords(storedBolos);
     setBoardPosts(storedBoardPosts);
-    setShiftRecords(storedShifts);
   }, []);
 
   useEffect(() => {
@@ -429,14 +417,7 @@ export default function Home() {
     }
   }, [boardPosts]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(STORAGE_KEYS.shifts, JSON.stringify(shiftRecords));
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [shiftRecords]);
+  // ...existing code...
 
   useEffect(() => {
     let isMounted = true;
@@ -895,7 +876,6 @@ export default function Home() {
     recentIncidents: incidentRecords.slice().sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 4),
     recentBolos: boloRecords.slice().sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 4),
     boardPosts,
-    shifts: shiftRecords,
     boardAdmin: isBoardAdmin,
   };
   const sidebarProfileData = {
@@ -1177,7 +1157,7 @@ export default function Home() {
 
       {show_ui && (
         <section className="nui-layer nui-layer-tablet" aria-label="tablet-ui">
-          <div className="tablet-shell flex text-sm text-[var(--mdt-text-muted)]">
+          <div className="tablet-shell flex text-sm text-[--mdt-text-muted]">
             
             {/* Modular Sidebar Component */}
             <Sidebar 

@@ -48,12 +48,7 @@ type BoardPost = {
   gradeDisplay?: string;
 };
 
-type ShiftRecord = {
-  id: string;
-  title: string;
-  note: string;
-  createdAt: string;
-};
+// ...existing code...
 
 type DashboardData = {
   personsCount?: number;

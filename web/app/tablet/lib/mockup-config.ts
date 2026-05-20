@@ -26,6 +26,5 @@ export const defaultMockupModules: Record<string, boolean> = {
   penalties: true,
   map: true,
   chat: true,
-  shifts: true,
   administration: true,
 };
