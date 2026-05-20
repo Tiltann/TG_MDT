@@ -48,6 +48,7 @@
   "tablet.actions.view_map": "View Map",
   "tablet.actions.filters": "Filters",
   "tablet.actions.back": "Back",
+  "tablet.actions.select_department": "Select department...",
   "tablet.status.on_scene": "ON SCENE",
   "tablet.status.en_route": "EN ROUTE",
   "tablet.status.available": "AVAILABLE",

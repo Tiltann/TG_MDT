@@ -48,6 +48,7 @@
   "tablet.actions.view_map": "Karte öffnen",
   "tablet.actions.filters": "Filter",
   "tablet.actions.back": "Zurück",
+  "tablet.actions.select_department": "Abteilung auswählen...",
   "tablet.status.on_scene": "VOR ORT",
   "tablet.status.en_route": "UNTERWEGS",
   "tablet.status.available": "VERFÜGBAR",
