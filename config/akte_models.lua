@@ -1,11 +1,11 @@
 -- ============================================================
 --  TG_MDT | config/akte_models.lua
---  Modular Akte schema definitions for persons and vehicles.
+--  Modular Record schema definitions for persons and vehicles.
 --
 --  You can add/edit fields here without touching UI/server logic.
 --  Supported field types: text, textarea, select
 --  data_fields are shown in the left profile/data panel.
---  fields are the editable Akte section on the right.
+--  fields are the editable Record section on the right.
 --
 --  default supports:
 --    1) static value: default = 'none'
@@ -43,7 +43,7 @@
 --    ctx.record -> current framework record
 --
 --  job_models (optional):
---    Define compartment-based Akte schemas.
+--    Define compartment-based Record schemas.
 --    Structure:
 --      job_models = {
 --        lspd = {
@@ -61,7 +61,7 @@
 --      }
 --
 --    Rules:
---      - Jobs in the same compartment share the same Akte data.
+--      - Jobs in the same compartment share the same Record data.
 --      - shared_with still works as a compatibility alias for membership.
 --      - If no compartment is configured, the job name is used as the scope.
 --      - Otherwise fallback to the default person/vehicle schemas below.

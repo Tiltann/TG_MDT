@@ -168,3 +168,20 @@ body,
 .tablet-shell ::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--mdt-accent-primary) 35%, var(--mdt-border));
 }
+
+/* Premium Micro-Animations for View and Tab Transitions */
+@keyframes mdt-view-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-mdt-view {
+  animation: mdt-view-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

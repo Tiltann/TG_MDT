@@ -16,6 +16,8 @@ import {
   Plus,
   ShieldCheck,
   Users,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -232,70 +234,90 @@ export function DashboardView({
       label: t("tablet.dashboard.stats.people", undefined, "Persons"),
       value: personsCount,
       icon: Users,
-      tone: "bg-[rgba(255,145,0,0.12)] text-[var(--mdt-accent-primary)] border-[rgba(255,145,0,0.2)]",
+      glow: "hover:border-amber-500/40 hover:shadow-amber-500/5",
+      tone: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     },
     {
       label: t("tablet.dashboard.stats.vehicles", undefined, "Vehicles"),
       value: vehiclesCount,
       icon: CarFront,
-      tone: "bg-[rgba(59,130,246,0.12)] text-blue-400 border-[rgba(59,130,246,0.2)]",
+      glow: "hover:border-blue-500/40 hover:shadow-blue-500/5",
+      tone: "bg-blue-500/10 text-blue-400 border-blue-500/20",
     },
     {
       label: t("tablet.dashboard.stats.incidents", undefined, "Incidents"),
       value: recentIncidents.length,
       icon: Activity,
-      tone: "bg-[rgba(239,68,68,0.12)] text-red-400 border-[rgba(239,68,68,0.2)]",
+      glow: "hover:border-rose-500/40 hover:shadow-rose-500/5",
+      tone: "bg-rose-500/10 text-rose-400 border-rose-500/20",
     },
     {
       label: t("tablet.dashboard.stats.bolos", undefined, "BOLOs"),
       value: recentBolos.length,
       icon: AlertTriangle,
-      tone: "bg-[rgba(168,85,247,0.12)] text-purple-400 border-[rgba(168,85,247,0.2)]",
+      glow: "hover:border-violet-500/40 hover:shadow-violet-500/5",
+      tone: "bg-violet-500/10 text-violet-400 border-violet-500/20",
     },
   ];
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto pr-3 pb-2 flex flex-col gap-6">
-      <div className="relative overflow-hidden rounded-[28px] border border-white/5 bg-[linear-gradient(135deg,rgba(14,17,23,0.98),rgba(10,12,16,0.94))] p-6 lg:p-8 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,145,0,0.14),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.08),transparent_38%)]" />
-        <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-2xl space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/60">
-              <Layers3 className="h-3.5 w-3.5 text-[var(--mdt-accent-primary)]" />
+    <div className="h-full min-h-0 overflow-y-auto pr-3 pb-4 flex flex-col gap-6 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent animate-in fade-in duration-500">
+      
+      {/* 1. Welcoming Dynamic Banner */}
+      <div className="relative overflow-hidden rounded-[24px] border border-white/5 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-6 lg:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] group">
+        <div className="absolute inset-0 bg-grid-pattern opacity-10" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,145,0,0.18),transparent_50%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.12),transparent_48%)] transition-all duration-1000 group-hover:scale-105" />
+        
+        <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="max-w-2xl space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-white/70 shadow-sm backdrop-blur-md">
+              <Layers3 className="h-3.5 w-3.5 text-[var(--mdt-accent-primary)] animate-pulse" />
               {branding.subtitle || t("tablet.branding.subtitle")}
             </div>
 
-            <h2 className="text-3xl lg:text-5xl font-bold leading-tight tracking-tight text-white">
+            <h2 className="text-3xl lg:text-5xl font-black tracking-tight text-white leading-none">
               {branding.greeting || t("tablet.dashboard.greeting_default")}
-              {actorName !== t("tablet.player.unknown_user") && <span className="ml-2 text-[var(--mdt-accent-primary)]">{actorName}</span>}
+              {actorName !== t("tablet.player.unknown_user") && (
+                <span className="block mt-1 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-600 bg-clip-text text-transparent [text-shadow:0_4px_12px_rgba(245,158,11,0.15)]">
+                  {actorName}
+                </span>
+              )}
             </h2>
 
-            <p className="max-w-xl text-sm lg:text-base leading-relaxed text-white/60">
+            <p className="max-w-md text-xs lg:text-sm text-zinc-400 font-medium leading-relaxed">
               {t("tablet.dashboard.overview_subtitle")}
             </p>
 
-            <div className="flex flex-wrap gap-3 pt-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-300 shadow-inner">
-                <Activity className="h-3.5 w-3.5" />
+            <div className="flex flex-wrap gap-2.5 pt-1">
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold tracking-wide transition-all shadow-md ${
+                isOnDuty 
+                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" 
+                  : "border-amber-500/20 bg-amber-500/10 text-amber-400"
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${isOnDuty ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
                 {isOnDuty ? t("tablet.dashboard.stats.active_shift") : t("tablet.topbar.duty_off")}
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white/70 shadow-inner">
-                <Clock3 className="h-3.5 w-3.5 text-[var(--mdt-accent-primary)]" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-[11px] font-semibold text-zinc-300 shadow-md">
+                <Clock3 className="h-3.5 w-3.5 text-zinc-400" />
                 {branding.timeLabel || t("tablet.topbar.date_fallback")}
               </div>
             </div>
           </div>
 
+          {/* Stat Grid inside Welcome Banner */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-fit">
             {statCards.map((stat) => {
               const Icon = stat.icon;
               return (
-                <Card key={stat.label} className="min-w-[145px] rounded-2xl border border-white/5 bg-white/[0.03] p-4 shadow-sm">
-                  <div className={`inline-flex rounded-xl border p-2.5 ${stat.tone}`}>
+                <Card 
+                  key={stat.label} 
+                  className={`min-w-[135px] rounded-2xl border border-zinc-800/80 bg-black/40 p-4 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${stat.glow}`}
+                >
+                  <div className={`inline-flex rounded-xl border p-2 shrink-0 ${stat.tone}`}>
                     <Icon className="h-4 w-4" />
                   </div>
-                  <p className="mt-4 text-2xl font-bold leading-none text-white">{stat.value}</p>
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">{stat.label}</p>
+                  <p className="mt-4 text-3xl font-black leading-none text-white tracking-tight">{stat.value}</p>
+                  <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">{stat.label}</p>
                 </Card>
               );
             })}
@@ -303,94 +325,60 @@ export function DashboardView({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="border border-white/5 bg-white/[0.03] p-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-text-muted)]">{t("tablet.dashboard.stats.active_shift")}</p>
-          <div className="mt-4 flex items-center justify-between gap-4">
+      {/* 2. Content Row: Blackboard & Sidebar Log */}
+      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr] flex-1 min-h-0">
+        
+        {/* Left Column: Blackboard */}
+        <Card className="overflow-hidden border border-zinc-800/80 bg-zinc-950/40 rounded-3xl flex flex-col justify-between shadow-lg">
+          <div className="flex items-center justify-between border-b border-zinc-800/80 px-6 py-4.5">
             <div>
-              <p className="text-2xl font-bold text-white">{isOnDuty ? t("tablet.dashboard.stats.active_shift") : t("tablet.topbar.duty_off")}</p>
-              <p className="mt-1 text-sm text-white/45">{branding.timeLabel || t("tablet.topbar.date_fallback")}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500">{t("tablet.dashboard.black_board")}</p>
+              <h4 className="mt-0.5 text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
+                <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
+                {t("tablet.dashboard.black_board_title")}
+              </h4>
             </div>
-            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${isOnDuty ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300" : "border-white/10 bg-white/5 text-white/50"}`}>
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="border border-white/5 bg-white/[0.03] p-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-text-muted)]">{t("tablet.dashboard.active_entries")}</p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-              <p className="text-2xl font-bold text-white">{personsCount}</p>
-              <p className="mt-1 text-xs text-white/45">{t("tablet.dashboard.stats.people", undefined, "Persons")}</p>
-            </div>
-            <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-              <p className="text-2xl font-bold text-white">{vehiclesCount}</p>
-              <p className="mt-1 text-xs text-white/45">{t("tablet.dashboard.stats.vehicles", undefined, "Vehicles")}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="border border-white/5 bg-white/[0.03] p-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-text-muted)]">{t("tablet.dashboard.stats.news_hints")}</p>
-          <div className="mt-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-2xl font-bold text-white">{recentActivity.length + recentChat.length}</p>
-              <p className="mt-1 text-sm text-white/45">Recent updates</p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[rgba(255,145,0,0.2)] bg-[rgba(255,145,0,0.1)] text-[var(--mdt-accent-primary)]">
-              <Activity className="h-5 w-5" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
-        <Card className="overflow-hidden border border-white/5 bg-[linear-gradient(180deg,rgba(16,19,26,0.98),rgba(11,13,17,0.94))]">
-          <div className="flex items-center justify-between border-b border-white/5 px-5 py-4 lg:px-6">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-text-muted)]">{t("tablet.dashboard.black_board")}</p>
-              <h4 className="mt-1 text-xl font-bold text-white">{t("tablet.dashboard.black_board_title")}</h4>
-            </div>
-            <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-medium text-white/60">
-              {boardPosts.length} posts
+            <div className="rounded-full border border-zinc-800 bg-black/35 px-3 py-1 text-[11px] font-semibold text-zinc-400">
+              {boardPosts.length} updates
             </div>
           </div>
 
-          <div className="space-y-4 p-5 lg:p-6">
+          <div className="space-y-4 p-6 overflow-y-auto max-h-[30rem] scrollbar-thin scrollbar-thumb-zinc-800">
             {boardPosts.length === 0 ? (
-              <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/[0.02] px-8 py-10 text-center">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-white/40">
-                  <CalendarDays className="h-5 w-5" />
+              <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 bg-white/[0.01] px-6 py-8 text-center">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500">
+                  <CalendarDays className="h-5 w-5 animate-bounce" />
                 </div>
-                <p className="text-lg font-semibold text-white/80">No blackboard posts yet</p>
-                <p className="mt-1 max-w-sm text-sm text-white/40">{t("tablet.dashboard.black_board_hint")}</p>
+                <p className="text-sm font-bold text-zinc-300">No blackboard posts yet</p>
+                <p className="mt-1 max-w-xs text-xs text-zinc-500">{t("tablet.dashboard.black_board_hint")}</p>
               </div>
             ) : (
               boardPosts.slice(0, 2).map((post) => (
-                <article key={post.id} className="rounded-[24px] border border-white/5 bg-white/[0.02] p-5">
+                <article 
+                  key={post.id} 
+                  className="rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-5 hover:border-zinc-700/80 transition-all duration-300 hover:shadow-md"
+                >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h5 className="text-lg font-bold tracking-tight text-white">{post.title}</h5>
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[var(--mdt-accent-primary)]">{post.author}</span>
-                        <span className="text-xs text-white/30">•</span>
-                        <span className="text-xs text-white/40">{formatRelativeTime(post.createdAt, t)}</span>
+                      <h5 className="text-base font-bold tracking-tight text-white">{post.title}</h5>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-amber-400/80">{post.author}</span>
+                        <span className="text-zinc-700 text-xs">•</span>
+                        <span className="text-[11px] text-zinc-500">{formatRelativeTime(post.createdAt, t)}</span>
                       </div>
                     </div>
-                    <span className="rounded-lg border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">Note</span>
+                    <span className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500 shrink-0">ANNOUNCEMENT</span>
                   </div>
 
-                  <div className="prose prose-invert max-w-none text-sm leading-relaxed text-white/75 prose-p:my-2 prose-strong:text-white prose-a:text-[var(--mdt-accent-primary)]">
+                  <div className="prose prose-invert max-w-none text-xs leading-relaxed text-zinc-300 prose-p:my-1.5 prose-strong:text-white prose-a:text-amber-400 font-medium">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.body}</ReactMarkdown>
                   </div>
 
                   {post.images.length > 0 && (
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       {post.images.slice(0, 2).map((image, index) => (
-                        <div key={`${post.id}-${index}`} className="overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={image} alt={`${post.title}-${index + 1}`} className="h-32 w-full object-cover" />
+                        <div key={`${post.id}-${index}`} className="overflow-hidden rounded-xl border border-zinc-800 bg-black/40 relative group/img">
+                          <img src={image} alt={`${post.title}-${index + 1}`} className="h-28 w-full object-cover group-hover/img:scale-105 transition-transform duration-500" />
                         </div>
                       ))}
                     </div>
@@ -401,51 +389,68 @@ export function DashboardView({
           </div>
 
           {boardAdmin && (
-            <div className="border-t border-white/5 bg-black/20 p-5 lg:p-6">
-              <div className="flex items-center justify-between gap-3">
+            <div className="border-t border-zinc-800/80 bg-zinc-900/10 p-5">
+              <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-accent-primary)]">Admin Controls</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white">Compact post composer</p>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-amber-500">Board Administration</p>
+                  <p className="text-xs font-bold text-white">Create dynamic announcement</p>
                 </div>
-                <Button variant="ghost" onClick={handleTakeBoardImage} disabled={boardBusy}>
-                  <Camera className="mr-2 h-3.5 w-3.5 text-white/70" />
-                  {boardBusy ? "Capturing..." : "Image"}
+                <Button 
+                  variant="ghost" 
+                  onClick={handleTakeBoardImage} 
+                  disabled={boardBusy}
+                  className="h-8.5 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800/40 text-xs"
+                >
+                  <Camera className="mr-1.5 h-3.5 w-3.5 text-zinc-400" />
+                  {boardBusy ? "Capturing..." : "Add Image"}
                 </Button>
               </div>
 
-              <div className="mt-4 grid gap-3">
+              <div className="grid gap-3">
                 <input
                   value={boardTitle}
                   onChange={(event) => setBoardTitle(event.target.value)}
-                  placeholder="Announcement title..."
-                  className="w-full rounded-2xl border border-white/10 bg-black/35 p-3 text-sm text-white placeholder:text-white/30 outline-none"
+                  placeholder="Post title..."
+                  className="w-full rounded-xl border border-zinc-800/80 bg-black/30 px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
                 />
                 <textarea
                   value={boardBody}
                   onChange={(event) => setBoardBody(event.target.value)}
-                  placeholder="Short update, markdown supported..."
-                  rows={3}
-                  className="w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-3 text-sm text-white placeholder:text-white/30 outline-none"
+                  placeholder="Announce updates, guidelines, or notices... (Markdown supported)"
+                  rows={2}
+                  className="w-full resize-none rounded-xl border border-zinc-800/80 bg-black/30 px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
                 />
 
                 {boardImages.length > 0 && (
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2 grid-cols-4">
                     {boardImages.map((image, index) => (
-                      <div key={`${image}-${index}`} className="overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={image} alt={`draft-${index + 1}`} className="h-28 w-full object-cover" />
+                      <div key={`${image}-${index}`} className="overflow-hidden rounded-lg border border-zinc-800 bg-black/40 relative">
+                        <img src={image} alt={`draft-${index + 1}`} className="h-14 w-full object-cover" />
+                        <button 
+                          onClick={() => setBoardImages((prev) => prev.filter((_, idx) => idx !== index))}
+                          className="absolute top-1 right-1 bg-black/60 hover:bg-black/90 p-0.5 rounded text-white"
+                        >
+                          &times;
+                        </button>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="ghost" onClick={() => { setBoardTitle(""); setBoardBody(""); setBoardImages([]); }}>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button 
+                    variant="ghost" 
+                    className="h-8.5 text-xs rounded-lg"
+                    onClick={() => { setBoardTitle(""); setBoardBody(""); setBoardImages([]); }}
+                  >
                     Clear
                   </Button>
-                  <Button onClick={handleCreateBoardPost} style={{ backgroundColor: accent }}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Publish
+                  <Button 
+                    onClick={handleCreateBoardPost} 
+                    className="h-8.5 text-xs rounded-lg px-4 bg-zinc-200 text-black hover:bg-white transition-all"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Publish Post
                   </Button>
                 </div>
               </div>
@@ -453,236 +458,121 @@ export function DashboardView({
           )}
         </Card>
 
-        <div className="space-y-6">
-          <Card className="overflow-hidden border border-white/5 bg-[linear-gradient(180deg,rgba(16,19,26,0.98),rgba(11,13,17,0.94))]">
-            <div className="flex items-center justify-between border-b border-white/5 p-5">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-text-muted)]">{t("tablet.sidebar.livemap")}</p>
-                <h4 className="mt-1 text-lg font-bold text-white">Live Map</h4>
-              </div>
-              <Button variant="ghost">Open</Button>
-            </div>
-
-            <div className="p-5">
-              <div className="relative overflow-hidden rounded-[24px] border border-white/5 bg-[radial-gradient(circle_at_top_left,rgba(255,145,0,0.15),transparent_35%),linear-gradient(135deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))] p-5">
-                <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:32px_32px]" />
-                <div className="relative z-10 flex min-h-[240px] flex-col justify-between rounded-[20px] border border-white/5 bg-[rgba(5,7,10,0.55)] p-5">
-                  <div className="flex items-center justify-between text-xs text-white/45">
-                    <span>District coverage</span>
-                    <span>Live markers</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <MapPin className="h-5 w-5 text-red-400" />
-                    <span className="text-sm text-white/80">Current assignment area</span>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.03] p-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-blue-400/20 bg-blue-400/10 text-blue-300">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">Unit markers</p>
-                      <p className="text-xs text-white/45">Shared positions update live</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-white/45">
-                    <span>POIs enabled</span>
-                    <span>Route overlay on</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="overflow-hidden border border-white/5 bg-[linear-gradient(180deg,rgba(16,19,26,0.98),rgba(11,13,17,0.94))]">
-            <div className="flex items-center justify-between border-b border-white/5 p-5">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-text-muted)]">{t("tablet.sidebar.chat")}</p>
-                <h4 className="mt-1 text-lg font-bold text-white">Internal chat</h4>
-              </div>
-              <Button variant="ghost">Open</Button>
-            </div>
-
-            <div className="space-y-3 p-5">
-              {recentChat.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-sm text-white/45">
-                  No recent messages.
-                </div>
-              ) : (
-                recentChat.slice(0, 2).map((message) => (
-                  <div key={message.id} className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5 text-[11px] font-semibold text-white/80">
-                        {message.avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={message.avatarUrl} alt={message.author} className="h-full w-full object-cover" />
-                        ) : (
-                          renderInitials(message.author)
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="truncate text-sm font-semibold text-white">{message.author}</p>
-                          <span className="text-xs text-white/35">{formatRelativeTime(message.createdAt, t)}</span>
-                        </div>
-                        <p className="mt-1 text-sm leading-relaxed text-white/65">{message.text}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-
-              <div className="rounded-2xl border border-white/5 bg-black/25 p-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    value={chatDraft}
-                    onChange={(event) => setChatDraft(event.target.value)}
-                    placeholder={t("tablet.sidebar.chat")}
-                    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30"
-                  />
-                  <Button onClick={handleSendChat}>
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="overflow-hidden border border-white/5 bg-[linear-gradient(180deg,rgba(16,19,26,0.98),rgba(11,13,17,0.94))]">
-            <div className="flex items-center justify-between border-b border-white/5 p-5">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-text-muted)]">{t("tablet.dashboard.stats.active_shift")}</p>
-                <h4 className="mt-1 text-lg font-bold text-white">Live activity</h4>
-              </div>
-              <Button variant="ghost">Refresh</Button>
-            </div>
-
-            <div className="space-y-3 p-5">
-              {recentActivity.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-sm text-white/45">
-                  No recent activity.
-                </div>
-              ) : (
-                recentActivity.slice(0, 4).map((entry) => {
-                  const Icon = activityIcon(entry.kind);
-                  return (
-                    <div key={entry.id} className="flex items-start gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[var(--mdt-accent-primary)]">
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="truncate text-sm font-semibold text-white">{entry.title}</p>
-                          <span className="text-xs text-white/35">{formatRelativeTime(entry.timestamp, t)}</span>
-                        </div>
-                        <p className="mt-1 text-sm text-white/60">{entry.detail}</p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="overflow-hidden border border-white/5 bg-[linear-gradient(180deg,rgba(16,19,26,0.98),rgba(11,13,17,0.94))]">
-            <div className="flex items-center justify-between border-b border-white/5 p-5">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-text-muted)]">{t("tablet.dashboard.quick_access")}</p>
-                <h4 className="mt-1 text-lg font-bold text-white">Quick actions</h4>
-              </div>
-              <Button variant="ghost">View all</Button>
-            </div>
-
-            <div className="grid gap-3 p-5 sm:grid-cols-2">
+        {/* Right Column: Dynamic Side Widgets */}
+        <div className="space-y-6 flex flex-col min-h-0">
+          
+          {/* Quick Actions Panel */}
+          <Card className="overflow-hidden border border-zinc-800/80 bg-zinc-950/40 rounded-3xl p-5 shadow-lg">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500 mb-3.5">
+              {t("tablet.dashboard.quick_access")}
+            </h4>
+            <div className="grid gap-3 sm:grid-cols-2">
               {[
                 {
-                  title: t("tablet.actions.new_person", undefined, "Open Person Record"),
-                  description: "Search by name, ID or plate and open the matching record.",
+                  title: t("tablet.actions.new_person", undefined, "Person Search"),
+                  desc: "MDT citizen databases.",
                   icon: Users,
+                  color: "text-amber-400 border-amber-500/20 bg-amber-500/5",
                 },
                 {
-                  title: t("tablet.actions.new_vehicle", undefined, "Open Vehicle Record"),
-                  description: "Vehicle holder, insurance, notes and status history.",
+                  title: t("tablet.actions.new_vehicle", undefined, "Vehicle Search"),
+                  desc: "Registered plates & details.",
                   icon: CarFront,
-                },
-                {
-                  title: t("tablet.actions.new_report", undefined, "Write Report"),
-                  description: "Incident, medical, case or internal report depending on role.",
-                  icon: FileText,
+                  color: "text-blue-400 border-blue-500/20 bg-blue-500/5",
                 },
                 {
                   title: t("tablet.actions.penalty_catalog", undefined, "Penalty Catalog"),
-                  description: "Issue fines or procedures directly from the codebook.",
+                  desc: "Fines & legal penal structures.",
                   icon: ClipboardList,
+                  color: "text-rose-400 border-rose-500/20 bg-rose-500/5",
                 },
-              ].map((action) => {
-                const Icon = action.icon;
+                {
+                  title: t("tablet.sidebar.chat", undefined, "Radio Channels"),
+                  desc: "Join active radio network.",
+                  icon: MessageSquare,
+                  color: "text-violet-400 border-violet-500/20 bg-violet-500/5",
+                },
+              ].map((act) => {
+                const Icon = act.icon;
                 return (
-                  <button key={action.title} className="group rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-left transition-colors hover:bg-white/[0.04]">
-                    <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-2.5 text-[var(--mdt-accent-primary)]">
+                  <div 
+                    key={act.title}
+                    className="group rounded-2xl border border-zinc-800 bg-zinc-900/10 p-3.5 hover:border-zinc-700/80 transition-all hover:bg-zinc-900/20 duration-300"
+                  >
+                    <div className={`inline-flex rounded-xl border p-2 ${act.color}`}>
                       <Icon className="h-4 w-4" />
                     </div>
-                    <p className="mt-4 text-sm font-semibold text-white">{action.title}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-white/45">{action.description}</p>
-                  </button>
+                    <p className="mt-3 text-xs font-bold text-white group-hover:text-amber-400 transition-colors flex items-center gap-1">
+                      {act.title}
+                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-zinc-500 leading-normal font-medium">{act.desc}</p>
+                  </div>
                 );
               })}
             </div>
           </Card>
 
-          <Card className="overflow-hidden border border-white/5 bg-[linear-gradient(180deg,rgba(16,19,26,0.98),rgba(11,13,17,0.94))]">
-            <div className="flex items-center justify-between border-b border-white/5 p-5">
+          {/* Active Shifts Service Log */}
+          <Card className="overflow-hidden border border-zinc-800/80 bg-zinc-950/40 rounded-3xl flex-1 flex flex-col justify-between shadow-lg">
+            <div className="flex items-center justify-between border-b border-zinc-800/80 p-5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--mdt-text-muted)]">{t("tablet.sidebar.warrants")}</p>
-                <h4 className="mt-1 text-lg font-bold text-white">Service log</h4>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500">{t("tablet.sidebar.shifts")}</p>
+                <h4 className="mt-0.5 text-base font-bold text-white tracking-tight">Active Shifts log</h4>
               </div>
-              <Button variant="ghost">View all</Button>
             </div>
 
-            <div className="space-y-3 p-5">
+            <div className="space-y-2.5 p-5 overflow-y-auto max-h-[14rem] scrollbar-thin scrollbar-thumb-zinc-800">
               {shifts.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-sm text-white/45">
-                  No shift log entries yet.
+                <div className="rounded-xl border border-dashed border-zinc-800 bg-white/[0.01] p-5 text-center text-xs text-zinc-500 italic">
+                  No shift log entries recorded.
                 </div>
               ) : (
-                shifts.slice(0, 3).map((shift) => (
-                  <div key={shift.id} className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-white">{shift.title}</p>
-                        <p className="mt-1 text-xs text-white/45">{shift.note || t("tablet.dashboard.shift_hint")}</p>
-                      </div>
-                      <span className="text-xs text-white/35">{formatRelativeTime(shift.createdAt, t)}</span>
+                shifts.slice(0, 3).map((sh) => (
+                  <div 
+                    key={sh.id} 
+                    className="rounded-xl border border-zinc-800 bg-zinc-900/20 p-3 flex justify-between items-start hover:border-zinc-700 transition-all"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs font-bold text-white truncate">{sh.title}</p>
+                      <p className="mt-0.5 text-[10px] text-zinc-500 truncate">{sh.note || "Duty duration log"}</p>
                     </div>
+                    <span className="text-[9px] text-zinc-600 font-bold shrink-0">{formatRelativeTime(sh.createdAt, t)}</span>
                   </div>
                 ))
               )}
             </div>
 
             {boardAdmin && (
-              <div className="border-t border-white/5 bg-black/20 p-5">
-                <div className="space-y-3">
+              <div className="border-t border-zinc-800/80 bg-zinc-900/10 p-5">
+                <div className="space-y-2">
                   <input
                     value={shiftTitle}
                     onChange={(event) => setShiftTitle(event.target.value)}
-                    placeholder="New shift entry..."
-                    className="w-full rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white placeholder:text-white/30 outline-none"
+                    placeholder="Duty shift entry title..."
+                    className="w-full rounded-xl border border-zinc-800/80 bg-black/35 px-3 py-2 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
                   />
                   <textarea
                     value={shiftNote}
                     onChange={(event) => setShiftNote(event.target.value)}
-                    placeholder="Optional note"
-                    rows={3}
-                    className="w-full resize-none rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white placeholder:text-white/30 outline-none"
+                    placeholder="Optional notes or crew roster..."
+                    rows={1}
+                    className="w-full resize-none rounded-xl border border-zinc-800/80 bg-black/35 px-3 py-2 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
                   />
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" onClick={() => { setShiftTitle(""); setShiftNote(""); }}>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button 
+                      variant="ghost" 
+                      className="h-8 text-[11px] rounded-lg"
+                      onClick={() => { setShiftTitle(""); setShiftNote(""); }}
+                    >
                       Clear
                     </Button>
-                    <Button onClick={handleCreateShift} disabled={shiftBusy} style={{ backgroundColor: accent }}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add entry
+                    <Button 
+                      onClick={handleCreateShift} 
+                      disabled={shiftBusy || !shiftTitle.trim()} 
+                      className="h-8 text-[11px] rounded-lg px-3 bg-zinc-200 hover:bg-white text-black transition-colors"
+                    >
+                      Add Entry
                     </Button>
                   </div>
                 </div>

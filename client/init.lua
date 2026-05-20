@@ -194,6 +194,65 @@ NUI.onCallback('setDutyState', function(body, cb)
 	cb(ok and result or { onDuty = true })
 end)
 
+-- ── Radio helper functions & NUI callbacks ──────────────
+
+local function getActiveVoiceSystem()
+	if GetResourceState('pma-voice') == 'started' then
+		return 'pma-voice'
+	elseif GetResourceState('saltychat') == 'started' then
+		return 'saltychat'
+	end
+	return 'standalone'
+end
+
+local function getActiveRadioFrequency()
+	local system = getActiveVoiceSystem()
+	if system == 'pma-voice' then
+		local freq = exports['pma-voice']:getRadioChannel()
+		return freq and tostring(freq) or ''
+	elseif system == 'saltychat' then
+		local freq = exports['saltychat']:GetRadioChannel()
+		return freq and tostring(freq) or ''
+	end
+	return ''
+end
+
+NUI.onCallback('joinRadioChannel', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local freq = type(payload.frequency) == 'string' and payload.frequency or tostring(payload.frequency or '')
+	local system = getActiveVoiceSystem()
+	local freqNum = tonumber(freq)
+
+	if system == 'pma-voice' and freqNum then
+		exports['pma-voice']:setRadioChannel(freqNum)
+	elseif system == 'saltychat' then
+		exports['saltychat']:SetRadioChannel(freq, true)
+	end
+
+	TriggerServerEvent('TG_MDT:server:joinRadioChannel', freq)
+	cb({ ok = true, frequency = freq, system = system })
+end)
+
+NUI.onCallback('leaveRadioChannel', function(_, cb)
+	local system = getActiveVoiceSystem()
+
+	if system == 'pma-voice' then
+		exports['pma-voice']:setRadioChannel(0)
+	elseif system == 'saltychat' then
+		exports['saltychat']:SetRadioChannel('', true)
+	end
+
+	TriggerServerEvent('TG_MDT:server:leaveRadioChannel')
+	cb({ ok = true, frequency = '', system = system })
+end)
+
+RegisterNetEvent('TG_MDT:client:updateRadioMembers', function(members)
+	NUI.send('setData', {
+		key = 'radioMembers',
+		value = members or {}
+	})
+end)
+
 NUI.onCallback('debugUiLog', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local tag = type(payload.tag) == 'string' and payload.tag or 'ui'
@@ -391,6 +450,12 @@ function TG_MDT_sendInitialState()
 	local mdtCfg     = Config.MDT or {}
 	local brandingCfg = type(mdtCfg.branding) == 'table' and mdtCfg.branding or {}
 
+	local activeSystem = getActiveVoiceSystem()
+	local activeFreq = getActiveRadioFrequency()
+	if activeFreq ~= '' then
+		TriggerServerEvent('TG_MDT:server:joinRadioChannel', activeFreq)
+	end
+
 	NUI.send('setData', {
 		key = 'meta',
 		value = {
@@ -400,6 +465,10 @@ function TG_MDT_sendInitialState()
 			translations         = locale_dictionary,
 			translationsByLocale = translations_by_locale,
 			akteModels           = akteModels,
+			radio = {
+				activeSystem = activeSystem,
+				activeFrequency = activeFreq,
+			},
 			mdt = {
 				allowed_jobs           = mdtCfg.allowed_jobs,
 				departments            = mdtCfg.departments,

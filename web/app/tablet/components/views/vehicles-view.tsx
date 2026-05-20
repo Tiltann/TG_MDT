@@ -829,7 +829,7 @@ export default function VehiclesView({
 
   if (!selectedVehicle) {
     return (
-      <div className="h-full flex flex-col gap-4">
+      <div key="list" className="h-full flex flex-col gap-4 animate-mdt-view">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl card-title">{t("tablet.sidebar.vehicles")}</h3>
@@ -868,7 +868,7 @@ export default function VehiclesView({
   }
 
   return (
-    <div className="h-full flex flex-col gap-4">
+    <div key={selectedPlate || "details"} className="h-full flex flex-col gap-4 animate-mdt-view">
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => setSelectedPlate(null)} className="inline-flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" />
@@ -947,7 +947,8 @@ export default function VehiclesView({
             </div>
           </div>
 
-          {!hasAccessToJobTab(selectedCompartment) ? (() => {
+          <div key={selectedCompartment} className="space-y-3 animate-mdt-view">
+            {!hasAccessToJobTab(selectedCompartment) ? (() => {
             const targetDept = departments ? departments[selectedCompartment] : null;
             const deptLogo = targetDept?.logo_url;
             const deptLabel = targetDept?.label || selectedCompartment.toUpperCase();
@@ -1283,6 +1284,7 @@ export default function VehiclesView({
                 })}
             </>
           )}
+          </div>
         </Card>
       </div>
 

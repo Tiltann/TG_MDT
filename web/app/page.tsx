@@ -1156,115 +1156,119 @@ export default function Home() {
               />
               
               <div className="flex-1 overflow-hidden p-6">
-                {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView branding={branding} modules={current_modules} data={dashboardData} onSendChat={sendChatMessage} onTakeBoardImage={captureBoardImage} onCreateBoardPost={createBoardPost} onCreateShift={createShift} t={t} />}
-                {activeScreen === "blackboard" && (
-                  <BlackboardView
-                    t={t}
-                    boardPosts={boardPosts}
-                    boardAdmin={isBoardAdmin}
-                    onTakeBoardImage={captureBoardImage}
-                    onCreateBoardPost={createBoardPost}
-                  />
-                )}
-                {activeScreen === "profile" && (
-                  <ProfileView
-                    t={t}
-                    profile={{
-                      name: profileData.name || actorName,
-                      imageUrl: profileData.imageUrl,
-                      gradeDisplay: actorGrade,
-                    }}
-                    onSave={updateProfile}
-                    onCapturePhoto={captureProfilePhoto}
-                  />
-                )}
-                {activeScreen === "dispatch" && (
-                  <DispatchView
-                    t={t}
-                    incidents={incidentRecords}
-                    persons={personsData}
-                    vehicles={vehiclesData}
-                    onCreateIncident={createIncident}
-                    onUpdateIncident={updateIncident}
-                    onDeleteIncident={deleteIncident}
-                  />
-                )}
-                {activeScreen === "chat" && (
-                  <ChatView
-                    t={t}
-                    messages={chatMessages}
-                    onSend={sendChatMessage}
-                    onDeleteMessage={deleteChatMessage}
-                    actorName={profileName}
-                    actorImageUrl={profileData.imageUrl}
-                    currentUserName={profileName}
-                  />
-                )}
-                {activeScreen === "persons" && (
-                  <PersonsView
-                    t={t}
-                    actorName={actorLabel}
-                    persons={personsData}
-                    globalSearch={globalSearch}
-                    initialAkten={personAktenData}
-                    akteSync={personAkteSync}
-                    akteFields={personAkteFields}
-                    dataFields={personDataFields}
-                    incidents={incidentRecords}
-                    bolos={boloRecords}
-                    akteScope={activeAkteCompartment}
-                    meta={typedMeta}
-                    viewerJob={sessionJob}
-                  />
-                )}
-                {activeScreen === "vehicles" && (
-                  <VehiclesView
-                    t={t}
-                    actorName={actorLabel}
-                    vehicles={vehiclesData}
-                    globalSearch={globalSearch}
-                    initialAkten={vehicleAktenData}
-                    akteSync={vehicleAkteSync}
-                    akteFields={vehicleAkteFields}
-                    dataFields={vehicleDataFields}
-                    incidents={incidentRecords}
-                    bolos={boloRecords}
-                    akteScope={activeAkteCompartment}
-                    meta={typedMeta}
-                    viewerJob={sessionJob}
-                  />
-                )}
-                {activeScreen === "warrants" && <WarrantsView t={t} />}
-                {activeScreen === "penalties" && <PenaltiesView t={t} />}
-                {activeScreen === "bolo" && (
-                  <BoloView
-                    t={t}
-                    bolos={boloRecords}
-                    persons={personsData}
-                    vehicles={vehiclesData}
-                    onCreate={createBolo}
-                    onUpdate={updateBolo}
-                    onDelete={deleteBolo}
-                  />
-                )}
-                {activeScreen === "livemap" && <LiveMapView t={t} />}
-                {activeScreen === "shifts" && (
-                  <ShiftsView t={t} shifts={shiftRecords} boardAdmin={isBoardAdmin} onCreateShift={createShift} />
-                )}
-                {activeScreen === "administration" && (
-                  <SettingsView
-                    t={t}
-                    locale={activeLocale}
-                    onLocaleChange={(nextLocale) => setLocaleOverride(nextLocale)}
-                    allowMapStyleChange={allowMapStyleChange}
-                    mapStyle={activeMapStyle}
-                    onMapStyleChange={(nextStyle) => setMapStyleOverride(nextStyle)}
-                    accentColor={branding.accent || defaultMockupBranding.accent || "#ff9100"}
-                    defaultAccent={typedMeta.branding?.accent || defaultMockupBranding.accent || "#ff9100"}
-                    onAccentColorChange={(accent) => setAccentOverride(accent)}
-                    onResetAccent={() => setAccentOverride(null)}
-                  />
-                )}
+                <div key={activeScreen || "dashboard"} className="h-full w-full animate-mdt-view">
+                  {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView branding={branding} modules={current_modules} data={dashboardData} onSendChat={sendChatMessage} onTakeBoardImage={captureBoardImage} onCreateBoardPost={createBoardPost} onCreateShift={createShift} t={t} />}
+                  {activeScreen === "blackboard" && (
+                    <BlackboardView
+                      t={t}
+                      boardPosts={boardPosts}
+                      boardAdmin={isBoardAdmin}
+                      onTakeBoardImage={captureBoardImage}
+                      onCreateBoardPost={createBoardPost}
+                    />
+                  )}
+                  {activeScreen === "profile" && (
+                    <ProfileView
+                      t={t}
+                      profile={{
+                        name: profileData.name || actorName,
+                        imageUrl: profileData.imageUrl,
+                        gradeDisplay: actorGrade,
+                      }}
+                      onSave={updateProfile}
+                      onCapturePhoto={captureProfilePhoto}
+                    />
+                  )}
+                  {activeScreen === "dispatch" && (
+                    <DispatchView
+                      t={t}
+                      incidents={incidentRecords}
+                      persons={personsData}
+                      vehicles={vehiclesData}
+                      onCreateIncident={createIncident}
+                      onUpdateIncident={updateIncident}
+                      onDeleteIncident={deleteIncident}
+                    />
+                  )}
+                  {activeScreen === "chat" && (
+                    <ChatView
+                      t={t}
+                      messages={chatMessages}
+                      onSend={sendChatMessage}
+                      onDeleteMessage={deleteChatMessage}
+                      actorName={profileName}
+                      actorImageUrl={profileData.imageUrl}
+                      currentUserName={profileName}
+                      radioMembers={(screenData as any).radioMembers || []}
+                      meta={typedMeta}
+                    />
+                  )}
+                  {activeScreen === "persons" && (
+                    <PersonsView
+                      t={t}
+                      actorName={actorLabel}
+                      persons={personsData}
+                      globalSearch={globalSearch}
+                      initialAkten={personAktenData}
+                      akteSync={personAkteSync}
+                      akteFields={personAkteFields}
+                      dataFields={personDataFields}
+                      incidents={incidentRecords}
+                      bolos={boloRecords}
+                      akteScope={activeAkteCompartment}
+                      meta={typedMeta}
+                      viewerJob={sessionJob}
+                    />
+                  )}
+                  {activeScreen === "vehicles" && (
+                    <VehiclesView
+                      t={t}
+                      actorName={actorLabel}
+                      vehicles={vehiclesData}
+                      globalSearch={globalSearch}
+                      initialAkten={vehicleAktenData}
+                      akteSync={vehicleAkteSync}
+                      akteFields={vehicleAkteFields}
+                      dataFields={vehicleDataFields}
+                      incidents={incidentRecords}
+                      bolos={boloRecords}
+                      akteScope={activeAkteCompartment}
+                      meta={typedMeta}
+                      viewerJob={sessionJob}
+                    />
+                  )}
+                  {activeScreen === "warrants" && <WarrantsView t={t} />}
+                  {activeScreen === "penalties" && <PenaltiesView t={t} />}
+                  {activeScreen === "bolo" && (
+                    <BoloView
+                      t={t}
+                      bolos={boloRecords}
+                      persons={personsData}
+                      vehicles={vehiclesData}
+                      onCreate={createBolo}
+                      onUpdate={updateBolo}
+                      onDelete={deleteBolo}
+                    />
+                  )}
+                  {activeScreen === "livemap" && <LiveMapView t={t} />}
+                  {activeScreen === "shifts" && (
+                    <ShiftsView t={t} shifts={shiftRecords} boardAdmin={isBoardAdmin} onCreateShift={createShift} />
+                  )}
+                  {activeScreen === "settings" && (
+                    <SettingsView
+                      t={t}
+                      locale={activeLocale}
+                      onLocaleChange={(nextLocale) => setLocaleOverride(nextLocale)}
+                      allowMapStyleChange={allowMapStyleChange}
+                      mapStyle={activeMapStyle}
+                      onMapStyleChange={(nextStyle) => setMapStyleOverride(nextStyle)}
+                      accentColor={branding.accent || defaultMockupBranding.accent || "#ff9100"}
+                      defaultAccent={typedMeta.branding?.accent || defaultMockupBranding.accent || "#ff9100"}
+                      onAccentColorChange={(accent) => setAccentOverride(accent)}
+                      onResetAccent={() => setAccentOverride(null)}
+                    />
+                  )}
+                </div>
               </div>
             </div>
 

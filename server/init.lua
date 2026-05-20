@@ -1298,3 +1298,134 @@ lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compa
 
     return merged
 end)
+
+-- ══════════════════════════════════════════════════════════
+-- RADIO MEMBERS SYNCHRONIZATION
+-- ══════════════════════════════════════════════════════════
+
+local activeRadioChannels = {}
+local playerActiveFrequencies = {}
+
+local function buildPlayerRadioData(src)
+    local fallback = {
+        source = src,
+        name = 'Colleague ' .. src,
+        gradeDisplay = '',
+    }
+    if not Framework or not Framework.Server or type(Framework.Server.getPlayerData) ~= 'function' then
+        return fallback
+    end
+
+    local pdata = Framework.Server.getPlayerData(src) or {}
+    local job = pdata.job or {}
+    local first = pdata.firstname
+    local last = pdata.lastname
+
+    if type(pdata.charinfo) == 'table' then
+        first = first or pdata.charinfo.firstname
+        last = last or pdata.charinfo.lastname
+    end
+
+    local name = nil
+    if type(pdata.name) == 'string' and pdata.name ~= '' then
+        name = pdata.name
+    elseif type(first) == 'string' and type(last) == 'string' then
+        name = first .. ' ' .. last
+    else
+        name = GetPlayerName(src) or fallback.name
+    end
+
+    local gradeName = nil
+    local gradeNumber = nil
+    if type(job) == 'table' then
+        if type(job.grade) == 'table' then
+            gradeName = job.grade.label or job.grade.name
+            gradeNumber = job.grade.level or job.grade.grade or job.grade.value
+        else
+            gradeName = job.grade_label or job.grade_name
+            gradeNumber = job.grade
+        end
+    end
+
+    local gradeDisplay = ''
+    if gradeName and gradeNumber then
+        gradeDisplay = tostring(gradeName) .. ' ' .. tostring(gradeNumber)
+    elseif gradeName then
+        gradeDisplay = tostring(gradeName)
+    elseif gradeNumber then
+        gradeDisplay = tostring(gradeNumber)
+    end
+
+    return {
+        source = src,
+        name = name,
+        gradeDisplay = gradeDisplay,
+        avatarUrl = pdata.imageUrl or nil
+    }
+end
+
+local function broadcastRadioMembers(freq)
+    if not freq or freq == '' then return end
+    local membersMap = activeRadioChannels[freq] or {}
+    local membersList = {}
+    for src, data in pairs(membersMap) do
+        membersList[#membersList + 1] = data
+    end
+
+    -- Broadcast to all members on this frequency
+    for src, _ in pairs(membersMap) do
+        TriggerClientEvent('TG_MDT:client:updateRadioMembers', src, membersList)
+    end
+end
+
+local function removePlayerFromRadio(src)
+    local oldFreq = playerActiveFrequencies[src]
+    if oldFreq then
+        playerActiveFrequencies[src] = nil
+        if activeRadioChannels[oldFreq] then
+            activeRadioChannels[oldFreq][src] = nil
+            local isEmpty = true
+            for _ in pairs(activeRadioChannels[oldFreq]) do
+                isEmpty = false
+                break
+            end
+            if isEmpty then
+                activeRadioChannels[oldFreq] = nil
+            else
+                broadcastRadioMembers(oldFreq)
+            end
+        end
+    end
+end
+
+RegisterNetEvent('TG_MDT:server:joinRadioChannel', function(freq)
+    local src = source
+    if not freq or freq == '' then
+        removePlayerFromRadio(src)
+        return
+    end
+
+    local freqStr = tostring(freq)
+    removePlayerFromRadio(src)
+
+    playerActiveFrequencies[src] = freqStr
+    if not activeRadioChannels[freqStr] then
+        activeRadioChannels[freqStr] = {}
+    end
+
+    local memberData = buildPlayerRadioData(src)
+    activeRadioChannels[freqStr][src] = memberData
+
+    broadcastRadioMembers(freqStr)
+end)
+
+RegisterNetEvent('TG_MDT:server:leaveRadioChannel', function()
+    local src = source
+    removePlayerFromRadio(src)
+end)
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    removePlayerFromRadio(src)
+end)
+

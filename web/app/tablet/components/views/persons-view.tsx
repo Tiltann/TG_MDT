@@ -870,7 +870,7 @@ export default function PersonsView({
 
   if (!selectedPerson) {
     return (
-      <div className="h-full flex flex-col gap-4">
+      <div key="list" className="h-full flex flex-col gap-4 animate-mdt-view">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl card-title">{t("tablet.sidebar.persons")}</h3>
@@ -923,7 +923,7 @@ export default function PersonsView({
   }
 
   return (
-    <div className="h-full flex flex-col gap-4">
+    <div key={selectedIdentifier || "details"} className="h-full flex flex-col gap-4 animate-mdt-view">
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => setSelectedIdentifier(null)} className="inline-flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" />
@@ -1014,7 +1014,8 @@ export default function PersonsView({
             </div>
           </div>
 
-          {!hasAccessToJobTab(selectedCompartment) ? (() => {
+          <div key={selectedCompartment} className="space-y-3 animate-mdt-view">
+            {!hasAccessToJobTab(selectedCompartment) ? (() => {
             const targetDept = departments ? departments[selectedCompartment] : null;
             const deptLogo = targetDept?.logo_url;
             const deptLabel = targetDept?.label || selectedCompartment.toUpperCase();
@@ -1350,6 +1351,7 @@ export default function PersonsView({
                 })}
             </>
           )}
+          </div>
         </Card>
       </div>
 

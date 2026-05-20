@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, RadioReceiver, Users, Car, BookOpen, MessageSquare, CalendarDays, Scale, Bell } from "lucide-react";
+import { Home, RadioReceiver, Users, Car, BookOpen, MessageSquare, CalendarDays, Scale, Bell, Settings } from "lucide-react";
 import type { TFunction } from "../lib/i18n";
 
 type Branding = {
@@ -44,7 +44,7 @@ export function Sidebar({
     { id: "livemap", label: t("tablet.sidebar.livemap"), icon: BookOpen },
     { id: "chat", label: t("tablet.sidebar.chat"), icon: MessageSquare },
     { id: "shifts", label: t("tablet.sidebar.shifts"), icon: CalendarDays },
-    { id: "administration", label: t("tablet.sidebar.administration"), icon: Bell },
+    { id: "settings", label: t("tablet.sidebar.settings"), icon: Settings },
   ];
 
   const accent = branding.accent || "#ff9100";

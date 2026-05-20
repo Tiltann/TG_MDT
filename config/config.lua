@@ -57,7 +57,7 @@ Config.MDT = {
     -- How long (ms) the MDT open/close animation takes.
     animation_duration = 300,
 
-    -- Akte photo capture settings.
+    -- Record photo capture settings.
     photo = {
         -- JPEG quality used by screenshot-basic (range 0.1 - 1.0).
         -- 1.0 = best quality / biggest payload.
