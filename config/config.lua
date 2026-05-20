@@ -29,6 +29,19 @@ Config.MDT = {
         'sheriff',
         'fbi',
         'ambulance',
+        'mdt',
+        'mechanic',
+    },
+
+    -- Compartment sharing configuration
+    -- Allows two or more agencies/jobs to share the same default database compartment
+    -- and view/edit each other's records by default.
+    -- In this example, 'police' and 'sheriff' share 'lspd' compartment records.
+    shared_departments = {
+        -- {
+        --     compartment = 'lspd',
+        --     jobs = { 'police', 'sheriff' },
+        -- }
     },
 
     -- Default screen opened by the tablet module.

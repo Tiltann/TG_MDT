@@ -279,32 +279,228 @@ Config.AkteModels = Config.AkteModels or {
     -- Optional per-job schema overrides + share rules.
     -- Keep empty to use default schemas for all jobs.
     job_models = {
-        -- Example:
-        -- lspd = {
-        --     compartment = 'lspd',
-        --     jobs = { 'police', 'sheriff' },
-        --     person = {
-        --         data_fields = {
-        --             { key = 'name', label_key = 'tablet.persons.field.name', source = 'name' },
-        --         },
-        --         fields = {
-        --             { key = 'notes', label_key = 'tablet.persons.akte.notes', type = 'textarea', default = '', editable = true },
-        --         },
-        --     },
-        --     vehicle = {
-        --         data_fields = {
-        --             { key = 'model', label_key = 'tablet.vehicles.field.model', source = 'model', fallback = '-' },
-        --         },
-        --         fields = {
-        --             { key = 'notes', label_key = 'tablet.vehicles.akte.notes', type = 'textarea', default = '', editable = true },
-        --         },
-        --     },
-        -- },
-        -- mdt = {
-        --     compartment = 'mdt',
-        --     jobs = { 'mdt' },
-        --     person = { ... },
-        --     vehicle = { ... },
-        -- },
+        pd = {
+            compartment = 'pd',
+            jobs = { 'police' },
+            person = {
+                data_fields = {
+                    { key = 'name', label_key = 'tablet.persons.field.name', source = 'name' },
+                    { key = 'dob', label_key = 'tablet.persons.field.dob', source = 'dob', fallback = '-' },
+                    { key = 'gender', label_key = 'tablet.persons.field.gender', source = 'gender', fallback = '-' },
+                    { key = 'job', label_key = 'tablet.persons.akte.occupation', source = 'job', fallback = '-' },
+                },
+                fields = {
+                    { key = 'personImage', label_key = 'tablet.persons.akte.image', type = 'text', default = '', editable = true },
+                    { key = 'phone', label_key = 'tablet.persons.akte.phone', type = 'text', default = '', editable = true },
+                    {
+                        key = 'warrantStatus',
+                        label_key = 'tablet.persons.akte.warrant',
+                        type = 'select',
+                        default = 'none',
+                        editable = true,
+                        options = {
+                            { value = 'none', label_key = 'tablet.persons.akte.warrant.none' },
+                            { value = 'active', label_key = 'tablet.persons.akte.warrant.active' },
+                            { value = 'served', label_key = 'tablet.persons.akte.warrant.served' },
+                        },
+                    },
+                    {
+                        key = 'dangerLevel',
+                        label_key = 'tablet.persons.akte.danger',
+                        type = 'select',
+                        default = 'low',
+                        editable = true,
+                        options = {
+                            { value = 'low', label_key = 'tablet.persons.akte.danger.low' },
+                            { value = 'medium', label_key = 'tablet.persons.akte.danger.medium' },
+                            { value = 'high', label_key = 'tablet.persons.akte.danger.high' },
+                        },
+                    },
+                    { key = 'notes', label_key = 'tablet.persons.akte.notes', type = 'textarea', default = '', editable = true },
+                },
+            },
+            vehicle = {
+                data_fields = {
+                    { key = 'plate', label_key = 'tablet.vehicles.field.plate', source = 'plate' },
+                    { key = 'model', label_key = 'tablet.vehicles.field.model', source = 'model', fallback = '-' },
+                    { key = 'owner', label_key = 'tablet.vehicles.field.owner', source = 'owner', fallback = '-' },
+                },
+                fields = {
+                    { key = 'vehicleImage', label_key = 'tablet.vehicles.akte.image', type = 'text', default = '', editable = true },
+                    {
+                        key = 'searchStatus',
+                        label_key = 'tablet.vehicles.akte.search_status',
+                        type = 'select',
+                        default = 'none',
+                        editable = true,
+                        options = {
+                            { value = 'none', label_key = 'tablet.vehicles.akte.search_status.none' },
+                            { value = 'wanted', label_key = 'tablet.vehicles.akte.search_status.wanted' },
+                            { value = 'stolen', label_key = 'tablet.vehicles.akte.search_status.stolen' },
+                        },
+                    },
+                    { key = 'notes', label_key = 'tablet.vehicles.akte.notes', type = 'textarea', default = '', editable = true },
+                },
+            },
+        },
+
+        mdt = {
+            compartment = 'mdt',
+            jobs = { 'mdt' },
+            person = {
+                data_fields = {
+                    { key = 'name', label_key = 'tablet.persons.field.name', source = 'name' },
+                    { key = 'dob', label_key = 'tablet.persons.field.dob', source = 'dob', fallback = '-' },
+                    { key = 'job', label_key = 'tablet.persons.akte.occupation', source = 'job', fallback = '-' },
+                },
+                fields = {
+                    { key = 'personImage', label_key = 'tablet.persons.akte.image', type = 'text', default = '', editable = true },
+                    { key = 'phone', label_key = 'tablet.persons.akte.phone', type = 'text', default = '', editable = true },
+                    {
+                        key = 'dojStatus',
+                        label = 'Legal / DoJ Status',
+                        type = 'select',
+                        default = 'none',
+                        editable = true,
+                        options = {
+                            { value = 'none', label = 'No Active Cases' },
+                            { value = 'trial', label = 'Awaiting Trial' },
+                            { value = 'convicted', label = 'Convicted' },
+                            { value = 'acquitted', label = 'Acquitted' },
+                        },
+                    },
+                    { key = 'legalNotes', label = 'Legal Case Notes', type = 'textarea', default = '', editable = true },
+                },
+            },
+            vehicle = {
+                data_fields = {
+                    { key = 'plate', label_key = 'tablet.vehicles.field.plate', source = 'plate' },
+                    { key = 'model', label_key = 'tablet.vehicles.field.model', source = 'model', fallback = '-' },
+                    { key = 'owner', label_key = 'tablet.vehicles.field.owner', source = 'owner', fallback = '-' },
+                },
+                fields = {
+                    { key = 'vehicleImage', label_key = 'tablet.vehicles.akte.image', type = 'text', default = '', editable = true },
+                    {
+                        key = 'legalHold',
+                        label = 'Legal Hold Status',
+                        type = 'select',
+                        default = 'no',
+                        editable = true,
+                        options = {
+                            { value = 'no', label = 'No Hold' },
+                            { value = 'seized', label = 'Seized by Court' },
+                            { value = 'investigation', label = 'Under Investigation' },
+                        },
+                    },
+                    { key = 'notes', label_key = 'tablet.vehicles.akte.notes', type = 'textarea', default = '', editable = true },
+                },
+            },
+        },
+
+        mechanic = {
+            compartment = 'mechanic',
+            jobs = { 'mechanic' },
+            person = {
+                data_fields = {
+                    { key = 'name', label_key = 'tablet.persons.field.name', source = 'name' },
+                    { key = 'dob', label_key = 'tablet.persons.field.dob', source = 'dob', fallback = '-' },
+                    { key = 'job', label_key = 'tablet.persons.akte.occupation', source = 'job', fallback = '-' },
+                },
+                fields = {
+                    { key = 'personImage', label_key = 'tablet.persons.akte.image', type = 'text', default = '', editable = true },
+                    { key = 'phone', label_key = 'tablet.persons.akte.phone', type = 'text', default = '', editable = true },
+                    {
+                        key = 'customerRating',
+                        label = 'Customer Tier',
+                        type = 'select',
+                        default = 'standard',
+                        editable = true,
+                        options = {
+                            { value = 'vip', label = 'VIP Client' },
+                            { value = 'standard', label = 'Standard Client' },
+                            { value = 'blacklist', label = 'Blacklisted Client' },
+                        },
+                    },
+                    { key = 'serviceNotes', label = 'Service & Billing Notes', type = 'textarea', default = '', editable = true },
+                },
+            },
+            vehicle = {
+                data_fields = {
+                    { key = 'plate', label_key = 'tablet.vehicles.field.plate', source = 'plate' },
+                    { key = 'model', label_key = 'tablet.vehicles.field.model', source = 'model', fallback = '-' },
+                    { key = 'owner', label_key = 'tablet.vehicles.field.owner', source = 'owner', fallback = '-' },
+                },
+                fields = {
+                    { key = 'vehicleImage', label_key = 'tablet.vehicles.akte.image', type = 'text', default = '', editable = true },
+                    {
+                        key = 'condition',
+                        label = 'Vehicle Status',
+                        type = 'select',
+                        default = 'good',
+                        editable = true,
+                        options = {
+                            { value = 'excellent', label = 'Excellent Condition' },
+                            { value = 'good', label = 'Good Condition' },
+                            { value = 'damaged', label = 'Needs Repair' },
+                            { value = 'totaled', label = 'Totaled' },
+                        },
+                    },
+                    {
+                        key = 'tuningStage',
+                        label = 'Tuning Package',
+                        type = 'select',
+                        default = 'stock',
+                        editable = true,
+                        options = {
+                            { value = 'stock', label = 'Stock' },
+                            { value = 'stage1', label = 'Stage 1 Street' },
+                            { value = 'stage2', label = 'Stage 2 Racing' },
+                            { value = 'stage3', label = 'Stage 3 Professional' },
+                        },
+                    },
+                    { key = 'mods', label = 'Installed Modifications', type = 'textarea', default = '', editable = true },
+                    { key = 'notes', label = 'Maintenance Log', type = 'textarea', default = '', editable = true },
+                },
+            },
+        },
     },
 }
+
+-- ── Dynamic Compartment Sharing Hydration ──────────────────
+-- Process Config.MDT.shared_departments to dynamically hydrate job_models
+if type(Config.MDT) == 'table' and type(Config.MDT.shared_departments) == 'table' then
+    Config.AkteModels.job_models = Config.AkteModels.job_models or {}
+    for _, share in ipairs(Config.MDT.shared_departments) do
+        if type(share) == 'table' and type(share.compartment) == 'string' and type(share.jobs) == 'table' then
+            local comp = share.compartment:lower()
+            -- We want to register both:
+            -- 1. The compartment key itself
+            -- 2. Each job key listed under the compartment so that they are directly resolvable by job name
+            local targets = { comp }
+            for _, job in ipairs(share.jobs) do
+                table.insert(targets, job:lower())
+            end
+
+            for _, key in ipairs(targets) do
+                Config.AkteModels.job_models[key] = Config.AkteModels.job_models[key] or {}
+                local model = Config.AkteModels.job_models[key]
+                model.compartment = comp
+                
+                -- Merge jobs list
+                model.jobs = model.jobs or {}
+                local jobsSeen = {}
+                for _, job in ipairs(model.jobs) do
+                    jobsSeen[job:lower()] = true
+                end
+                for _, job in ipairs(share.jobs) do
+                    local jLower = job:lower()
+                    if not jobsSeen[jLower] then
+                        jobsSeen[jLower] = true
+                        table.insert(model.jobs, job)
+                    end
+                end
+            end
+        end
+    end
+end
+
