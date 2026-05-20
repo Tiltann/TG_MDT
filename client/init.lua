@@ -194,6 +194,21 @@ NUI.onCallback('setDutyState', function(body, cb)
 	cb(ok and result or { onDuty = true })
 end)
 
+NUI.onCallback('setDispatchStatus', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local status = type(payload.status) == 'string' and payload.status or ''
+	if status == '' then
+		cb({ ok = false })
+		return
+	end
+
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:setDispatchStatus', false, { status = status })
+	end)
+
+	cb({ ok = ok and result == true })
+end)
+
 -- ── Radio helper functions & NUI callbacks ──────────────
 
 local function getActiveVoiceSystem()
@@ -303,6 +318,45 @@ NUI.onCallback('getTabletBootstrap', function(_, cb)
 	cb(result or { persons = {}, vehicles = {}, akteBootstrap = { personAkten = {}, vehicleAkten = {} } })
 end)
 
+NUI.onCallback('getDispatchState', function(_, cb)
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:getDispatchState', false)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('assignDispatchUnit', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:assignDispatchUnit', false, payload)
+	end)
+	cb({ ok = ok and result == true })
+end)
+
+NUI.onCallback('unassignDispatchUnit', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:unassignDispatchUnit', false, payload)
+	end)
+	cb({ ok = ok and result == true })
+end)
+
+NUI.onCallback('assignDispatchVehicle', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:assignDispatchVehicle', false, payload)
+	end)
+	cb({ ok = ok and result == true })
+end)
+
+NUI.onCallback('unassignDispatchVehicle', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:unassignDispatchVehicle', false, payload)
+	end)
+	cb({ ok = ok and result == true })
+end)
+
 NUI.onCallback('getAkteCompartments', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local kind = type(payload.kind) == 'string' and payload.kind or ''
@@ -355,6 +409,17 @@ NUI.onCallback('saveVehicleAkte', function(body, cb)
 	cb(ok and result or {})
 end)
 
+NUI.onCallback('removeAkteCompartment', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local kind = type(payload.kind) == 'string' and payload.kind or ''
+	local value = type(payload.value) == 'string' and payload.value or ''
+	local compartment = type(payload.compartment) == 'string' and payload.compartment or ''
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:removeAkteCompartment', false, kind, value, compartment)
+	end)
+	cb({ ok = ok and result == true })
+end)
+
 RegisterNetEvent('TG_MDT:akteUpdated', function(payload)
 	if type(payload) ~= 'table' then return end
 	
@@ -390,6 +455,14 @@ RegisterNetEvent('TG_MDT:dutyStateChanged', function(payload)
 	NUI.send('setData', {
 		key = 'player',
 		value = buildPlayerUiData(),
+	})
+end)
+
+RegisterNetEvent('TG_MDT:dispatchStateChanged', function(payload)
+	if type(payload) ~= 'table' then return end
+	NUI.send('setData', {
+		key = 'dispatchState',
+		value = payload,
 	})
 end)
 
@@ -508,6 +581,11 @@ function TG_MDT_sendInitialState()
 					logo_url       = brandingCfg.logo_url,
 					job_overrides  = brandingCfg.job_overrides,
 				},
+				dispatch = {
+					default_status = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.default_status or nil,
+					off_duty_status = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.off_duty_status or nil,
+					status_codes = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.status_codes or nil,
+				},
 			},
 		},
 	})
@@ -516,6 +594,16 @@ function TG_MDT_sendInitialState()
 		key = 'player',
 		value = buildPlayerUiData(),
 	})
+
+	local okDispatch, dispatchState = pcall(function()
+		return lib.callback.await('TG_MDT:getDispatchState', false)
+	end)
+	if okDispatch then
+		NUI.send('setData', {
+			key = 'dispatchState',
+			value = dispatchState or {},
+		})
+	end
 
 	Debug.debug('TG_MDT_sendInitialState: done')
 end

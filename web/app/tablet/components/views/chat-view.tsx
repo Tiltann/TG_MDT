@@ -66,6 +66,7 @@ export default function ChatView({
   radioMembers?: RadioMember[];
   meta?: any;
 }) {
+  const EQUALIZER_HEIGHTS = [30, 55, 45, 80, 25, 60, 75, 40, 65, 50, 85, 30, 55, 70, 35, 90, 45, 60, 30, 55, 75, 40, 80, 45];
   const [message, setMessage] = useState("");
   
   // Radio System State
@@ -154,14 +155,19 @@ export default function ChatView({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
         {/* Left Column: Radio Device */}
         <div className="lg:col-span-5 flex flex-col gap-4 h-full min-h-0">
-          <Card className="p-4 bg-gradient-to-b from-zinc-900/90 to-zinc-950/95 border-zinc-800/80 rounded-2xl flex-1 flex flex-col justify-between overflow-hidden shadow-2xl relative">
+          <Card className="p-5 bg-gradient-to-b from-zinc-900/90 to-zinc-950/95 border-zinc-800/80 rounded-2xl flex-1 flex flex-col justify-between overflow-hidden shadow-2xl relative">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-800/10 via-transparent to-transparent pointer-events-none" />
             
-            <div className="space-y-4">
-              {/* Radio Screen */}
-              <div className="rounded-xl border border-zinc-800/80 bg-black/40 p-4 relative overflow-hidden shadow-inner flex flex-col gap-2">
-                <div className="absolute top-1 right-2 flex items-center gap-1.5">
-                  <span className="text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
+            <div className="space-y-5">
+              {/* Radio Screen - Glowing CRT LCD look */}
+              <div className="rounded-xl border border-emerald-500/20 bg-black/60 p-4 relative overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.8),_0_0_15px_rgba(16,185,129,0.03)] flex flex-col gap-2 radio-led-screen">
+                {/* Scanline pattern overlay */}
+                <div className="absolute inset-0 bg-scanlines pointer-events-none opacity-[0.06]" />
+                {/* Glowing gradient back-light */}
+                <div className="absolute -inset-10 bg-radial-glow pointer-events-none opacity-[0.12]" />
+
+                <div className="absolute top-1.5 right-2.5 flex items-center gap-1.5 z-10">
+                  <span className="text-[8px] font-bold tracking-widest text-zinc-500 uppercase">
                     {systemLabel}
                   </span>
                   {currentFreq ? (
@@ -171,17 +177,17 @@ export default function ChatView({
                   )}
                 </div>
                 
-                <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-semibold flex items-center gap-1">
-                  <Smartphone className="w-3.5 h-3.5 text-zinc-500" />
+                <span className="text-[10px] text-emerald-500/60 uppercase tracking-widest  font-bold flex items-center gap-1.5 z-10">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-500/50" />
                   Transmitter RF
                 </span>
                 
-                <div className="flex items-baseline justify-between mt-1">
-                  <div className="text-3xl font-mono font-bold tracking-widest text-emerald-400/90 [text-shadow:0_0_12px_rgba(52,211,153,0.3)]">
-                    {radioFreq || "0.0"} <span className="text-sm font-sans text-zinc-400">MHz</span>
+                <div className="flex items-baseline justify-between mt-1 z-10">
+                  <div className="text-3xl  font-bold tracking-widest text-emerald-400 [text-shadow:0_0_12px_rgba(52,211,153,0.55)]">
+                    {radioFreq || "0.0"} <span className="text-sm font-sans text-emerald-500/60 font-semibold">MHz</span>
                   </div>
                   {currentFreq && (
-                    <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-800/50 px-2 py-0.5 rounded">
+                    <div className="flex items-center gap-1 text-[9px] text-emerald-400 font-extrabold bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded tracking-wider shadow-[0_0_8px_rgba(52,211,153,0.25)]">
                       CONNECTED
                     </div>
                   )}
@@ -189,21 +195,20 @@ export default function ChatView({
 
                 {/* Pulsing Visualizer Waves when connected */}
                 {currentFreq ? (
-                  <div className="flex items-end gap-1 h-6 mt-2 overflow-hidden px-1">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 7, 6, 5, 4, 3, 2, 1, 2, 3, 4, 5].map((h, i) => (
+                  <div className="flex items-end gap-[3px] h-8 mt-2 overflow-hidden px-1 bg-black/40 py-1.5 rounded-lg border border-emerald-950/30">
+                    {EQUALIZER_HEIGHTS.map((h, i) => (
                       <div
                         key={i}
-                        className="flex-1 bg-emerald-400/80 rounded-t-sm"
+                        className="flex-1 bg-emerald-400/85 rounded-t-[1px] origin-bottom animate-mdt-wave-equalizer"
                         style={{
-                          height: `${h * 12}%`,
-                          animation: `pulse 1.2s ease-in-out infinite alternate`,
-                          animationDelay: `${i * 0.08}s`
+                          height: `${h}%`,
+                          animationDelay: `${i * 0.03}s`
                         }}
                       />
                     ))}
                   </div>
                 ) : (
-                  <div className="h-6 border-b border-dashed border-zinc-800 flex items-center justify-center text-[10px] text-zinc-600 tracking-wider">
+                  <div className="h-8 border-b border-dashed border-zinc-800 flex items-center justify-center text-[10px] text-zinc-500 tracking-widest ">
                     STBY FREQ READY
                   </div>
                 )}
@@ -216,7 +221,7 @@ export default function ChatView({
                     key={key}
                     onClick={() => handleNumpadPress(key)}
                     disabled={!!currentFreq}
-                    className="h-10 text-sm font-semibold rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-all active:scale-95 disabled:opacity-40 disabled:hover:bg-zinc-900"
+                    className="h-11 text-sm  font-semibold rounded-xl bg-zinc-900/90 border border-zinc-800/80 text-zinc-300 hover:bg-zinc-800/60 hover:text-emerald-400 hover:border-emerald-500/30 transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:hover:bg-zinc-900/90 disabled:active:scale-100 shadow-sm"
                   >
                     {key}
                   </button>
@@ -230,7 +235,7 @@ export default function ChatView({
                 <Button
                   onClick={handleLeaveRadio}
                   disabled={isTransmitting}
-                  className="flex-1 bg-red-950/40 border border-red-800/60 hover:bg-red-900/40 text-red-300 rounded-xl h-11 transition-all active:scale-[0.98]"
+                  className="flex-1 bg-red-950/40 border border-red-800/60 hover:bg-red-900/40 text-red-300 rounded-xl h-11 transition-all duration-300 active:scale-[0.98] shadow-lg shadow-black/20"
                 >
                   <PhoneOff className="w-4 h-4 mr-2" />
                   Disconnect
@@ -239,9 +244,9 @@ export default function ChatView({
                 <Button
                   onClick={handleJoinRadio}
                   disabled={isTransmitting || !radioFreq}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-11 transition-all active:scale-[0.98] shadow-lg shadow-emerald-950/20"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-11 transition-all duration-300 active:scale-[0.98] shadow-lg shadow-emerald-950/30"
                 >
-                  <Radio className="w-4 h-4 mr-2" />
+                  <Radio className="w-4 h-4 mr-2 animate-pulse" />
                   Transmit on Freq
                 </Button>
               )}
@@ -249,24 +254,25 @@ export default function ChatView({
           </Card>
 
           {/* Connected Colleagues Section */}
-          <Card className="p-4 bg-zinc-900/90 border-zinc-800/80 rounded-2xl h-[12.5rem] flex flex-col gap-3 overflow-hidden">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center justify-between">
+          <Card className="p-4 bg-zinc-900/40 border-zinc-800/80 rounded-2xl h-[12.5rem] flex flex-col gap-3 overflow-hidden glass-panel">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 flex items-center justify-between">
               <span>Channel Colleagues ({radioMembers.length})</span>
               <Volume2 className="w-3.5 h-3.5 text-zinc-500" />
             </h4>
-            <div className="flex-1 overflow-auto space-y-2 pr-1">
+            <div className="flex-1 overflow-auto space-y-2 pr-1 premium-scroll">
               {radioMembers.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-xs text-zinc-600 italic">
+                <div className="h-full flex items-center justify-center text-xs text-zinc-500 italic">
                   {currentFreq ? "No other users on this frequency." : "Join a frequency to list colleagues."}
                 </div>
               ) : (
-                radioMembers.map((member) => (
+                radioMembers.map((member, i) => (
                   <div
                     key={member.source}
-                    className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/8 transition-all"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/50 border border-zinc-800/40 hover:bg-zinc-900/60 hover:border-zinc-800 transition-all duration-200 animate-mdt-fade-in-up"
+                    style={{ animationDelay: `${i * 0.05}s` }}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-7 w-7 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-xs text-white overflow-hidden">
+                      <div className="h-7 w-7 rounded-full bg-gradient-to-br from-zinc-800 to-zinc-950 border border-white/5 flex items-center justify-center text-xs font-semibold text-zinc-300 overflow-hidden">
                         {member.avatarUrl ? (
                           <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
                         ) : (
@@ -281,7 +287,7 @@ export default function ChatView({
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
                     </div>
                   </div>
                 ))
@@ -292,78 +298,112 @@ export default function ChatView({
 
         {/* Right Column: Live Text Chat */}
         <div className="lg:col-span-7 flex flex-col gap-4 h-full min-h-0">
-          <Card className="p-4 bg-zinc-950/80 border-[var(--mdt-border)] rounded-2xl flex-1 flex flex-col gap-4 overflow-hidden shadow-xl">
-            <div className="flex-1 overflow-auto space-y-3 pr-1">
+          <Card className="p-5 bg-zinc-950/40 border-zinc-800/80 rounded-2xl flex-1 flex flex-col gap-4 overflow-hidden shadow-2xl relative glass-panel">
+            <div className="flex-1 overflow-auto space-y-3.5 pr-1.5 premium-scroll">
               {messages.length === 0 ? (
-                <div className="h-full min-h-48 flex items-center justify-center text-sm text-[var(--mdt-text-muted)]">
+                <div className="h-full min-h-48 flex items-center justify-center text-sm text-zinc-500 italic">
                   {t("tablet.chat.empty")}
                 </div>
               ) : (
-                messages.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 hover:bg-[rgba(255,255,255,0.03)] transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-9 w-9 overflow-hidden rounded-full border border-white/10 bg-[rgba(255,255,255,0.05)] flex items-center justify-center shrink-0">
-                          {item.avatarUrl ? (
-                            <img src={item.avatarUrl} alt={item.author} className="h-full w-full object-cover" />
-                          ) : (
-                            <span className="text-[10px] font-semibold text-white/80">{renderInitials(item.author)}</span>
+                messages.map((item, i) => {
+                  const isMe = item.author === currentUserName;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`group rounded-2xl border p-3.5 transition-all duration-300 relative animate-mdt-fade-in-up ${
+                        isMe
+                          ? "bg-zinc-900/20 border-emerald-500/10 hover:bg-zinc-900/30 hover:border-emerald-500/20"
+                          : "bg-zinc-950/30 border-zinc-800/60 hover:bg-zinc-950/50 hover:border-zinc-800"
+                      }`}
+                      style={{ animationDelay: `${i * 0.04}s` }}
+                    >
+                      {isMe && (
+                        <div className="absolute top-0 bottom-0 left-0 w-[3px] rounded-l-2xl bg-emerald-500/75 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                      )}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-9 w-9 overflow-hidden rounded-full border border-white/5 bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center shrink-0 shadow-inner">
+                            {item.avatarUrl ? (
+                              <img src={item.avatarUrl} alt={item.author} className="h-full w-full object-cover" />
+                            ) : (
+                              <span className="text-[10px] font-bold text-zinc-300">{renderInitials(item.author)}</span>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-white truncate">{item.author}</p>
+                            {item.gradeDisplay && (
+                              <p className="text-[10px] text-zinc-500 truncate mt-0.5">{item.gradeDisplay}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] text-zinc-500  tracking-wider">
+                            {formatRelativeTime(item.createdAt, t)}
+                          </span>
+                          {item.author === currentUserName && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteMessage(item.id)}
+                              className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 rounded-full border border-red-500/10 bg-red-950/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] text-red-400 hover:text-white hover:bg-red-900/40 hover:border-red-500/30 transition-all duration-200"
+                              title={t("tablet.chat.delete_message", undefined, "Delete message")}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              {t("tablet.chat.delete_message", undefined, "Delete")}
+                            </button>
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm text-white font-medium truncate">{item.author}</p>
-                          {item.gradeDisplay && <p className="text-[11px] text-[var(--mdt-text-muted)] truncate">{item.gradeDisplay}</p>}
-                        </div>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <span className="text-[11px] text-[var(--mdt-text-muted)]">{formatRelativeTime(item.createdAt, t)}</span>
-                        {item.author === currentUserName && (
-                          <button
-                            type="button"
-                            onClick={() => onDeleteMessage(item.id)}
-                            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-[var(--mdt-text-muted)] hover:text-white hover:bg-white/10 transition-all"
-                            title={t("tablet.chat.delete_message", undefined, "Delete message")}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            {t("tablet.chat.delete_message", undefined, "Delete")}
-                          </button>
-                        )}
-                      </div>
+                      <p className="text-xs text-zinc-300 mt-2.5 whitespace-pre-wrap break-words leading-relaxed font-sans pl-1">
+                        {item.text}
+                      </p>
                     </div>
-                    <p className="text-xs text-[var(--mdt-text-muted)] mt-2 whitespace-pre-wrap break-words">{item.text}</p>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
-            <div className="rounded-2xl border border-[var(--mdt-border)] bg-[rgba(255,255,255,0.02)] p-3 space-y-3">
-              <div className="flex items-center gap-3 text-xs text-[var(--mdt-text-muted)] uppercase tracking-[0.22em]">
-                <div className="h-9 w-9 overflow-hidden rounded-full border border-white/10 bg-[rgba(255,255,255,0.05)] flex items-center justify-center shrink-0">
-                  {actorImageUrl ? (
-                    <img src={actorImageUrl} alt={actorName} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-[10px] font-semibold text-white/80">{actorName.slice(0, 2).toUpperCase()}</span>
-                  )}
+            {/* Composer Box */}
+            <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/10 p-3.5 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-[10px] text-zinc-400 uppercase tracking-widest font-semibold">
+                  <div className="h-7 w-7 overflow-hidden rounded-full border border-white/5 bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center shrink-0">
+                    {actorImageUrl ? (
+                      <img src={actorImageUrl} alt={actorName} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-[10px] font-bold text-zinc-300">
+                        {actorName.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
+                    <span className="text-zinc-300 font-medium">{actorName}</span>
+                  </div>
                 </div>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                {actorName}
+                <div className="text-[10px]  text-zinc-500 tracking-wider">
+                  {message.length} chars
+                </div>
               </div>
               <textarea
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
                 rows={2}
-                className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white text-sm placeholder-[var(--mdt-text-muted)] focus:outline-none focus:border-zinc-700 transition-colors"
+                className="w-full p-3 bg-black/40 border border-zinc-800/60 focus:border-zinc-700/80 rounded-xl text-white text-sm placeholder-zinc-500 focus:outline-none transition-all duration-300 resize-none"
                 placeholder={t("tablet.chat.placeholder")}
               />
               <div className="flex items-center justify-end gap-2">
-                <Button variant="ghost" className="h-9 rounded-lg" onClick={() => setMessage("")}>
+                <Button
+                  variant="ghost"
+                  className="h-9 rounded-xl hover:bg-zinc-900/60 text-zinc-400 hover:text-white transition-all active:scale-95 duration-100"
+                  onClick={() => setMessage("")}
+                >
                   {t("cancel")}
                 </Button>
-                <Button className="h-9 rounded-lg px-4 bg-zinc-200 text-black hover:bg-white" onClick={handleSend}>
-                  <Send className="w-4 h-4 mr-2" />
+                <Button
+                  className="h-9 rounded-xl px-4 bg-zinc-100 text-black hover:bg-white transition-all active:scale-95 duration-100 shadow-lg shadow-black/25 flex items-center font-medium"
+                  onClick={handleSend}
+                >
+                  <Send className="w-3.5 h-3.5 mr-2" />
                   {t("tablet.chat.send")}
                 </Button>
               </div>
@@ -372,11 +412,26 @@ export default function ChatView({
         </div>
       </div>
       
-      {/* Visualizer CSS embedded safely */}
+      {/* High-Fidelity Radio CRT Scanline Styles */}
       <style jsx global>{`
-        @keyframes pulse {
-          0% { opacity: 0.3; transform: scaleY(0.4); }
-          100% { opacity: 1; transform: scaleY(1); }
+        .bg-scanlines {
+          background: linear-gradient(
+            rgba(18, 16, 16, 0) 50%, 
+            rgba(0, 0, 0, 0.25) 50%
+          ), linear-gradient(
+            90deg, 
+            rgba(16, 185, 129, 0.04), 
+            rgba(16, 185, 129, 0.01), 
+            rgba(16, 185, 129, 0.04)
+          );
+          background-size: 100% 4px, 4px 100%;
+        }
+        .bg-radial-glow {
+          background: radial-gradient(
+            circle, 
+            rgba(16, 185, 129, 0.15) 0%, 
+            rgba(0, 0, 0, 0) 70%
+          );
         }
       `}</style>
     </div>

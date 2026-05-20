@@ -1299,12 +1299,57 @@ lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compa
     return merged
 end)
 
+lib.callback.register('TG_MDT:removeAkteCompartment', function(src, kind, value, compartment)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized akte compartment delete: Player %s'):format(src))
+        return false
+    end
+
+    if type(kind) ~= 'string' or (kind ~= 'person' and kind ~= 'vehicle') then
+        return false
+    end
+
+    if type(value) ~= 'string' or value == '' then
+        return false
+    end
+
+    local scope = normalizeAkteScopeName(compartment)
+    if scope == '' or scope == 'default' then
+        return false
+    end
+
+    local tableName = kind == 'vehicle' and 'tg_mdt_vehicle_akten' or 'tg_mdt_person_akten'
+    local columnName = kind == 'vehicle' and 'plate' or 'identifier'
+    local storageKey = buildAkteStorageKey(scope, value)
+
+    SQL.execute(('DELETE FROM %s WHERE %s = ?'):format(tableName, columnName), { storageKey })
+    akteBootstrapCache[scope] = nil
+    return true
+end)
+
 -- ══════════════════════════════════════════════════════════
 -- RADIO MEMBERS SYNCHRONIZATION
 -- ══════════════════════════════════════════════════════════
 
 local activeRadioChannels = {}
 local playerActiveFrequencies = {}
+local playerDispatchStatuses = {}
+
+local function getDispatchDefaultStatus()
+    local dispatchCfg = Config and Config.MDT and Config.MDT.dispatch
+    if type(dispatchCfg) == 'table' and type(dispatchCfg.default_status) == 'string' and dispatchCfg.default_status ~= '' then
+        return dispatchCfg.default_status
+    end
+    return '10-8'
+end
+
+local function getPlayerDispatchStatus(src)
+    local current = playerDispatchStatuses[src]
+    if type(current) == 'string' and current ~= '' then
+        return current
+    end
+    return getDispatchDefaultStatus()
+end
 
 local function buildPlayerRadioData(src)
     local fallback = {
@@ -1360,7 +1405,8 @@ local function buildPlayerRadioData(src)
         source = src,
         name = name,
         gradeDisplay = gradeDisplay,
-        avatarUrl = pdata.imageUrl or nil
+        avatarUrl = pdata.imageUrl or nil,
+        status = getPlayerDispatchStatus(src)
     }
 end
 
@@ -1427,5 +1473,269 @@ end)
 AddEventHandler('playerDropped', function()
     local src = source
     removePlayerFromRadio(src)
+    playerDispatchStatuses[src] = nil
+end)
+
+lib.callback.register('TG_MDT:setDispatchStatus', function(src, payload)
+    if not hasAccess(src) then
+        return false
+    end
+
+    local body = type(payload) == 'table' and payload or {}
+    local status = type(body.status) == 'string' and body.status or ''
+    if status == '' then
+        return false
+    end
+
+    playerDispatchStatuses[src] = status
+
+    local freq = playerActiveFrequencies[src]
+    if freq and activeRadioChannels[freq] and activeRadioChannels[freq][src] then
+        activeRadioChannels[freq][src] = buildPlayerRadioData(src)
+        broadcastRadioMembers(freq)
+    end
+
+    return true
+end)
+
+-- ══════════════════════════════════════════════════════════
+-- DISPATCH CALLS (LIVE SYNC + ASSIGNMENTS)
+-- ══════════════════════════════════════════════════════════
+
+local dispatchCalls = {}
+local dispatchSequence = 0
+
+local function nextDispatchId()
+    dispatchSequence = dispatchSequence + 1
+    return ('dispatch-%s-%s'):format(os.time(), dispatchSequence)
+end
+
+local function normalizeDispatchPriority(value)
+    local raw = type(value) == 'string' and string.lower(value) or 'medium'
+    if raw == 'low' or raw == 'medium' or raw == 'high' then
+        return raw
+    end
+    return 'medium'
+end
+
+local function normalizeDispatchStatus(value)
+    local raw = type(value) == 'string' and string.lower(value) or 'open'
+    if raw == 'open' or raw == 'investigating' or raw == 'closed' then
+        return raw
+    end
+    return 'open'
+end
+
+local function buildUnitEntry(payload)
+    local id = type(payload.id) == 'string' and payload.id or ''
+    local name = type(payload.name) == 'string' and payload.name or id
+    if id == '' or name == '' then return nil end
+    return {
+        id = id,
+        name = name,
+        status = type(payload.status) == 'string' and payload.status or 'assigned',
+        assignedAt = os.time(),
+    }
+end
+
+local function buildVehicleEntry(payload)
+    local plate = type(payload.plate) == 'string' and payload.plate or ''
+    if plate == '' then return nil end
+    return {
+        plate = plate,
+        model = type(payload.model) == 'string' and payload.model or nil,
+        assignedAt = os.time(),
+    }
+end
+
+local function upsertUnit(call, unit)
+    for i = 1, #call.assignedUnits do
+        if call.assignedUnits[i].id == unit.id then
+            call.assignedUnits[i] = unit
+            return
+        end
+    end
+    call.assignedUnits[#call.assignedUnits + 1] = unit
+end
+
+local function upsertVehicle(call, vehicle)
+    for i = 1, #call.assignedVehicles do
+        if call.assignedVehicles[i].plate == vehicle.plate then
+            call.assignedVehicles[i] = vehicle
+            return
+        end
+    end
+    call.assignedVehicles[#call.assignedVehicles + 1] = vehicle
+end
+
+local function removeUnit(call, unitId)
+    for i = #call.assignedUnits, 1, -1 do
+        if call.assignedUnits[i].id == unitId then
+            table.remove(call.assignedUnits, i)
+        end
+    end
+end
+
+local function removeVehicle(call, plate)
+    for i = #call.assignedVehicles, 1, -1 do
+        if call.assignedVehicles[i].plate == plate then
+            table.remove(call.assignedVehicles, i)
+        end
+    end
+end
+
+local function getDispatchCallsSnapshot()
+    local list = {}
+    for _, call in pairs(dispatchCalls) do
+        list[#list + 1] = call
+    end
+    table.sort(list, function(a, b)
+        return (a.createdAt or '') > (b.createdAt or '')
+    end)
+    return list
+end
+
+local function broadcastDispatchState()
+    local snapshot = getDispatchCallsSnapshot()
+    local players = GetPlayers()
+    for i = 1, #players do
+        local targetSrc = tonumber(players[i])
+        if targetSrc and hasAccess(targetSrc) then
+            TriggerClientEvent('TG_MDT:dispatchStateChanged', targetSrc, snapshot)
+        end
+    end
+end
+
+local function createDispatchCall(payload)
+    local title = type(payload.title) == 'string' and payload.title or ''
+    if title == '' then
+        return nil, 'missing_title'
+    end
+
+    local id = type(payload.id) == 'string' and payload.id or nextDispatchId()
+    local call = {
+        id = id,
+        title = title,
+        description = type(payload.description) == 'string' and payload.description or '',
+        location = type(payload.location) == 'string' and payload.location or 'Unknown',
+        priority = normalizeDispatchPriority(payload.priority),
+        status = normalizeDispatchStatus(payload.status),
+        createdAt = type(payload.createdAt) == 'string' and payload.createdAt or os.date('!%Y-%m-%dT%H:%M:%SZ'),
+        updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ'),
+        assignedUnits = {},
+        assignedVehicles = {},
+    }
+
+    if type(payload.assignedUnits) == 'table' then
+        for i = 1, #payload.assignedUnits do
+            local unit = buildUnitEntry(payload.assignedUnits[i] or {})
+            if unit then
+                upsertUnit(call, unit)
+            end
+        end
+    end
+
+    if type(payload.assignedVehicles) == 'table' then
+        for i = 1, #payload.assignedVehicles do
+            local vehicle = buildVehicleEntry(payload.assignedVehicles[i] or {})
+            if vehicle then
+                upsertVehicle(call, vehicle)
+            end
+        end
+    end
+
+    dispatchCalls[id] = call
+    broadcastDispatchState()
+    return call, nil
+end
+
+-- External API: TriggerEvent('TG_MDT:server:createDispatch', payload)
+RegisterNetEvent('TG_MDT:server:createDispatch', function(payload)
+    if type(payload) ~= 'table' then return end
+    local call, err = createDispatchCall(payload)
+    if not call and err then
+        Debug.warn(('Dispatch create failed: %s'):format(err))
+    end
+end)
+
+-- Optional export for other resources
+exports('CreateDispatch', function(payload)
+    if type(payload) ~= 'table' then return nil end
+    local call = createDispatchCall(payload)
+    return call and call.id or nil
+end)
+
+lib.callback.register('TG_MDT:getDispatchState', function(src)
+    if not hasAccess(src) then
+        return {}
+    end
+    return getDispatchCallsSnapshot()
+end)
+
+lib.callback.register('TG_MDT:assignDispatchUnit', function(src, payload)
+    if not hasAccess(src) then return false end
+    local body = type(payload) == 'table' and payload or {}
+    local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
+    local call = dispatchCalls[dispatchId]
+    if not call then return false end
+
+    local unit = buildUnitEntry({
+        id = body.unitId,
+        name = body.unitName,
+        status = body.status,
+    })
+    if not unit then return false end
+
+    upsertUnit(call, unit)
+    call.updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ')
+    broadcastDispatchState()
+    return true
+end)
+
+lib.callback.register('TG_MDT:unassignDispatchUnit', function(src, payload)
+    if not hasAccess(src) then return false end
+    local body = type(payload) == 'table' and payload or {}
+    local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
+    local unitId = type(body.unitId) == 'string' and body.unitId or ''
+    local call = dispatchCalls[dispatchId]
+    if not call or unitId == '' then return false end
+
+    removeUnit(call, unitId)
+    call.updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ')
+    broadcastDispatchState()
+    return true
+end)
+
+lib.callback.register('TG_MDT:assignDispatchVehicle', function(src, payload)
+    if not hasAccess(src) then return false end
+    local body = type(payload) == 'table' and payload or {}
+    local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
+    local call = dispatchCalls[dispatchId]
+    if not call then return false end
+
+    local vehicle = buildVehicleEntry({
+        plate = body.plate,
+        model = body.model,
+    })
+    if not vehicle then return false end
+
+    upsertVehicle(call, vehicle)
+    call.updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ')
+    broadcastDispatchState()
+    return true
+end)
+
+lib.callback.register('TG_MDT:unassignDispatchVehicle', function(src, payload)
+    if not hasAccess(src) then return false end
+    local body = type(payload) == 'table' and payload or {}
+    local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
+    local plate = type(body.plate) == 'string' and body.plate or ''
+    local call = dispatchCalls[dispatchId]
+    if not call or plate == '' then return false end
+
+    removeVehicle(call, plate)
+    call.updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ')
+    broadcastDispatchState()
+    return true
 end)
 

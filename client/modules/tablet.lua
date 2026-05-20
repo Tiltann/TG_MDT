@@ -168,9 +168,20 @@ local function toggleTablet()
     Debug.debug('toggleTablet: session payload sent to NUI')
 end
 
-local OPEN_COMMAND = (Config.Commands and Config.Commands.open_mdt)
+local OPEN_COMMAND = (Config.Commands and Config.Commands.open_mdt) or 'mdt'
+if type(OPEN_COMMAND) ~= 'string' or OPEN_COMMAND == '' then
+    OPEN_COMMAND = 'mdt'
+end
+
 RegisterCommand(OPEN_COMMAND, toggleTablet)
-Debug.debug(('Tablet command registered: /%s'):format(OPEN_COMMAND))
+if OPEN_COMMAND ~= 'mdt' then
+    RegisterCommand('mdt', toggleTablet)
+end
+
+Debug.debug(('Tablet command registered: /%s (alias: /mdt=%s)'):format(
+    OPEN_COMMAND,
+    tostring(OPEN_COMMAND ~= 'mdt')
+))
 
 local function requestModel(model)
     if not IsModelInCdimage(model) then return false end

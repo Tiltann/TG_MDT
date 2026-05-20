@@ -7,6 +7,15 @@ import { Topbar } from "./tablet/components/topbar";
 import DashboardView from "./tablet/components/dashboard-view";
 import BlackboardView from "./tablet/components/views/blackboard-view";
 import DispatchView from "./tablet/components/views/dispatch-view";
+import type {
+  DispatchAssignedUnit,
+  DispatchAssignedVehicle,
+  DispatchGroup,
+  DispatchLiveCall,
+  DispatchOfficer,
+  DispatchStatus,
+  DispatchStatusOption,
+} from "./tablet/components/views/dispatch-view";
 import ChatView from "./tablet/components/views/chat-view";
 import BoloView from "./tablet/components/views/bolo-view";
 import WarrantsView from "./tablet/components/views/warrants-view";
@@ -62,6 +71,11 @@ type NuiMetaPayload = {
       title_template?: string;
       logo_url?: string;
       job_overrides?: Record<string, { title?: string; logo_url?: string }>;
+    };
+    dispatch?: {
+      default_status?: string;
+      off_duty_status?: string;
+      status_codes?: Array<{ code?: string; label?: string; color?: "green" | "blue" | "yellow" | "purple" | "gray" | "red" }>;
     };
   };
   akteModels?: {
@@ -221,6 +235,13 @@ type BoloRecord = {
   createdAt: string;
   updatedAt: string;
 };
+type RadioMember = {
+  source: number;
+  name: string;
+  gradeDisplay?: string;
+  avatarUrl?: string;
+  status?: string;
+};
 
 const STORAGE_KEYS = {
   profile: "tg_mdt_profile",
@@ -228,6 +249,8 @@ const STORAGE_KEYS = {
   incidents: "tg_mdt_incidents",
   bolos: "tg_mdt_bolos",
   boardPosts: "tg_mdt_board_posts",
+  dispatchStatuses: "tg_mdt_dispatch_statuses",
+  dispatchGroups: "tg_mdt_dispatch_groups",
 };
 
 const DEFAULT_PROFILE: ProfileData = {
@@ -239,6 +262,8 @@ const DEFAULT_CHAT_MESSAGES: ChatMessage[] = [];
 const DEFAULT_INCIDENTS: IncidentRecord[] = [];
 const DEFAULT_BOLOS: BoloRecord[] = [];
 const DEFAULT_BOARD_POSTS: BoardPost[] = [];
+const DEFAULT_DISPATCH_STATUSES: Record<string, DispatchStatus> = {};
+const DEFAULT_DISPATCH_GROUPS: DispatchGroup[] = [];
 
 const MAP_STYLE_KEY = "tg_mdt_map_style";
 
@@ -349,6 +374,8 @@ export default function Home() {
   const [incidentRecords, setIncidentRecords] = useState<IncidentRecord[]>(DEFAULT_INCIDENTS);
   const [boloRecords, setBoloRecords] = useState<BoloRecord[]>(DEFAULT_BOLOS);
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>(DEFAULT_BOARD_POSTS);
+  const [dispatchStatuses, setDispatchStatuses] = useState<Record<string, DispatchStatus>>(DEFAULT_DISPATCH_STATUSES);
+  const [dispatchGroups, setDispatchGroups] = useState<DispatchGroup[]>(DEFAULT_DISPATCH_GROUPS);
   const [startupValidationError, setStartupValidationError] = useState<StartupValidationError | null>(null);
   const seededActivityRef = useRef(false);
   const previousDutyRef = useRef<boolean | null>(null);
@@ -362,6 +389,14 @@ export default function Home() {
     const storedIncidents = loadJsonArray<IncidentRecord>(STORAGE_KEYS.incidents, DEFAULT_INCIDENTS);
     const storedBolos = loadJsonArray<BoloRecord>(STORAGE_KEYS.bolos, DEFAULT_BOLOS);
     const storedBoardPosts = loadJsonArray<BoardPost>(STORAGE_KEYS.boardPosts, DEFAULT_BOARD_POSTS);
+    const storedDispatchStatuses = loadJsonObject<Record<string, DispatchStatus>>(
+      STORAGE_KEYS.dispatchStatuses,
+      DEFAULT_DISPATCH_STATUSES
+    );
+    const storedDispatchGroups = loadJsonArray<DispatchGroup>(
+      STORAGE_KEYS.dispatchGroups,
+      DEFAULT_DISPATCH_GROUPS
+    );
     setProfileData((prev) => ({
       ...prev,
       ...storedProfile,
@@ -370,6 +405,8 @@ export default function Home() {
     setIncidentRecords(storedIncidents);
     setBoloRecords(storedBolos);
     setBoardPosts(storedBoardPosts);
+    setDispatchStatuses(storedDispatchStatuses);
+    setDispatchGroups(storedDispatchGroups);
   }, []);
 
   useEffect(() => {
@@ -416,6 +453,24 @@ export default function Home() {
       // Ignore storage errors.
     }
   }, [boardPosts]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.dispatchStatuses, JSON.stringify(dispatchStatuses));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [dispatchStatuses]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.dispatchGroups, JSON.stringify(dispatchGroups));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [dispatchGroups]);
 
   // ...existing code...
 
@@ -764,8 +819,14 @@ export default function Home() {
   const mapMarkers = Array.isArray(mapData.markers)
     ? (mapData.markers as Array<{ x: number; y: number; label?: string }>)
     : [];
+  const radioMembers = Array.isArray((screenData as { radioMembers?: unknown[] })?.radioMembers)
+    ? ((screenData as { radioMembers?: RadioMember[] }).radioMembers || [])
+    : [];
   const playerPosition =
     (mapData.playerPosition as { x: number; y: number } | undefined) || undefined;
+  const liveDispatchCalls = Array.isArray((screenData as { dispatchState?: unknown[] })?.dispatchState)
+    ? (((screenData as { dispatchState?: DispatchLiveCall[] }).dispatchState || []) as DispatchLiveCall[])
+    : [];
   const personsData = Array.isArray(screenData?.persons)
     ? (screenData.persons as PersonRecord[])
     : [];
@@ -785,6 +846,107 @@ export default function Home() {
     !akteSyncData?.compartment || normalizeJobKey(akteSyncData.compartment) === activeAkteCompartment;
   const personAkteSync = akteSyncData?.kind === "person" && akteSyncMatchesScope ? akteSyncData : undefined;
   const vehicleAkteSync = akteSyncData?.kind === "vehicle" && akteSyncMatchesScope ? akteSyncData : undefined;
+  const currentOfficerId = "self";
+  const dispatchStatusOptions = useMemo<DispatchStatusOption[]>(() => {
+    const rawOptions = typedMeta.mdt?.dispatch?.status_codes;
+    if (!Array.isArray(rawOptions) || rawOptions.length === 0) {
+      return [
+        { code: "10-8", label: "Available", color: "green" },
+        { code: "10-6", label: "Busy", color: "yellow" },
+        { code: "10-97", label: "On Scene", color: "blue" },
+        { code: "10-23", label: "En Route", color: "blue" },
+        { code: "10-7", label: "Out of Service", color: "gray" },
+      ];
+    }
+
+    return rawOptions
+      .map((entry) => ({
+        code: typeof entry?.code === "string" ? entry.code : "",
+        label: typeof entry?.label === "string" ? entry.label : (typeof entry?.code === "string" ? entry.code : "Status"),
+        color: entry?.color,
+      }))
+      .filter((entry) => entry.code !== "");
+  }, [typedMeta.mdt?.dispatch?.status_codes]);
+  const dispatchDefaultStatus =
+    (typeof typedMeta.mdt?.dispatch?.default_status === "string" && typedMeta.mdt?.dispatch?.default_status) ||
+    (dispatchStatusOptions[0]?.code || "10-8");
+  const dispatchOffDutyStatus =
+    (typeof typedMeta.mdt?.dispatch?.off_duty_status === "string" && typedMeta.mdt?.dispatch?.off_duty_status) ||
+    "10-7";
+
+  const currentDispatchStatus =
+    dispatchStatuses[currentOfficerId] ||
+    (dutyState?.onDuty === false ? dispatchOffDutyStatus : dispatchDefaultStatus);
+
+  const dispatchOfficers = useMemo<DispatchOfficer[]>(() => {
+    const officersById = new Map<string, DispatchOfficer>();
+
+    officersById.set(currentOfficerId, {
+      id: currentOfficerId,
+      name: profileName,
+      gradeDisplay: actorGrade,
+      job: sessionJob || undefined,
+      online: true,
+      status: dispatchStatuses[currentOfficerId] || (dutyState?.onDuty === false ? dispatchOffDutyStatus : dispatchDefaultStatus),
+    });
+
+    for (const member of radioMembers) {
+      const id = `radio:${member.source}`;
+      officersById.set(id, {
+        id,
+        name: member.name,
+        gradeDisplay: member.gradeDisplay,
+        online: true,
+        status: dispatchStatuses[id] || member.status || dispatchDefaultStatus,
+      });
+    }
+
+    for (const person of personsData) {
+      const job = normalizeJobKey(person.job || "");
+      const looksLikeOfficer =
+        job.includes("police") ||
+        job.includes("sheriff") ||
+        job.includes("trooper") ||
+        job.includes("state") ||
+        job.includes("lspd") ||
+        job.includes("bcso") ||
+        job.includes("fib") ||
+        job.includes("ems") ||
+        job.includes("ambulance");
+      if (!looksLikeOfficer) continue;
+
+      const id = `person:${person.identifier}`;
+      const personName =
+        person.name || [person.firstname, person.lastname].filter(Boolean).join(" ") || t("tablet.player.unknown_user");
+      if (officersById.has(id)) continue;
+      officersById.set(id, {
+        id,
+        name: personName,
+        job: job || undefined,
+        online: false,
+        status: dispatchStatuses[id] || dispatchOffDutyStatus,
+      });
+    }
+
+    return Array.from(officersById.values()).sort((a, b) => {
+      if (a.id === currentOfficerId) return -1;
+      if (b.id === currentOfficerId) return 1;
+      if (a.online !== b.online) return a.online ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [
+    actorGrade,
+    currentOfficerId,
+    dispatchDefaultStatus,
+    dispatchOffDutyStatus,
+    dispatchStatuses,
+    dutyState?.onDuty,
+    personsData,
+    profileName,
+    radioMembers,
+    sessionJob,
+    t,
+  ]);
   const createActivity = (activity: Omit<DashboardActivity, "id" | "timestamp"> & { timestamp?: string }) => ({
     id: `${Date.now()}-${Math.floor(Math.random() * 100000)}`,
     timestamp: activity.timestamp || new Date().toISOString(),
@@ -887,6 +1049,136 @@ export default function Home() {
   const rootStyle = {
     "--mdt-accent-primary": branding.accent || defaultMockupBranding.accent || "#ff9100",
   } as CSSProperties;
+
+  const handleSetOwnDispatchStatus = (status: DispatchStatus) => {
+    setDispatchStatuses((prev) => ({ ...prev, [currentOfficerId]: status }));
+    fetchNui("setDispatchStatus", { status }).catch(() => null);
+  };
+
+  useEffect(() => {
+    if (dispatchStatuses[currentOfficerId]) return;
+    const fallback = dutyState?.onDuty === false ? dispatchOffDutyStatus : dispatchDefaultStatus;
+    setDispatchStatuses((prev) => ({ ...prev, [currentOfficerId]: fallback }));
+  }, [currentOfficerId, dispatchDefaultStatus, dispatchOffDutyStatus, dispatchStatuses, dutyState?.onDuty]);
+
+  useEffect(() => {
+    const status = dispatchStatuses[currentOfficerId];
+    if (!status) return;
+    fetchNui("setDispatchStatus", { status }).catch(() => null);
+  }, [currentOfficerId, dispatchStatuses]);
+
+  const handleCreateDispatchGroup = (name: string, memberIds: string[]) => {
+    const trimmed = name.trim();
+    if (trimmed === "" || memberIds.length === 0) return;
+    setDispatchGroups((prev) => [
+      {
+        id: createId("dispatch-group"),
+        name: trimmed,
+        memberIds: Array.from(new Set(memberIds)),
+      },
+      ...prev,
+    ]);
+  };
+
+  const handleUpdateDispatchGroupMembers = (groupId: string, memberIds: string[]) => {
+    setDispatchGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId ? { ...group, memberIds: Array.from(new Set(memberIds)) } : group
+      )
+    );
+  };
+
+  const handleDeleteDispatchGroup = (groupId: string) => {
+    setDispatchGroups((prev) => prev.filter((group) => group.id !== groupId));
+  };
+
+  const updateDispatchCallsLocal = (updater: (prev: DispatchLiveCall[]) => DispatchLiveCall[]) => {
+    setScreenData((prev) => {
+      const current = Array.isArray((prev as { dispatchState?: unknown[] }).dispatchState)
+        ? (((prev as { dispatchState?: DispatchLiveCall[] }).dispatchState || []) as DispatchLiveCall[])
+        : [];
+      return {
+        ...prev,
+        dispatchState: updater(current),
+      };
+    });
+  };
+
+  const handleAssignDispatchUnit = async (dispatchId: string, officer: DispatchOfficer) => {
+    if (!dispatchId || !officer?.id) return;
+
+    updateDispatchCallsLocal((prev) =>
+      prev.map((call) => {
+        if (call.id !== dispatchId) return call;
+        const unit: DispatchAssignedUnit = {
+          id: officer.id,
+          name: officer.name,
+          status: officer.status,
+          assignedAt: Date.now(),
+        };
+        const nextUnits = [...(call.assignedUnits || []).filter((entry) => entry.id !== unit.id), unit];
+        return { ...call, assignedUnits: nextUnits };
+      })
+    );
+
+    await fetchNui<{ ok?: boolean }>("assignDispatchUnit", {
+      dispatchId,
+      unitId: officer.id,
+      unitName: officer.name,
+      status: officer.status,
+    }).catch(() => null);
+  };
+
+  const handleUnassignDispatchUnit = async (dispatchId: string, unitId: string) => {
+    if (!dispatchId || !unitId) return;
+
+    updateDispatchCallsLocal((prev) =>
+      prev.map((call) =>
+        call.id === dispatchId
+          ? { ...call, assignedUnits: (call.assignedUnits || []).filter((entry) => entry.id !== unitId) }
+          : call
+      )
+    );
+
+    await fetchNui<{ ok?: boolean }>("unassignDispatchUnit", { dispatchId, unitId }).catch(() => null);
+  };
+
+  const handleAssignDispatchVehicle = async (dispatchId: string, vehicle: VehicleRecord) => {
+    if (!dispatchId || !vehicle?.plate) return;
+
+    updateDispatchCallsLocal((prev) =>
+      prev.map((call) => {
+        if (call.id !== dispatchId) return call;
+        const entry: DispatchAssignedVehicle = {
+          plate: vehicle.plate,
+          model: typeof vehicle.model === "string" ? vehicle.model : String(vehicle.model || ""),
+          assignedAt: Date.now(),
+        };
+        const nextVehicles = [...(call.assignedVehicles || []).filter((item) => item.plate !== entry.plate), entry];
+        return { ...call, assignedVehicles: nextVehicles };
+      })
+    );
+
+    await fetchNui<{ ok?: boolean }>("assignDispatchVehicle", {
+      dispatchId,
+      plate: vehicle.plate,
+      model: typeof vehicle.model === "string" ? vehicle.model : String(vehicle.model || ""),
+    }).catch(() => null);
+  };
+
+  const handleUnassignDispatchVehicle = async (dispatchId: string, plate: string) => {
+    if (!dispatchId || !plate) return;
+
+    updateDispatchCallsLocal((prev) =>
+      prev.map((call) =>
+        call.id === dispatchId
+          ? { ...call, assignedVehicles: (call.assignedVehicles || []).filter((entry) => entry.plate !== plate) }
+          : call
+      )
+    );
+
+    await fetchNui<{ ok?: boolean }>("unassignDispatchVehicle", { dispatchId, plate }).catch(() => null);
+  };
 
   const handleToggleDuty = async () => {
     if (isDutyBusy) return;
@@ -1182,6 +1474,9 @@ export default function Home() {
                 onSearchSelect={handleSearchSelect}
                 onSearchSubmit={handleSearchSubmit}
                 dutyState={dutyState}
+                dispatchStatus={currentDispatchStatus}
+                dispatchStatusOptions={dispatchStatusOptions}
+                onDispatchStatusChange={handleSetOwnDispatchStatus}
                 isDutyBusy={isDutyBusy}
                 onToggleDuty={handleToggleDuty}
                 onClose={() => fetchNui("hideUI", {}).catch(() => setVisible(false))}
@@ -1239,6 +1534,19 @@ export default function Home() {
                       incidents={incidentRecords}
                       persons={personsData}
                       vehicles={vehiclesData}
+                      officers={dispatchOfficers}
+                      liveCalls={liveDispatchCalls}
+                      statusOptions={dispatchStatusOptions}
+                      groups={dispatchGroups}
+                      currentOfficerId={currentOfficerId}
+                      onSetOwnStatus={handleSetOwnDispatchStatus}
+                      onAssignUnit={handleAssignDispatchUnit}
+                      onUnassignUnit={handleUnassignDispatchUnit}
+                      onAssignVehicle={handleAssignDispatchVehicle}
+                      onUnassignVehicle={handleUnassignDispatchVehicle}
+                      onCreateGroup={handleCreateDispatchGroup}
+                      onUpdateGroupMembers={handleUpdateDispatchGroupMembers}
+                      onDeleteGroup={handleDeleteDispatchGroup}
                       onCreateIncident={createIncident}
                       onUpdateIncident={updateIncident}
                       onDeleteIncident={deleteIncident}
@@ -1253,7 +1561,7 @@ export default function Home() {
                       actorName={profileName}
                       actorImageUrl={profileData.imageUrl}
                       currentUserName={profileName}
-                      radioMembers={(screenData as any).radioMembers || []}
+                      radioMembers={radioMembers}
                       meta={typedMeta}
                     />
                   )}

@@ -123,6 +123,25 @@ Config.MDT = {
 
         notify_on_toggle = true,
     },
+
+    -- Dispatch status codes shown in tablet (dispatch + topbar when on-duty).
+    dispatch = {
+        -- Default status when none is set.
+        default_status = '10-8',
+
+        -- Optional status used when a user is off duty.
+        off_duty_status = '10-7',
+
+        -- Configurable status catalog (numeric/radio-style codes).
+        -- color supports: green, blue, yellow, purple, gray, red
+        status_codes = {
+            { code = '10-8', label = 'Available', color = 'green' },
+            { code = '10-6', label = 'Busy', color = 'yellow' },
+            { code = '10-97', label = 'On Scene', color = 'blue' },
+            { code = '10-23', label = 'En Route', color = 'blue' },
+            { code = '10-7', label = 'Out of Service', color = 'gray' },
+        },
+    },
 }
 
 -- ── BOLO / Warrants ───────────────────────────────────────
