@@ -142,7 +142,7 @@ local function toggleTablet()
         return
     end
 
-    local screen = (Config.MDT and Config.MDT.default_screen) or MODULE_NAME
+    local screen = MODULE_NAME
     Debug.debug(('toggleTablet: opening screen "%s"'):format(screen))
 
     NUI.toggle(screen)

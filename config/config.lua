@@ -54,10 +54,12 @@ Config.MDT = {
             jobs = { 'mechanic' },
             logo_url = 'mechanic.png',
         },
+        ems = {
+            label = 'EMS',
+            jobs = { 'ambulance' },
+            logo_url = 'ems.png',
+        },
     },
-
-    -- Default screen opened by the tablet module.
-    default_screen = 'tablet',
 
     -- If true, players without allowed jobs will get a notify.
     notify_on_denied = true,
