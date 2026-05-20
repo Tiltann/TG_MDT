@@ -90,6 +90,8 @@ type DashboardData = {
   shifts?: ShiftRecord[];
 };
 
+type DashboardShortcutScreen = "persons" | "vehicles" | "penalties" | "chat";
+
 function formatRelativeTime(timestamp: string, t: TFunction): string {
   const parsed = Date.parse(timestamp);
   if (Number.isNaN(parsed)) return t("tablet.time.just_now", undefined, "just now");
@@ -143,6 +145,7 @@ export function DashboardView({
   onTakeBoardImage,
   onCreateBoardPost,
   onCreateShift,
+  onShortcutNavigate,
 }: {
   branding: Branding;
   modules?: Record<string, boolean>;
@@ -152,6 +155,7 @@ export function DashboardView({
   onTakeBoardImage?: () => Promise<string | null>;
   onCreateBoardPost?: (post: { title: string; body: string; images: string[] }) => void;
   onCreateShift?: (shift: { title: string; note: string }) => void;
+  onShortcutNavigate?: (screen: DashboardShortcutScreen) => void;
 }) {
   const isOnDuty = Boolean(data?.dutyState?.onDuty);
   const personsCount = data?.personsCount ?? 0;
@@ -349,7 +353,7 @@ export function DashboardView({
                 <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500">
                   <CalendarDays className="h-5 w-5 animate-bounce" />
                 </div>
-                <p className="text-sm font-bold text-zinc-300">No blackboard posts yet</p>
+                <p className="text-sm font-bold text-zinc-300">{t("tablet.blackboard.empty_posts")}</p>
                 <p className="mt-1 max-w-xs text-xs text-zinc-500">{t("tablet.dashboard.black_board_hint")}</p>
               </div>
             ) : (
@@ -367,7 +371,7 @@ export function DashboardView({
                         <span className="text-[11px] text-zinc-500">{formatRelativeTime(post.createdAt, t)}</span>
                       </div>
                     </div>
-                    <span className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500 shrink-0">ANNOUNCEMENT</span>
+                    <span className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500 shrink-0">{t("tablet.blackboard.announcement_tag")}</span>
                   </div>
 
                   <div className="prose prose-invert max-w-none text-xs leading-relaxed text-zinc-300 prose-p:my-1.5 prose-strong:text-white prose-a:text-amber-400 font-medium">
@@ -470,33 +474,39 @@ export function DashboardView({
               {[
                 {
                   title: t("tablet.actions.new_person", undefined, "Person Search"),
-                  desc: "MDT citizen databases.",
+                  desc: t("tablet.dashboard.shortcut.persons_desc"),
+                  screen: "persons" as const,
                   icon: Users,
                   color: "text-amber-400 border-amber-500/20 bg-amber-500/5",
                 },
                 {
                   title: t("tablet.actions.new_vehicle", undefined, "Vehicle Search"),
-                  desc: "Registered plates & details.",
+                  desc: t("tablet.dashboard.shortcut.vehicles_desc"),
+                  screen: "vehicles" as const,
                   icon: CarFront,
                   color: "text-blue-400 border-blue-500/20 bg-blue-500/5",
                 },
                 {
                   title: t("tablet.actions.penalty_catalog", undefined, "Penalty Catalog"),
-                  desc: "Fines & legal penal structures.",
+                  desc: t("tablet.dashboard.shortcut.penalties_desc"),
+                  screen: "penalties" as const,
                   icon: ClipboardList,
                   color: "text-rose-400 border-rose-500/20 bg-rose-500/5",
                 },
                 {
                   title: t("tablet.sidebar.chat", undefined, "Radio Channels"),
-                  desc: "Join active radio network.",
+                  desc: t("tablet.dashboard.shortcut.chat_desc"),
+                  screen: "chat" as const,
                   icon: MessageSquare,
                   color: "text-violet-400 border-violet-500/20 bg-violet-500/5",
                 },
               ].map((act) => {
                 const Icon = act.icon;
                 return (
-                  <div 
+                  <button
                     key={act.title}
+                    type="button"
+                    onClick={() => onShortcutNavigate?.(act.screen)}
                     className="group rounded-2xl border border-zinc-800 bg-zinc-900/10 p-3.5 hover:border-zinc-700/80 transition-all hover:bg-zinc-900/20 duration-300"
                   >
                     <div className={`inline-flex rounded-xl border p-2 ${act.color}`}>
@@ -507,7 +517,7 @@ export function DashboardView({
                       <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
                     </p>
                     <p className="mt-0.5 text-[10px] text-zinc-500 leading-normal font-medium">{act.desc}</p>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -518,14 +528,14 @@ export function DashboardView({
             <div className="flex items-center justify-between border-b border-zinc-800/80 p-5">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500">{t("tablet.sidebar.shifts")}</p>
-                <h4 className="mt-0.5 text-base font-bold text-white tracking-tight">Active Shifts log</h4>
+                <h4 className="mt-0.5 text-base font-bold text-white tracking-tight">{t("tablet.shifts.log_title")}</h4>
               </div>
             </div>
 
             <div className="space-y-2.5 p-5 overflow-y-auto max-h-[14rem] scrollbar-thin scrollbar-thumb-zinc-800">
               {shifts.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-zinc-800 bg-white/[0.01] p-5 text-center text-xs text-zinc-500 italic">
-                  No shift log entries recorded.
+                  {t("tablet.shifts.log_empty")}
                 </div>
               ) : (
                 shifts.slice(0, 3).map((sh) => (
@@ -535,7 +545,7 @@ export function DashboardView({
                   >
                     <div className="min-w-0 pr-2">
                       <p className="text-xs font-bold text-white truncate">{sh.title}</p>
-                      <p className="mt-0.5 text-[10px] text-zinc-500 truncate">{sh.note || "Duty duration log"}</p>
+                      <p className="mt-0.5 text-[10px] text-zinc-500 truncate">{sh.note || t("tablet.shifts.log_note_fallback")}</p>
                     </div>
                     <span className="text-[9px] text-zinc-600 font-bold shrink-0">{formatRelativeTime(sh.createdAt, t)}</span>
                   </div>
@@ -549,13 +559,13 @@ export function DashboardView({
                   <input
                     value={shiftTitle}
                     onChange={(event) => setShiftTitle(event.target.value)}
-                    placeholder="Duty shift entry title..."
+                    placeholder={t("tablet.shifts.input_title_placeholder")}
                     className="w-full rounded-xl border border-zinc-800/80 bg-black/35 px-3 py-2 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
                   />
                   <textarea
                     value={shiftNote}
                     onChange={(event) => setShiftNote(event.target.value)}
-                    placeholder="Optional notes or crew roster..."
+                    placeholder={t("tablet.shifts.input_note_placeholder")}
                     rows={1}
                     className="w-full resize-none rounded-xl border border-zinc-800/80 bg-black/35 px-3 py-2 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
                   />
@@ -565,14 +575,14 @@ export function DashboardView({
                       className="h-8 text-[11px] rounded-lg"
                       onClick={() => { setShiftTitle(""); setShiftNote(""); }}
                     >
-                      Clear
+                      {t("tablet.actions.clear")}
                     </Button>
                     <Button 
                       onClick={handleCreateShift} 
                       disabled={shiftBusy || !shiftTitle.trim()} 
                       className="h-8 text-[11px] rounded-lg px-3 bg-zinc-200 hover:bg-white text-black transition-colors"
                     >
-                      Add Entry
+                      {t("tablet.shifts.add_entry")}
                     </Button>
                   </div>
                 </div>

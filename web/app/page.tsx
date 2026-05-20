@@ -1226,7 +1226,19 @@ export default function Home() {
                     </div>
                   ) : (
                     <>
-                  {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView branding={branding} modules={current_modules} data={dashboardData} onSendChat={sendChatMessage} onTakeBoardImage={captureBoardImage} onCreateBoardPost={createBoardPost} onCreateShift={createShift} t={t} />}
+                  {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && (
+                    <DashboardView
+                      branding={branding}
+                      modules={current_modules}
+                      data={dashboardData}
+                      onSendChat={sendChatMessage}
+                      onTakeBoardImage={captureBoardImage}
+                      onCreateBoardPost={createBoardPost}
+                      onCreateShift={createShift}
+                      onShortcutNavigate={(screen) => setActiveScreen(screen)}
+                      t={t}
+                    />
+                  )}
                   {activeScreen === "blackboard" && (
                     <BlackboardView
                       t={t}
