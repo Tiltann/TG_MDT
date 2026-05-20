@@ -202,6 +202,8 @@ type PlayerUiPayload = {
   gradeCount?: number;
 };
 
+type StartupValidationError = "meta_missing" | "modules_missing" | "translations_missing";
+
 type IncidentRecord = {
   id: string;
   title: string;
@@ -352,6 +354,7 @@ export default function Home() {
   const [boloRecords, setBoloRecords] = useState<BoloRecord[]>(DEFAULT_BOLOS);
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>(DEFAULT_BOARD_POSTS);
   const [shiftRecords, setShiftRecords] = useState<ShiftRecord[]>(DEFAULT_SHIFTS);
+  const [startupValidationError, setStartupValidationError] = useState<StartupValidationError | null>(null);
   const seededActivityRef = useRef(false);
   const previousDutyRef = useRef<boolean | null>(null);
   const previousAkteSyncRef = useRef<string | null>(null);
@@ -555,6 +558,61 @@ export default function Home() {
     (activeLocale === baseLocale ? typedMeta.translations : undefined) ||
     translationsByLocale.en ||
     typedMeta.translations;
+
+  useEffect(() => {
+    const isOpen = isVisible || activeScreen !== null;
+    if (is_browser || !isHandshakeDone || !isOpen) {
+      setStartupValidationError(null);
+      return;
+    }
+
+    const validateStartupPayload = (): StartupValidationError | null => {
+      if (!typedMeta || typeof typedMeta !== "object" || Array.isArray(typedMeta)) {
+        return "meta_missing";
+      }
+
+      const modulesOk =
+        typedMeta.modules &&
+        typeof typedMeta.modules === "object" &&
+        !Array.isArray(typedMeta.modules) &&
+        Object.keys(typedMeta.modules).length > 0;
+      if (!modulesOk) {
+        return "modules_missing";
+      }
+
+      const directTranslationsOk =
+        typedMeta.translations &&
+        typeof typedMeta.translations === "object" &&
+        !Array.isArray(typedMeta.translations) &&
+        Object.keys(typedMeta.translations).length > 0;
+
+      const byLocaleEn = typedMeta.translationsByLocale?.en;
+      const byLocaleOk =
+        byLocaleEn &&
+        typeof byLocaleEn === "object" &&
+        !Array.isArray(byLocaleEn) &&
+        Object.keys(byLocaleEn).length > 0;
+
+      if (!directTranslationsOk && !byLocaleOk) {
+        return "translations_missing";
+      }
+
+      return null;
+    };
+
+    const immediateError = validateStartupPayload();
+    if (!immediateError) {
+      setStartupValidationError(null);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      const deferredError = validateStartupPayload();
+      setStartupValidationError(deferredError);
+    }, 1800);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeScreen, isHandshakeDone, isVisible, is_browser, typedMeta]);
 
   useEffect(() => {
     if (chatAutoDeleteMs <= 0) return;
@@ -1157,6 +1215,17 @@ export default function Home() {
               
               <div className="flex-1 overflow-hidden p-6">
                 <div key={activeScreen || "dashboard"} className="h-full w-full animate-mdt-view">
+                  {startupValidationError ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="w-full max-w-xl rounded-2xl border border-red-500/40 bg-[rgba(20,0,0,0.7)] p-6 text-center shadow-2xl">
+                        <p className="text-xs uppercase tracking-[0.22em] text-red-300">{t("tablet.error.startup_tag")}</p>
+                        <h2 className="mt-2 text-2xl font-bold text-white">{t("tablet.error.startup_title")}</h2>
+                        <p className="mt-3 text-sm text-zinc-300">{t("tablet.error.startup_message")}</p>
+                        <p className="mt-2 text-sm font-semibold text-red-200">{t("tablet.error.contact_admin")}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                   {(!activeScreen || activeScreen === "dashboard" || activeScreen === "tablet") && <DashboardView branding={branding} modules={current_modules} data={dashboardData} onSendChat={sendChatMessage} onTakeBoardImage={captureBoardImage} onCreateBoardPost={createBoardPost} onCreateShift={createShift} t={t} />}
                   {activeScreen === "blackboard" && (
                     <BlackboardView
@@ -1267,6 +1336,8 @@ export default function Home() {
                       onAccentColorChange={(accent) => setAccentOverride(accent)}
                       onResetAccent={() => setAccentOverride(null)}
                     />
+                  )}
+                    </>
                   )}
                 </div>
               </div>

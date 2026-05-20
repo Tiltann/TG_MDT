@@ -224,6 +224,18 @@ function encodeAkteNotes(notes: AkteNote[]): string {
   return JSON.stringify(notes);
 }
 
+function resolveLogoUrl(value?: string): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed === "") return undefined;
+
+  if (/^(https?:|data:|blob:|nui:|\/|\.\/|\.\.)/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `./${trimmed.replace(/^\/+/, "")}`;
+}
+
 function isNoteExpired(note: AkteNote): boolean {
   if (!note.expiresAt) return false;
   const expires = Date.parse(note.expiresAt);
@@ -421,7 +433,7 @@ export default function PersonsView({
     return Object.entries(departments).map(([deptKey, deptCfg]: [string, any]) => ({
       value: deptKey.toLowerCase(),
       label: deptCfg.label || deptKey.toUpperCase(),
-      logoUrl: deptCfg.logo_url,
+      logoUrl: resolveLogoUrl(deptCfg.logo_url),
     }));
   }, [departments, allowedJobs]);
 
@@ -440,17 +452,31 @@ export default function PersonsView({
 
     // 1. Direct department membership
     const targetDept = departments[normTarget];
+    const jobModels = meta?.akteModels?.job_models || {};
+    const viewerConfig = jobModels[normViewer];
+    const viewerCompartment = (viewerConfig?.compartment || normViewer).trim().toLowerCase();
+
     if (targetDept) {
       const deptJobs = Array.isArray(targetDept.jobs)
         ? targetDept.jobs.map((j: string) => j.trim().toLowerCase())
         : [];
       if (deptJobs.includes(normViewer)) return true;
+
+      for (const deptJob of deptJobs) {
+        const deptJobConfig = jobModels[deptJob];
+        const deptJobCompartment = (deptJobConfig?.compartment || deptJob).trim().toLowerCase();
+        if (deptJobCompartment === viewerCompartment) return true;
+
+        const sharedWith = Array.isArray(deptJobConfig?.shared_with)
+          ? deptJobConfig.shared_with.map((s: string) => s.trim().toLowerCase())
+          : [];
+        if (sharedWith.includes(normViewer) || sharedWith.includes(viewerCompartment)) {
+          return true;
+        }
+      }
     }
 
     // 2. Compartment/job sharing fallback
-    const jobModels = meta?.akteModels?.job_models || {};
-    const viewerConfig = jobModels[normViewer];
-    const viewerCompartment = (viewerConfig?.compartment || normViewer).trim().toLowerCase();
     const targetCompartment = (jobModels[normTarget]?.compartment || normTarget).trim().toLowerCase();
     if (viewerCompartment === targetCompartment) return true;
 
@@ -667,7 +693,6 @@ export default function PersonsView({
           ...(saved || {}),
         },
       }));
-      setSelectedCompartment(target);
       setShareTarget("");
     });
   };
@@ -931,7 +956,7 @@ export default function PersonsView({
         </Button>
         <div className="flex items-center gap-2">
           <Button variant={isSelectedSearched ? "ghost" : "primary"} onClick={() => setSelectedPersonSearchState(!isSelectedSearched)}>
-            {isSelectedSearched ? "Clear SEARCHED" : "Mark SEARCHED"}
+            {isSelectedSearched ? t("tablet.actions.clear_searched") : t("tablet.actions.mark_searched")}
           </Button>
           <Button onClick={saveAkte}>{t("tablet.form.save_akte")}</Button>
         </div>
@@ -944,7 +969,7 @@ export default function PersonsView({
             <h4 className="text-2xl text-white font-semibold mt-1">{selectedPerson.name}</h4>
             {isSelectedSearched && (
               <span className="mt-2 inline-flex rounded-full border border-[rgba(255,145,0,0.35)] bg-[rgba(255,145,0,0.12)] px-3 py-1 text-xs font-semibold text-[var(--mdt-accent-primary)]">
-                SEARCHED
+                {t("tablet.status.searched")}
               </span>
             )}
           </div>
@@ -1009,7 +1034,7 @@ export default function PersonsView({
                   ))}
               </select>
               <Button variant="ghost" onClick={shareCurrentAkte} disabled={shareTarget.trim() === ""}>
-                Share with
+                {t("tablet.actions.share_with")}
               </Button>
             </div>
           </div>
@@ -1017,7 +1042,7 @@ export default function PersonsView({
           <div key={selectedCompartment} className="space-y-3 animate-mdt-view">
             {!hasAccessToJobTab(selectedCompartment) ? (() => {
             const targetDept = departments ? departments[selectedCompartment] : null;
-            const deptLogo = targetDept?.logo_url;
+            const deptLogo = resolveLogoUrl(targetDept?.logo_url);
             const deptLabel = targetDept?.label || selectedCompartment.toUpperCase();
             return (
               <div className="relative overflow-hidden rounded-md border border-[var(--mdt-border)] bg-black/40 backdrop-blur-xl p-8 py-16 flex flex-col items-center justify-center text-center space-y-4 animate-pulse">
@@ -1057,10 +1082,10 @@ export default function PersonsView({
                 )}
                 <div className="space-y-2">
                   <h5 className="text-lg font-semibold text-white tracking-wide">
-                    Access Restricted
+                    {t("tablet.access.restricted_title")}
                   </h5>
                   <p className="text-xs text-[var(--mdt-text-muted)] max-w-sm">
-                    Your department does not have the clearance level required to view or edit files in the <span className="text-[var(--mdt-accent-primary)] font-medium uppercase">{deptLabel}</span> database.
+                    {t("tablet.access.restricted_body", { department: deptLabel })}
                   </p>
                 </div>
               </div>

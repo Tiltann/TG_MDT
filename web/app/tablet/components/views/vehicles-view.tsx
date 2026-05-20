@@ -200,6 +200,18 @@ function encodeAkteNotes(notes: AkteNote[]): string {
   return JSON.stringify(notes);
 }
 
+function resolveLogoUrl(value?: string): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed === "") return undefined;
+
+  if (/^(https?:|data:|blob:|nui:|\/|\.\/|\.\.)/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `./${trimmed.replace(/^\/+/, "")}`;
+}
+
 function isNoteExpired(note: AkteNote): boolean {
   if (!note.expiresAt) return false;
   const expires = Date.parse(note.expiresAt);
@@ -397,7 +409,7 @@ export default function VehiclesView({
     return Object.entries(departments).map(([deptKey, deptCfg]: [string, any]) => ({
       value: deptKey.toLowerCase(),
       label: deptCfg.label || deptKey.toUpperCase(),
-      logoUrl: deptCfg.logo_url,
+      logoUrl: resolveLogoUrl(deptCfg.logo_url),
     }));
   }, [departments, allowedJobs]);
 
@@ -416,17 +428,31 @@ export default function VehiclesView({
 
     // 1. Direct department membership
     const targetDept = departments[normTarget];
+    const jobModels = meta?.akteModels?.job_models || {};
+    const viewerConfig = jobModels[normViewer];
+    const viewerCompartment = (viewerConfig?.compartment || normViewer).trim().toLowerCase();
+
     if (targetDept) {
       const deptJobs = Array.isArray(targetDept.jobs)
         ? targetDept.jobs.map((j: string) => j.trim().toLowerCase())
         : [];
       if (deptJobs.includes(normViewer)) return true;
+
+      for (const deptJob of deptJobs) {
+        const deptJobConfig = jobModels[deptJob];
+        const deptJobCompartment = (deptJobConfig?.compartment || deptJob).trim().toLowerCase();
+        if (deptJobCompartment === viewerCompartment) return true;
+
+        const sharedWith = Array.isArray(deptJobConfig?.shared_with)
+          ? deptJobConfig.shared_with.map((s: string) => s.trim().toLowerCase())
+          : [];
+        if (sharedWith.includes(normViewer) || sharedWith.includes(viewerCompartment)) {
+          return true;
+        }
+      }
     }
 
     // 2. Compartment/job sharing fallback
-    const jobModels = meta?.akteModels?.job_models || {};
-    const viewerConfig = jobModels[normViewer];
-    const viewerCompartment = (viewerConfig?.compartment || normViewer).trim().toLowerCase();
     const targetCompartment = (jobModels[normTarget]?.compartment || normTarget).trim().toLowerCase();
     if (viewerCompartment === targetCompartment) return true;
 
@@ -631,7 +657,6 @@ export default function VehiclesView({
           ...(saved || {}),
         },
       }));
-      setSelectedCompartment(target);
       setShareTarget("");
     });
   };
@@ -942,7 +967,7 @@ export default function VehiclesView({
                   ))}
               </select>
               <Button variant="ghost" onClick={shareCurrentAkte} disabled={shareTarget.trim() === ""}>
-                Share with
+                {t("tablet.actions.share_with")}
               </Button>
             </div>
           </div>
@@ -950,7 +975,7 @@ export default function VehiclesView({
           <div key={selectedCompartment} className="space-y-3 animate-mdt-view">
             {!hasAccessToJobTab(selectedCompartment) ? (() => {
             const targetDept = departments ? departments[selectedCompartment] : null;
-            const deptLogo = targetDept?.logo_url;
+            const deptLogo = resolveLogoUrl(targetDept?.logo_url);
             const deptLabel = targetDept?.label || selectedCompartment.toUpperCase();
             return (
               <div className="relative overflow-hidden rounded-md border border-[var(--mdt-border)] bg-black/40 backdrop-blur-xl p-8 py-16 flex flex-col items-center justify-center text-center space-y-4 animate-pulse">
@@ -990,10 +1015,10 @@ export default function VehiclesView({
                 )}
                 <div className="space-y-2">
                   <h5 className="text-lg font-semibold text-white tracking-wide">
-                    Access Restricted
+                    {t("tablet.access.restricted_title")}
                   </h5>
                   <p className="text-xs text-[var(--mdt-text-muted)] max-w-sm">
-                    Your department does not have the clearance level required to view or edit files in the <span className="text-[var(--mdt-accent-primary)] font-medium uppercase">{deptLabel}</span> database.
+                    {t("tablet.access.restricted_body", { department: deptLabel })}
                   </p>
                 </div>
               </div>

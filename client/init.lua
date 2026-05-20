@@ -208,13 +208,29 @@ end
 local function getActiveRadioFrequency()
 	local system = getActiveVoiceSystem()
 	if system == 'pma-voice' then
-		local freq = exports['pma-voice']:getRadioChannel()
-		return freq and tostring(freq) or ''
+		local ok, freq = pcall(function()
+			return exports['pma-voice']:getRadioChannel()
+		end)
+		if not ok then
+			return '0'
+		end
+		if freq == nil or freq == false then
+			return '0'
+		end
+		return tostring(freq)
 	elseif system == 'saltychat' then
-		local freq = exports['saltychat']:GetRadioChannel()
-		return freq and tostring(freq) or ''
+		local ok, freq = pcall(function()
+			return exports['saltychat']:GetRadioChannel()
+		end)
+		if not ok then
+			return 'none'
+		end
+		if freq == nil or freq == false then
+			return 'none'
+		end
+		return tostring(freq)
 	end
-	return ''
+	return 'none'
 end
 
 NUI.onCallback('joinRadioChannel', function(body, cb)
@@ -224,9 +240,13 @@ NUI.onCallback('joinRadioChannel', function(body, cb)
 	local freqNum = tonumber(freq)
 
 	if system == 'pma-voice' and freqNum then
-		exports['pma-voice']:setRadioChannel(freqNum)
+		pcall(function()
+			exports['pma-voice']:setRadioChannel(freqNum)
+		end)
 	elseif system == 'saltychat' then
-		exports['saltychat']:SetRadioChannel(freq, true)
+		pcall(function()
+			exports['saltychat']:SetRadioChannel(freq, true)
+		end)
 	end
 
 	TriggerServerEvent('TG_MDT:server:joinRadioChannel', freq)
@@ -237,9 +257,13 @@ NUI.onCallback('leaveRadioChannel', function(_, cb)
 	local system = getActiveVoiceSystem()
 
 	if system == 'pma-voice' then
-		exports['pma-voice']:setRadioChannel(0)
+		pcall(function()
+			exports['pma-voice']:setRadioChannel(0)
+		end)
 	elseif system == 'saltychat' then
-		exports['saltychat']:SetRadioChannel('', true)
+		pcall(function()
+			exports['saltychat']:SetRadioChannel('', true)
+		end)
 	end
 
 	TriggerServerEvent('TG_MDT:server:leaveRadioChannel')

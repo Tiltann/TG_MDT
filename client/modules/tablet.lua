@@ -333,7 +333,7 @@ NUI.onCallback('openAktePhotoMode', function(body, cb)
         SetNuiFocus(false, false)
         NUI.send('setVisible', {
             visible = false,
-            screen = reopenScreen,
+            screen = nil,
         })
     end
 

@@ -392,8 +392,8 @@ export function DashboardView({
             <div className="border-t border-zinc-800/80 bg-zinc-900/10 p-5">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-amber-500">Board Administration</p>
-                  <p className="text-xs font-bold text-white">Create dynamic announcement</p>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-amber-500">{t("tablet.blackboard.admin_title")}</p>
+                  <p className="text-xs font-bold text-white">{t("tablet.blackboard.admin_subtitle")}</p>
                 </div>
                 <Button 
                   variant="ghost" 
@@ -402,7 +402,7 @@ export function DashboardView({
                   className="h-8.5 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800/40 text-xs"
                 >
                   <Camera className="mr-1.5 h-3.5 w-3.5 text-zinc-400" />
-                  {boardBusy ? "Capturing..." : "Add Image"}
+                  {boardBusy ? t("tablet.blackboard.capturing") : t("tablet.blackboard.add_image")}
                 </Button>
               </div>
 
@@ -410,13 +410,13 @@ export function DashboardView({
                 <input
                   value={boardTitle}
                   onChange={(event) => setBoardTitle(event.target.value)}
-                  placeholder="Post title..."
+                  placeholder={t("tablet.blackboard.title_placeholder")}
                   className="w-full rounded-xl border border-zinc-800/80 bg-black/30 px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
                 />
                 <textarea
                   value={boardBody}
                   onChange={(event) => setBoardBody(event.target.value)}
-                  placeholder="Announce updates, guidelines, or notices... (Markdown supported)"
+                  placeholder={t("tablet.blackboard.body_placeholder")}
                   rows={2}
                   className="w-full resize-none rounded-xl border border-zinc-800/80 bg-black/30 px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
                 />
@@ -443,14 +443,14 @@ export function DashboardView({
                     className="h-8.5 text-xs rounded-lg"
                     onClick={() => { setBoardTitle(""); setBoardBody(""); setBoardImages([]); }}
                   >
-                    Clear
+                    {t("tablet.actions.clear")}
                   </Button>
                   <Button 
                     onClick={handleCreateBoardPost} 
                     className="h-8.5 text-xs rounded-lg px-4 bg-zinc-200 text-black hover:bg-white transition-all"
                   >
                     <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Publish Post
+                    {t("tablet.blackboard.publish")}
                   </Button>
                 </div>
               </div>

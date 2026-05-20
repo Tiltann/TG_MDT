@@ -99,7 +99,7 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
           {boardPosts.length === 0 ? (
             <div className="h-full min-h-48 flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800/80 bg-zinc-900/10 p-10 text-center">
               <ClipboardList className="w-10 h-10 text-zinc-600 mb-3 animate-pulse" />
-              <p className="text-sm font-bold text-zinc-300">Blackboard is clear</p>
+              <p className="text-sm font-bold text-zinc-300">{t("tablet.blackboard.empty_title")}</p>
               <p className="mt-1 max-w-xs text-xs text-zinc-500 leading-normal">
                 {t("tablet.dashboard.black_board_hint")}
               </p>
@@ -154,8 +154,8 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
           <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/10 p-5 space-y-3 shrink-0">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-amber-500">Board Administration</p>
-                <p className="text-xs font-bold text-white mt-0.5">Compose internal bulletin</p>
+                <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-amber-500">{t("tablet.blackboard.admin_title")}</p>
+                <p className="text-xs font-bold text-white mt-0.5">{t("tablet.blackboard.admin_subtitle")}</p>
               </div>
               <Button 
                 variant="ghost" 
@@ -164,7 +164,7 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
                 className="h-8.5 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800/40 text-xs"
               >
                 <Camera className="w-3.5 h-3.5 mr-1.5 text-zinc-400" />
-                {busy ? "Capturing..." : "Add Image"}
+                {busy ? t("tablet.blackboard.capturing") : t("tablet.blackboard.add_image")}
               </Button>
             </div>
 
@@ -172,13 +172,13 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="Bulleting post title..."
+                placeholder={t("tablet.blackboard.title_placeholder")}
                 className="w-full rounded-xl border border-zinc-800/80 bg-black/30 p-3 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors"
               />
               <textarea
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
-                placeholder="Markdown is fully supported. Use bullet lists, headers, bold, and links..."
+                placeholder={t("tablet.blackboard.body_placeholder")}
                 rows={4}
                 className="w-full rounded-xl border border-zinc-800/80 bg-black/30 p-3 text-xs text-white outline-none resize-none placeholder:text-zinc-600 focus:border-zinc-700 transition-colors"
               />
@@ -203,7 +203,7 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
                   className="h-8.5 text-xs rounded-lg"
                   onClick={() => { setTitle(""); setBody(""); setImages([]); }}
                 >
-                  Clear
+                  {t("tablet.actions.clear")}
                 </Button>
                 <Button 
                   onClick={handleCreatePost}
@@ -211,7 +211,7 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
                   className="h-8.5 text-xs rounded-lg px-4 bg-zinc-200 hover:bg-white text-black font-semibold transition-colors"
                 >
                   <Plus className="w-4 h-4 mr-1.5" />
-                  Publish bulletin
+                  {t("tablet.blackboard.publish")}
                 </Button>
               </div>
             </div>
