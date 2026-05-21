@@ -27,6 +27,7 @@ import SettingsView from "./tablet/components/views/settings-view";
 import { defaultMockupBranding, defaultMockupModules } from "./tablet/lib/mockup-config";
 import { createTranslator, normalizeLocale, type SupportedLocale } from "./tablet/lib/i18n";
 import devTranslationsEn from "./tablet/lib/dev-translations.en.json";
+import devTranslationsDe from "./tablet/lib/dev-translations.de.json";
 
 type NuiVisibilityPayload = {
   visible?: boolean;
@@ -292,6 +293,59 @@ const DEV_PROFILE: ProfileData = {
 };
 
 const DEV_TRANSLATIONS_EN = devTranslationsEn as Record<string, string>;
+const DEV_TRANSLATIONS_DE = devTranslationsDe as Record<string, string>;
+
+const DEV_INCIDENTS: IncidentRecord[] = [
+  {
+    id: "incident-001",
+    title: "Traffic Stop Escalation",
+    description: "Routine stop escalated after the driver attempted to flee on foot.",
+    location: "Mission Row",
+    severity: "medium",
+    status: "investigating",
+    linkedPersons: ["char-002"],
+    linkedVehicles: ["LSPD-204"],
+    createdAt: "2026-05-22T09:48:00.000Z",
+    updatedAt: "2026-05-22T10:02:00.000Z",
+  },
+  {
+    id: "incident-002",
+    title: "Medical Scene Response",
+    description: "EMS requested police support for crowd control during patient transport.",
+    location: "Pillbox Hill",
+    severity: "low",
+    status: "open",
+    linkedPersons: ["char-003"],
+    linkedVehicles: ["EMS-911"],
+    createdAt: "2026-05-22T08:15:00.000Z",
+    updatedAt: "2026-05-22T08:27:00.000Z",
+  },
+];
+
+const DEV_BOLOS: BoloRecord[] = [
+  {
+    id: "bolo-001",
+    title: "Wanted for Felony Evading",
+    description: "Be on the lookout for Noah Mercer following a felony evading charge.",
+    priority: "high",
+    status: "active",
+    linkedPersons: ["char-002"],
+    linkedVehicles: ["LSPD-204"],
+    createdAt: "2026-05-22T09:10:00.000Z",
+    updatedAt: "2026-05-22T09:55:00.000Z",
+  },
+  {
+    id: "bolo-002",
+    title: "Witness Vehicle Request",
+    description: "Locate EMS-911 for a statement regarding a downtown collision.",
+    priority: "medium",
+    status: "active",
+    linkedPersons: ["char-003"],
+    linkedVehicles: ["EMS-911"],
+    createdAt: "2026-05-22T07:42:00.000Z",
+    updatedAt: "2026-05-22T08:03:00.000Z",
+  },
+];
 
 const DEV_PERSONS: PersonRecord[] = [
   {
@@ -392,6 +446,7 @@ const DEV_META: NuiMetaPayload = {
   translations: DEV_TRANSLATIONS_EN,
   translationsByLocale: {
     en: DEV_TRANSLATIONS_EN,
+    de: DEV_TRANSLATIONS_DE,
   },
   branding: {
     accent: "#ff9100",
@@ -618,10 +673,10 @@ export default function Home({ devMode = false }: HomeProps) {
   const [globalSearch, setGlobalSearch] = useState("");
   const [isDutyBusy, setDutyBusy] = useState(false);
   const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([]);
-  const [profileData, setProfileData] = useState<ProfileData>(DEFAULT_PROFILE);
+  const [profileData, setProfileData] = useState<ProfileData>(devMode ? DEV_PROFILE : DEFAULT_PROFILE);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(DEFAULT_CHAT_MESSAGES);
-  const [incidentRecords, setIncidentRecords] = useState<IncidentRecord[]>(DEFAULT_INCIDENTS);
-  const [boloRecords, setBoloRecords] = useState<BoloRecord[]>(DEFAULT_BOLOS);
+  const [incidentRecords, setIncidentRecords] = useState<IncidentRecord[]>(devMode ? DEV_INCIDENTS : DEFAULT_INCIDENTS);
+  const [boloRecords, setBoloRecords] = useState<BoloRecord[]>(devMode ? DEV_BOLOS : DEFAULT_BOLOS);
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>(DEFAULT_BOARD_POSTS);
   const [dispatchStatuses, setDispatchStatuses] = useState<Record<string, DispatchStatus>>(DEFAULT_DISPATCH_STATUSES);
   const [dispatchGroups, setDispatchGroups] = useState<DispatchGroup[]>(DEFAULT_DISPATCH_GROUPS);
@@ -650,8 +705,8 @@ export default function Home({ devMode = false }: HomeProps) {
     if (devMode) {
       setProfileData(DEV_PROFILE);
       setChatMessages(DEFAULT_CHAT_MESSAGES);
-      setIncidentRecords(DEFAULT_INCIDENTS);
-      setBoloRecords(DEFAULT_BOLOS);
+      setIncidentRecords(DEV_INCIDENTS);
+      setBoloRecords(DEV_BOLOS);
       setBoardPosts(DEFAULT_BOARD_POSTS);
       setDispatchStatuses(DEFAULT_DISPATCH_STATUSES);
       setDispatchGroups(DEFAULT_DISPATCH_GROUPS);

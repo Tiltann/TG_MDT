@@ -17,6 +17,25 @@ const RESOURCE_NAME =
       GetParentResourceName()
     : "TG_MDT";
 
+function getDevMockResponse<T>(eventName: string, data?: unknown): T | null {
+  if (eventName !== "openAktePhotoMode") {
+    return null;
+  }
+
+  const seedSource =
+    typeof data === "object" && data !== null && "seed" in data && typeof (data as { seed?: unknown }).seed === "string"
+      ? (data as { seed: string }).seed
+      : typeof data === "object" && data !== null && "context" in data && typeof (data as { context?: unknown }).context === "string"
+        ? (data as { context: string }).context
+        : "mdt-dev-camera";
+  const seed = encodeURIComponent(seedSource.toLowerCase().replace(/[^a-z0-9_-]+/g, "-"));
+
+  return {
+    ok: true,
+    images: [`https://picsum.photos/seed/${seed}/1200/800`],
+  } as T;
+}
+
 /**
  * Send a NUI callback to the resource.
  * Falls back to a local mock during browser dev.
@@ -27,6 +46,13 @@ export async function fetchNui<T = unknown>(
 ): Promise<T> {
   if (typeof window === "undefined") {
     return {} as T;
+  }
+
+  if (!IS_FIVEM) {
+    const mockResponse = getDevMockResponse<T>(eventName, data);
+    if (mockResponse) {
+      return mockResponse;
+    }
   }
 
   const url = IS_FIVEM
