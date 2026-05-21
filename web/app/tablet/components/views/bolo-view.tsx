@@ -228,13 +228,13 @@ export default function BoloView({
 
                 <div className="grid gap-3 md:grid-cols-2 text-xs text-[var(--mdt-text-muted)]">
                   <div>
-                    <p className="uppercase tracking-[0.2em] mb-2">People</p>
+                    <p className="uppercase tracking-[0.2em] mb-2">{t("tablet.sidebar.persons")}</p>
                     <div className="flex flex-wrap gap-2">
                       {bolo.linkedPersons.length === 0 ? <span>{t("tablet.notes.none")}</span> : bolo.linkedPersons.map((id) => <span key={id} className="px-2 py-1 rounded-full bg-white/5 text-white">{persons.find((person) => person.identifier === id)?.name || id}</span>)}
                     </div>
                   </div>
                   <div>
-                    <p className="uppercase tracking-[0.2em] mb-2">Vehicles</p>
+                    <p className="uppercase tracking-[0.2em] mb-2">{t("tablet.sidebar.vehicles")}</p>
                     <div className="flex flex-wrap gap-2">
                       {bolo.linkedVehicles.length === 0 ? <span>{t("tablet.notes.none")}</span> : bolo.linkedVehicles.map((plate) => <span key={plate} className="px-2 py-1 rounded-full bg-white/5 text-white">{vehicles.find((vehicle) => vehicle.plate === plate)?.plate || plate}</span>)}
                     </div>
@@ -258,23 +258,23 @@ export default function BoloView({
             <input value={draft.title} onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))} className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white" />
           </div>
           <div>
-            <label className="block text-xs mdt-muted mb-1">Description</label>
+            <label className="block text-xs mdt-muted mb-1">{t("tablet.form.description")}</label>
             <textarea value={draft.description} onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))} rows={4} className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs mdt-muted mb-1">Priority</label>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.form.priority")}</label>
               <select value={draft.priority} onChange={(event) => setDraft((prev) => ({ ...prev, priority: event.target.value as DraftBolo["priority"] }))} className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
+                <option value="low">{t("tablet.severity.low")}</option>
+                <option value="medium">{t("tablet.severity.medium")}</option>
+                <option value="high">{t("tablet.severity.high")}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs mdt-muted mb-1">Status</label>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.form.status")}</label>
               <select value={draft.status} onChange={(event) => setDraft((prev) => ({ ...prev, status: event.target.value as DraftBolo["status"] }))} className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white">
-                <option value="active">Active</option>
-                <option value="resolved">Resolved</option>
+                <option value="active">{t("tablet.status.active")}</option>
+                <option value="resolved">{t("tablet.status.resolved")}</option>
               </select>
             </div>
           </div>
@@ -286,7 +286,7 @@ export default function BoloView({
                 <input
                   value={personSearch}
                   onChange={(event) => setPersonSearch(event.target.value)}
-                  placeholder="Search people"
+                  placeholder={t("tablet.search.people")}
                   className="w-full bg-transparent text-sm text-white placeholder:text-[var(--mdt-text-muted)] outline-none"
                 />
               </div>

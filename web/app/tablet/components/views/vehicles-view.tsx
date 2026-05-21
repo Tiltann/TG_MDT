@@ -978,7 +978,7 @@ export default function VehiclesView({
             <p className="card-sub mt-1  text-[11px]">{t("tablet.vehicles.subtitle")}</p>
           </div>
           <div className="px-3 py-1 rounded border border-zinc-800 bg-black/30 text-xs text-zinc-400  font-bold tracking-wider">
-            {filteredVehicles.length} / {normalizedVehicles.length} RECORDED
+            {filteredVehicles.length} / {normalizedVehicles.length} {t("tablet.common.recorded")}
           </div>
         </div>
 
@@ -1022,12 +1022,12 @@ export default function VehiclesView({
                         <div className="flex items-center gap-1">
                           {isStolen && (
                             <span className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[8px] font-bold text-red-400 tracking-widest  animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.1)]">
-                              STOLEN
+                              {t("tablet.vehicles.status.stolen")}
                             </span>
                           )}
                           {isWanted && (
                             <span className="rounded border border-orange-500/40 bg-orange-500/10 px-1.5 py-0.5 text-[8px] font-bold text-orange-400 tracking-widest  animate-pulse">
-                              BOLO
+                              {t("tablet.vehicles.status.bolo")}
                             </span>
                           )}
                         </div>
@@ -1035,11 +1035,11 @@ export default function VehiclesView({
 
                       <div className="mt-auto pl-1 ">
                         <div className="flex items-center justify-between text-[10px] text-zinc-500">
-                          <span>MODEL:</span>
+                          <span>{t("tablet.vehicles.field.model_short")}</span>
                           <span className="text-zinc-300 font-semibold truncate max-w-[125px]">{vehicle.model !== "-" ? vehicle.model : t("tablet.vehicles.not_available")}</span>
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-zinc-500 mt-1">
-                          <span>OWNER:</span>
+                          <span>{t("tablet.vehicles.field.owner_short")}</span>
                           <span className="text-zinc-400 truncate max-w-[125px]">{vehicle.ownerName || t("tablet.vehicles.not_available")}</span>
                         </div>
                       </div>
@@ -1077,7 +1077,7 @@ export default function VehiclesView({
         
         {currentAkte.stolenStatus === "yes" && (
           <div className="absolute top-16 right-8 select-none border-2 border-dashed border-red-500/30 text-red-500/60 px-4 py-1.5 rounded text-[10px]  font-black tracking-widest uppercase rotate-[2deg] mix-blend-screen shadow-[0_0_8px_rgba(239,68,68,0.05)] pointer-events-none z-10 animate-pulse">
-            REPORTED STOLEN
+            {t("tablet.vehicles.reported_stolen")}
           </div>
         )}
 
@@ -1090,28 +1090,28 @@ export default function VehiclesView({
 
           <div className="p-6 pt-8 space-y-5 overflow-y-auto premium-scroll flex-1">
             <div>
-              <p className="text-[9px]  tracking-[0.25em] text-[var(--mdt-text-muted)] font-black uppercase">DOSSIER INDEX // VEHICLE RECORD</p>
+              <p className="text-[9px]  tracking-[0.25em] text-[var(--mdt-text-muted)] font-black uppercase">{t("tablet.vehicles.dossier_header")}</p>
               <h4 className="text-2xl text-white  font-black mt-1.5 tracking-wide uppercase">{selectedVehicle.plate}</h4>
               
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {currentAkte.stolenStatus === "yes" && (
                   <span className="rounded border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[8px] font-bold text-red-400 tracking-wider ">
-                    STOLEN
+                    {t("tablet.vehicles.status.stolen")}
                   </span>
                 )}
                 {currentAkte.stolenStatus === "investigation" && (
                   <span className="rounded border border-orange-500/40 bg-orange-500/10 px-2 py-0.5 text-[8px] font-bold text-orange-400 tracking-wider ">
-                    BOLO
+                    {t("tablet.vehicles.status.bolo")}
                   </span>
                 )}
                 {currentAkte.registrationStatus === "revoked" && (
                   <span className="rounded border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[8px] font-bold text-red-400 tracking-wider ">
-                    REG REVOKED
+                    {t("tablet.vehicles.status.reg_revoked")}
                   </span>
                 )}
                 {currentAkte.registrationStatus === "expired" && (
                   <span className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[8px] font-bold text-amber-400 tracking-wider ">
-                    REG EXPIRED
+                    {t("tablet.vehicles.status.reg_expired")}
                   </span>
                 )}
               </div>
@@ -1173,14 +1173,14 @@ export default function VehiclesView({
                 {t("tablet.vehicles.akte.title")}
               </h4>
               <div className="flex items-center gap-3">
-                <span className="text-[10px] text-zinc-500  uppercase tracking-widest">Scope: {selectedCompartment}</span>
+                <span className="text-[10px] text-zinc-500  uppercase tracking-widest">{t("tablet.akte.scope")}: {selectedCompartment}</span>
               </div>
             </div>
 
             {/* Sharing Interface */}
             <div className="p-3.5 rounded-xl border border-zinc-900 bg-black/25 space-y-3 ">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <p className="text-[9px] uppercase tracking-widest text-zinc-500 font-black">Compartment Sharing Controls</p>
+                <p className="text-[9px] uppercase tracking-widest text-zinc-500 font-black">{t("tablet.akte.sharing_controls")}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <select
                     value={shareTarget}
@@ -1203,9 +1203,9 @@ export default function VehiclesView({
               </div>
 
               <div className="rounded-lg border border-zinc-900 bg-black/10 p-2.5">
-                <p className="text-[8px] uppercase tracking-wider text-zinc-500 font-bold mb-1.5">ACTIVE SECURE SHARES</p>
+                <p className="text-[8px] uppercase tracking-wider text-zinc-500 font-bold mb-1.5">{t("tablet.akte.active_secure_shares")}</p>
                 {sharedCompartments.length === 0 ? (
-                  <p className="text-[11px] text-zinc-600 italic">No external department shares active for this file</p>
+                  <p className="text-[11px] text-zinc-600 italic">{t("tablet.akte.no_external_shares")}</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {sharedCompartments.map((scope) => {
@@ -1218,7 +1218,7 @@ export default function VehiclesView({
                         >
                           {compartmentLabels[normalizedScope] || normalizedScope.toUpperCase()}
                           {!removable && (
-                            <span className="text-[8px] px-1.5 py-0.2 rounded bg-zinc-805 text-zinc-500 font-bold">SYSTEM</span>
+                            <span className="text-[8px] px-1.5 py-0.2 rounded bg-zinc-805 text-zinc-500 font-bold">{t("tablet.akte.system_share")}</span>
                           )}
                           {removable && (
                             <button
@@ -1322,7 +1322,7 @@ export default function VehiclesView({
                               disabled={captureBusy}
                               className="p-1.5 rounded bg-black/70 hover:bg-black/90 text-white/80 hover:text-white text-[10px] font-semibold border border-white/5 backdrop-blur-sm transition-colors"
                             >
-                              Retake
+                                {t("tablet.akte.retake_image")}
                             </button>
                             <button
                               type="button"
@@ -1330,7 +1330,7 @@ export default function VehiclesView({
                               disabled={captureBusy}
                               className="p-1.5 rounded bg-red-950/70 hover:bg-red-900/90 text-red-300 hover:text-red-200 text-[10px] font-semibold border border-red-500/20 backdrop-blur-sm transition-colors"
                             >
-                              Delete
+                                {t("tablet.akte.delete_image")}
                             </button>
                           </div>
                         </div>
@@ -1423,8 +1423,8 @@ export default function VehiclesView({
                               <div>
                                 <p className="text-xs text-white font-semibold">{note.author}</p>
                                 <p className="text-[10px] text-[var(--mdt-text-muted)] mt-0.5">
-                                  Posted {formatRelativeTime(note.createdAt)}
-                                  {note.expiresAt ? ` • Expires ${formatRelativeTime(note.expiresAt)}` : ""}
+                                  {t("tablet.notes.posted_relative", { time: formatRelativeTime(note.createdAt) })}
+                                  {note.expiresAt ? ` • ${t("tablet.notes.expires_relative", { time: formatRelativeTime(note.expiresAt) })}` : ""}
                                 </p>
                               </div>
                               <button
@@ -1445,7 +1445,7 @@ export default function VehiclesView({
 
                     {/* Add Note Section */}
                     <div className="space-y-3 pt-3 border-t border-zinc-800/40">
-                      <p className="text-[10px] text-[var(--mdt-text-muted)] font-medium">Markdown supported (headings, lists, **bold**, links, checklists).</p>
+                      <p className="text-[10px] text-[var(--mdt-text-muted)] font-medium">{t("tablet.notes.markdown_supported")}</p>
                       
                       <textarea
                         value={newNoteText}
@@ -1457,7 +1457,7 @@ export default function VehiclesView({
 
                       {newNoteText.trim() !== "" && (
                         <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.02] p-3 animate-mdt-scale-in glass-panel">
-                          <p className="text-[9px] uppercase tracking-widest text-amber-500 font-bold mb-1.5">Note Preview</p>
+                          <p className="text-[9px] uppercase tracking-widest text-amber-500 font-bold mb-1.5">{t("tablet.notes.preview")}</p>
                           <div className="text-xs text-zinc-200 prose prose-invert max-w-none prose-p:my-1 prose-li:my-0 leading-relaxed">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{newNoteText}</ReactMarkdown>
                           </div>
@@ -1466,15 +1466,15 @@ export default function VehiclesView({
 
                       <div className="flex items-center gap-2 flex-wrap bg-black/10 p-2.5 rounded-lg border border-zinc-800/40">
                         <div className="flex items-center gap-1.5">
-                          <label className="text-[10px] text-[var(--mdt-text-muted)] uppercase tracking-wider font-semibold">Expiry:</label>
+                          <label className="text-[10px] text-[var(--mdt-text-muted)] uppercase tracking-wider font-semibold">{t("tablet.notes.expiry_label")}:</label>
                           <select
                             value={newNoteExpiryMode}
                             onChange={(event) => setNewNoteExpiryMode(event.target.value as ExpiryMode)}
                             className="p-1.5 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-xs text-white focus:outline-none focus:ring-1 focus:ring-[var(--mdt-accent-primary)]"
                           >
                             <option value="none">{t("tablet.notes.expiry.none")}</option>
-                            <option value="relative">Duration</option>
-                            <option value="custom">Date & time</option>
+                            <option value="relative">{t("tablet.notes.expiry.relative")}</option>
+                            <option value="custom">{t("tablet.notes.expiry.custom")}</option>
                           </select>
                         </div>
 
@@ -1493,9 +1493,9 @@ export default function VehiclesView({
                               onChange={(event) => setNewNoteExpiryUnit(event.target.value as ExpiryUnit)}
                               className="p-1.5 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-xs text-white focus:outline-none"
                             >
-                              <option value="minutes">Minutes</option>
-                              <option value="hours">Hours</option>
-                              <option value="days">Days</option>
+                              <option value="minutes">{t("tablet.notes.expiry.minutes")}</option>
+                              <option value="hours">{t("tablet.notes.expiry.hours")}</option>
+                              <option value="days">{t("tablet.notes.expiry.days")}</option>
                             </select>
                           </div>
                         )}
@@ -1553,7 +1553,7 @@ export default function VehiclesView({
 
                   {/* Additional Details Fields */}
                   <div className="p-4 rounded-xl border border-[var(--mdt-border)] bg-white/[0.01] hover:bg-white/[0.02] hover:border-zinc-800 transition-all duration-300 space-y-3">
-                    <p className="text-xs uppercase tracking-widest text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">Akte Attributes</p>
+                    <p className="text-xs uppercase tracking-widest text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">{t("tablet.akte.attributes")}</p>
                     <div className="grid grid-cols-2 gap-3">
                       {resolvedFields
                         .filter((field) => field.type !== "textarea" && field.key !== imageFieldKey)

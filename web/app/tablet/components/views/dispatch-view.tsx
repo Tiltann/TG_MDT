@@ -258,7 +258,7 @@ export default function DispatchView({
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-white">{call.title}</p>
-                          <p className="text-xs text-(--mdt-text-muted)">{call.location || "Unknown location"}</p>
+                          <p className="text-xs text-(--mdt-text-muted)">{call.location || t("tablet.common.unknown_location")}</p>
                         </div>
                         <span className="dispatch-chip border-(--mdt-border) text-white/80 text-[10px] uppercase tracking-wide">
                           {(call.priority || "medium").toUpperCase()}

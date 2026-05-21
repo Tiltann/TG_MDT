@@ -92,22 +92,22 @@ export default function PenaltiesView({ t }: { t: TFunction }) {
     if (basket.length === 0) return;
     
     let text = `====================================\n`;
-    text += `       MDT CRIMINAL CHARGE REPORT    \n`;
+    text += `       ${t("tablet.penalties.report_title")}    \n`;
     text += `====================================\n\n`;
-    text += `OFFENSES CHARGED:\n`;
+    text += `${t("tablet.penalties.report_offenses")}:\n`;
     
     basket.forEach((item) => {
       text += `- [${item.offense.code}] ${item.offense.name} x${item.count}\n`;
-      text += `  Fine: $${item.offense.fine * item.count} | Sentence: ${item.offense.prison * item.count} months\n`;
+      text += `  ${t("tablet.penalties.report_fine")}: $${item.offense.fine * item.count} | ${t("tablet.penalties.report_sentence")}: ${item.offense.prison * item.count} ${t("tablet.penalties.report_months")}\n`;
     });
     
     text += `\n------------------------------------\n`;
-    text += `SUBTOTAL FINE:  $${subtotalFine.toLocaleString()}\n`;
+    text += `${t("tablet.penalties.report_subtotal")}:  $${subtotalFine.toLocaleString()}\n`;
     if (discount > 0) {
-      text += `DISCOUNT APPLIED: ${discount}%\n`;
+      text += `${t("tablet.penalties.report_discount")}: ${discount}%\n`;
     }
-    text += `TOTAL FINE DUE: $${totalFine.toLocaleString()}\n`;
-    text += `TOTAL SENTENCE:  ${totalPrison} Months\n`;
+    text += `${t("tablet.penalties.report_total_fine")}: $${totalFine.toLocaleString()}\n`;
+    text += `${t("tablet.penalties.report_total_sentence")}:  ${totalPrison} ${t("tablet.penalties.report_months_title")}\n`;
     text += `====================================\n`;
 
     navigator.clipboard.writeText(text);
@@ -262,7 +262,7 @@ export default function PenaltiesView({ t }: { t: TFunction }) {
               {basket.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-[11px] font-bold text-zinc-400 uppercase tracking-wide">
-                    <span>Cooperation Discount</span>
+                    <span>{t("tablet.penalties.cooperation_discount")}</span>
                     <span className="text-amber-500">{discount}%</span>
                   </div>
                   <input
@@ -280,11 +280,11 @@ export default function PenaltiesView({ t }: { t: TFunction }) {
               {/* Totals display */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="bg-black/30 border border-zinc-800/60 p-2.5 rounded-xl text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Total Sentence</p>
-                  <p className="text-lg font-black text-white mt-0.5">{totalPrison} <span className="text-xs text-zinc-400 font-bold">Mos</span></p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{t("tablet.penalties.total_sentence")}</p>
+                  <p className="text-lg font-black text-white mt-0.5">{totalPrison} <span className="text-xs text-zinc-400 font-bold">{t("tablet.penalties.months_short")}</span></p>
                 </div>
                 <div className="bg-black/30 border border-zinc-800/60 p-2.5 rounded-xl text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Total Fine Due</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{t("tablet.penalties.total_fine_due")}</p>
                   <p className="text-lg font-black text-emerald-400 mt-0.5">${totalFine.toLocaleString()}</p>
                 </div>
               </div>
@@ -302,12 +302,12 @@ export default function PenaltiesView({ t }: { t: TFunction }) {
                 {copied ? (
                   <>
                     <Check className="w-4 h-4 mr-2" />
-                    Copied Summary!
+                    {t("tablet.penalties.copied_summary")}
                   </>
                 ) : (
                   <>
                     <Clipboard className="w-4 h-4 mr-2" />
-                    Copy Charge Summary
+                    {t("tablet.penalties.copy_charge_summary")}
                   </>
                 )}
               </Button>

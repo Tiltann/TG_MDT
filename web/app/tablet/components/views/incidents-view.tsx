@@ -236,13 +236,13 @@ export default function IncidentsView({
 
                 <div className="grid gap-3 md:grid-cols-2 text-xs text-[var(--mdt-text-muted)]">
                   <div>
-                    <p className="uppercase tracking-[0.2em] mb-2">People</p>
+                    <p className="uppercase tracking-[0.2em] mb-2">{t("tablet.sidebar.persons")}</p>
                     <div className="flex flex-wrap gap-2">
                       {incident.linkedPersons.length === 0 ? <span>{t("tablet.notes.none")}</span> : incident.linkedPersons.map((id) => <span key={id} className="px-2 py-1 rounded-full bg-white/5 text-white">{persons.find((person) => person.identifier === id)?.name || id}</span>)}
                     </div>
                   </div>
                   <div>
-                    <p className="uppercase tracking-[0.2em] mb-2">Vehicles</p>
+                    <p className="uppercase tracking-[0.2em] mb-2">{t("tablet.sidebar.vehicles")}</p>
                     <div className="flex flex-wrap gap-2">
                       {incident.linkedVehicles.length === 0 ? <span>{t("tablet.notes.none")}</span> : incident.linkedVehicles.map((plate) => <span key={plate} className="px-2 py-1 rounded-full bg-white/5 text-white">{vehicles.find((vehicle) => vehicle.plate === plate)?.plate || plate}</span>)}
                     </div>
@@ -267,27 +267,27 @@ export default function IncidentsView({
           </div>
           <div>
             <label className="block text-xs mdt-muted mb-1">{t("tablet.form.category")}</label>
-            <input value={draft.location} onChange={(event) => setDraft((prev) => ({ ...prev, location: event.target.value }))} className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white" placeholder="Location" />
+            <input value={draft.location} onChange={(event) => setDraft((prev) => ({ ...prev, location: event.target.value }))} className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white" placeholder={t("tablet.form.location")} />
           </div>
           <div>
-            <label className="block text-xs mdt-muted mb-1">Description</label>
+            <label className="block text-xs mdt-muted mb-1">{t("tablet.form.description")}</label>
             <textarea value={draft.description} onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))} rows={4} className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs mdt-muted mb-1">Severity</label>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.form.severity")}</label>
               <select value={draft.severity} onChange={(event) => setDraft((prev) => ({ ...prev, severity: event.target.value as DraftIncident["severity"] }))} className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
+                <option value="low">{t("tablet.severity.low")}</option>
+                <option value="medium">{t("tablet.severity.medium")}</option>
+                <option value="high">{t("tablet.severity.high")}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs mdt-muted mb-1">Status</label>
+              <label className="block text-xs mdt-muted mb-1">{t("tablet.form.status")}</label>
               <select value={draft.status} onChange={(event) => setDraft((prev) => ({ ...prev, status: event.target.value as DraftIncident["status"] }))} className="w-full p-3 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-xl text-white">
-                <option value="open">Open</option>
-                <option value="investigating">Investigating</option>
-                <option value="closed">Closed</option>
+                <option value="open">{t("tablet.status.open")}</option>
+                <option value="investigating">{t("tablet.status.investigating")}</option>
+                <option value="closed">{t("tablet.status.closed")}</option>
               </select>
             </div>
           </div>
@@ -299,7 +299,7 @@ export default function IncidentsView({
                 <input
                   value={personSearch}
                   onChange={(event) => setPersonSearch(event.target.value)}
-                  placeholder="Search people"
+                  placeholder={t("tablet.search.people")}
                   className="w-full bg-transparent text-sm text-white placeholder:text-[var(--mdt-text-muted)] outline-none"
                 />
               </div>

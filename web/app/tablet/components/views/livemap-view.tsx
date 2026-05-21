@@ -52,7 +52,7 @@ export default function LiveMapView({ t }: { t: TFunction }) {
     <div className="h-full flex flex-col gap-4">
       <div>
         <h3 className="text-2xl card-title">{t("tablet.sidebar.livemap")}</h3>
-        <p className="card-sub mt-1">StyleAtlas Livemap (gta-v-map)</p>
+        <p className="card-sub mt-1">{t("tablet.map.subtitle")}</p>
       </div>
       <Card className="p-0 flex-1 overflow-hidden border-(--mdt-border) bg-black">
         {/* @ts-expect-error: Custom element not in JSX.IntrinsicElements */}

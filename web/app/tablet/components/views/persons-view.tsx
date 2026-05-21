@@ -1036,7 +1036,7 @@ export default function PersonsView({
             <p className="card-sub mt-1  text-[11px]">{t("tablet.persons.subtitle")}</p>
           </div>
           <div className="px-3 py-1 rounded border border-zinc-800 bg-black/30 text-xs text-zinc-400  font-bold tracking-wider">
-            {filteredPersons.length} / {normalizedPersons.length} RECORDED
+            {filteredPersons.length} / {normalizedPersons.length} {t("tablet.common.recorded")}
           </div>
         </div>
 
@@ -1062,17 +1062,17 @@ export default function PersonsView({
                     <div className="p-4 rounded-xl border border-zinc-800/80 bg-zinc-950/20 group-hover:bg-zinc-900/10 group-hover:border-zinc-700/60 shadow-lg shadow-black/35 flex flex-col justify-between h-28 overflow-hidden">
                       <div className="flex items-start justify-between gap-3 w-full">
                         <p className="text-sm text-white font-semibold truncate group-hover:text-[var(--mdt-accent-primary)] transition-colors">{person.name}</p>
-                        {isSearched && <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-300 shrink-0">Flagged</span>}
+                        {isSearched && <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-300 shrink-0">{t("tablet.persons.flagged")}</span>}
                       </div>
 
                       <div className="mt-auto">
                         <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                          <span>Job</span>
+                          <span>{t("tablet.persons.field.job")}</span>
                           <span className="text-zinc-300 font-medium truncate max-w-[125px]">{person.job || t("tablet.persons.not_available")}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1">
-                          <span>DOB</span>
-                          <span className="text-zinc-400">{person.dob || "N/A"}</span>
+                          <span>{t("tablet.persons.field.dob")}</span>
+                          <span className="text-zinc-400">{person.dob || t("tablet.persons.not_available")}</span>
                         </div>
                       </div>
                     </div>
@@ -1116,7 +1116,7 @@ export default function PersonsView({
         
         {isSelectedSearched && (
           <div className="absolute top-16 right-8 select-none border-2 border-dashed border-amber-500/30 text-amber-500/60 px-4 py-1.5 rounded text-[10px]  font-black tracking-widest uppercase rotate-[2deg] mix-blend-screen shadow-[0_0_8px_rgba(245,158,11,0.05)] pointer-events-none z-10 animate-pulse">
-            WARRANT RECORD ACTIVE
+            {t("tablet.persons.warrant_record_active")}
           </div>
         )}
 
@@ -1129,9 +1129,9 @@ export default function PersonsView({
 
           <div className="p-6 pt-8 space-y-5 overflow-y-auto premium-scroll flex-1">
             <div>
-              <p className="text-[9px]  tracking-[0.25em] text-[var(--mdt-text-muted)] font-black uppercase">DOSSIER INDEX // PLAYER RECORD</p>
+              <p className="text-[9px]  tracking-[0.25em] text-[var(--mdt-text-muted)] font-black uppercase">{t("tablet.persons.dossier_header")}</p>
               <h4 className="text-2xl text-white  font-black mt-1.5 tracking-wide uppercase">{selectedPerson.name}</h4>
-              <p className="text-[10px] text-zinc-650  mt-1">SERIAL KEY: P-{selectedPerson.identifier.slice(0, 10).toUpperCase()}</p>
+              <p className="text-[10px] text-zinc-650  mt-1">{t("tablet.persons.serial_key")}: P-{selectedPerson.identifier.slice(0, 10).toUpperCase()}</p>
             </div>
 
             <div className="space-y-3 ">
@@ -1192,14 +1192,14 @@ export default function PersonsView({
                 {t("tablet.persons.akte.title")}
               </h4>
               <div className="flex items-center gap-3">
-                <span className="text-[10px] text-zinc-500  uppercase tracking-widest">Scope: {selectedCompartment}</span>
+                <span className="text-[10px] text-zinc-500  uppercase tracking-widest">{t("tablet.akte.scope")}: {selectedCompartment}</span>
               </div>
             </div>
 
             {/* Sharing Interface */}
             <div className="p-3.5 rounded-xl border border-zinc-900 bg-black/25 space-y-3 ">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <p className="text-[9px] uppercase tracking-widest text-zinc-500 font-black">Compartment Sharing Controls</p>
+                <p className="text-[9px] uppercase tracking-widest text-zinc-500 font-black">{t("tablet.akte.sharing_controls")}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <select
                     value={shareTarget}
@@ -1222,9 +1222,9 @@ export default function PersonsView({
               </div>
 
               <div className="rounded-lg border border-zinc-900 bg-black/10 p-2.5">
-                <p className="text-[8px] uppercase tracking-wider text-zinc-500 font-bold mb-1.5">ACTIVE SECURE SHARES</p>
+                <p className="text-[8px] uppercase tracking-wider text-zinc-500 font-bold mb-1.5">{t("tablet.akte.active_secure_shares")}</p>
                 {sharedCompartments.length === 0 ? (
-                  <p className="text-[11px] text-zinc-600 italic">No external department shares active for this file</p>
+                  <p className="text-[11px] text-zinc-600 italic">{t("tablet.akte.no_external_shares")}</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {sharedCompartments.map((scope) => {
@@ -1237,7 +1237,7 @@ export default function PersonsView({
                         >
                           {compartmentLabels[normalizedScope] || normalizedScope.toUpperCase()}
                           {!removable && (
-                            <span className="text-[8px] px-1.5 py-0.2 rounded bg-zinc-805 text-zinc-500 font-bold">SYSTEM</span>
+                            <span className="text-[8px] px-1.5 py-0.2 rounded bg-zinc-805 text-zinc-500 font-bold">{t("tablet.akte.system_share")}</span>
                           )}
                           {removable && (
                             <button
@@ -1341,7 +1341,7 @@ export default function PersonsView({
                             disabled={captureBusy}
                             className="p-1.5 rounded bg-black/70 hover:bg-black/90 text-white/80 hover:text-white text-[10px] font-semibold border border-white/5 backdrop-blur-sm transition-colors"
                           >
-                            Retake
+                            {t("tablet.akte.retake_image")}
                           </button>
                           <button
                             type="button"
@@ -1349,7 +1349,7 @@ export default function PersonsView({
                             disabled={captureBusy}
                             className="p-1.5 rounded bg-red-950/70 hover:bg-red-900/90 text-red-300 hover:text-red-200 text-[10px] font-semibold border border-red-500/20 backdrop-blur-sm transition-colors"
                           >
-                            Delete
+                            {t("tablet.akte.delete_image")}
                           </button>
                         </div>
                       </div>
@@ -1442,8 +1442,8 @@ export default function PersonsView({
                             <div>
                               <p className="text-xs text-white font-semibold">{note.author}</p>
                               <p className="text-[10px] text-[var(--mdt-text-muted)] mt-0.5">
-                                Posted {formatRelativeTime(note.createdAt)}
-                                {note.expiresAt ? ` • Expires ${formatRelativeTime(note.expiresAt)}` : ""}
+                                {t("tablet.notes.posted_relative", { time: formatRelativeTime(note.createdAt) })}
+                                {note.expiresAt ? ` • ${t("tablet.notes.expires_relative", { time: formatRelativeTime(note.expiresAt) })}` : ""}
                               </p>
                             </div>
                             <button
@@ -1464,7 +1464,7 @@ export default function PersonsView({
 
                   {/* Add Note Section */}
                   <div className="space-y-3 pt-3 border-t border-zinc-800/40">
-                    <p className="text-[10px] text-[var(--mdt-text-muted)] font-medium">Markdown supported (headings, lists, **bold**, links, checklists).</p>
+                    <p className="text-[10px] text-[var(--mdt-text-muted)] font-medium">{t("tablet.notes.markdown_supported")}</p>
                     
                     <textarea
                       value={newNoteText}
@@ -1476,7 +1476,7 @@ export default function PersonsView({
 
                     {newNoteText.trim() !== "" && (
                       <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.02] p-3 animate-mdt-scale-in glass-panel">
-                        <p className="text-[9px] uppercase tracking-widest text-amber-500 font-bold mb-1.5">Note Preview</p>
+                        <p className="text-[9px] uppercase tracking-widest text-amber-500 font-bold mb-1.5">{t("tablet.notes.preview")}</p>
                         <div className="text-xs text-zinc-200 prose prose-invert max-w-none prose-p:my-1 prose-li:my-0 leading-relaxed">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>{newNoteText}</ReactMarkdown>
                         </div>
@@ -1485,15 +1485,15 @@ export default function PersonsView({
 
                     <div className="flex items-center gap-2 flex-wrap bg-black/10 p-2.5 rounded-lg border border-zinc-800/40">
                       <div className="flex items-center gap-1.5">
-                        <label className="text-[10px] text-[var(--mdt-text-muted)] uppercase tracking-wider font-semibold">Expiry:</label>
+                        <label className="text-[10px] text-[var(--mdt-text-muted)] uppercase tracking-wider font-semibold">{t("tablet.notes.expiry_label")}:</label>
                         <select
                           value={newNoteExpiryMode}
                           onChange={(event) => setNewNoteExpiryMode(event.target.value as ExpiryMode)}
                           className="p-1.5 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-xs text-white focus:outline-none focus:ring-1 focus:ring-[var(--mdt-accent-primary)]"
                         >
                           <option value="none">{t("tablet.notes.expiry.none")}</option>
-                          <option value="relative">Duration</option>
-                          <option value="custom">Date & time</option>
+                          <option value="relative">{t("tablet.notes.expiry.relative")}</option>
+                          <option value="custom">{t("tablet.notes.expiry.custom")}</option>
                         </select>
                       </div>
 
@@ -1512,9 +1512,9 @@ export default function PersonsView({
                             onChange={(event) => setNewNoteExpiryUnit(event.target.value as ExpiryUnit)}
                             className="p-1.5 bg-[var(--mdt-bg-base)] border border-[var(--mdt-border)] rounded-md text-xs text-white focus:outline-none"
                           >
-                            <option value="minutes">Minutes</option>
-                            <option value="hours">Hours</option>
-                            <option value="days">Days</option>
+                            <option value="minutes">{t("tablet.notes.expiry.minutes")}</option>
+                            <option value="hours">{t("tablet.notes.expiry.hours")}</option>
+                            <option value="days">{t("tablet.notes.expiry.days")}</option>
                           </select>
                         </div>
                       )}
@@ -1570,7 +1570,7 @@ export default function PersonsView({
                   </div>
 
                   <div className="rounded-xl border border-[var(--mdt-border)] bg-white/[0.01] hover:bg-white/[0.02] hover:border-zinc-800 transition-all duration-300 p-4 space-y-3">
-                    <p className="text-[10px] uppercase tracking-wider text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">Dispatch Calls</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">{t("tablet.dispatch.calls")}</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto premium-scroll pr-1">
                       {relatedDispatches.length === 0 ? (
                         <p className="text-xs text-zinc-650 italic text-center py-2">{t("tablet.notes.none")}</p>
@@ -1579,11 +1579,11 @@ export default function PersonsView({
                           <div key={dispatchEntry.id} className="text-xs rounded-lg bg-black/25 border border-zinc-900 p-2.5 hover:border-zinc-800 transition-colors">
                             <p className="text-white font-semibold">{dispatchEntry.title}</p>
                             <p className="text-[10px] text-[var(--mdt-text-muted)] mt-1">
-                              {(dispatchEntry.location || "Unknown")} • {new Date(dispatchEntry.createdAt).toLocaleString()}
+                              {(dispatchEntry.location || t("tablet.common.unknown"))} • {new Date(dispatchEntry.createdAt).toLocaleString()}
                             </p>
                             {Array.isArray(dispatchEntry.acceptedBy) && dispatchEntry.acceptedBy.length > 0 && (
                               <p className="text-[10px] text-[var(--mdt-text-muted)] mt-1">
-                                Accepted: {dispatchEntry.acceptedBy.map((item) => item.name).join(", ")}
+                                {t("tablet.dispatch.accepted_by", { names: dispatchEntry.acceptedBy.map((item) => item.name).join(", ") })}
                               </p>
                             )}
                           </div>
@@ -1595,7 +1595,7 @@ export default function PersonsView({
 
                 {/* Additional Details Fields */}
                 <div className="p-4 rounded-xl border border-[var(--mdt-border)] bg-white/[0.01] hover:bg-white/[0.02] hover:border-zinc-800 transition-all duration-300 space-y-3">
-                  <p className="text-xs uppercase tracking-widest text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">Akte Attributes</p>
+                  <p className="text-xs uppercase tracking-widest text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">{t("tablet.akte.attributes")}</p>
                   <div className="grid grid-cols-2 gap-3">
                     {resolvedFields
                       .filter((field) => field.type !== "textarea" && field.key !== imageFieldKey)

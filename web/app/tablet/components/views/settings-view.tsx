@@ -85,8 +85,8 @@ export default function SettingsView({
                   onChange={(event) => onLocaleChange(event.target.value as SupportedLocale)}
                   className="w-full appearance-none bg-zinc-950/60 border border-zinc-800/80 hover:border-zinc-700/60 text-zinc-100 rounded-xl px-4 py-3 pr-10 focus:outline-none focus:border-[var(--mdt-accent-primary)] focus:ring-1 focus:ring-[var(--mdt-accent-primary)]/20 transition-all  text-sm cursor-pointer shadow-inner"
                 >
-                  <option value="en" className="bg-zinc-950">English (EN)</option>
-                  <option value="de" className="bg-zinc-950">Deutsch (DE)</option>
+                  <option value="en" className="bg-zinc-950">{t("tablet.settings.locale_option_en")}</option>
+                  <option value="de" className="bg-zinc-950">{t("tablet.settings.locale_option_de")}</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-zinc-500">
                   <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -98,7 +98,7 @@ export default function SettingsView({
           </div>
           
           <div className="mt-6 text-[9px]  text-zinc-650 tracking-wider">
-            INTERFACE DIALECT CONTROL: ACCESSED AND STABILIZED
+            {t("tablet.settings.locale_hint_line")}
           </div>
         </Card>
 
@@ -145,7 +145,7 @@ export default function SettingsView({
             </div>
 
             <div className="mt-4 text-[9px]  text-zinc-650 tracking-wider">
-              HUD GRAPHICAL FEED OVERLAY SETTINGS
+              {t("tablet.settings.map_hint_line")}
             </div>
           </Card>
         )}
@@ -184,7 +184,7 @@ export default function SettingsView({
               />
             </div>
             <div className="space-y-1 ">
-              <p className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold">SYSTEM ACTIVE HEX</p>
+              <p className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold">{t("tablet.settings.system_active_hex")}</p>
               <p className="text-sm font-black text-white tracking-widest bg-black/40 px-2.5 py-1 rounded border border-zinc-900">
                 {accentColor.toUpperCase()}
               </p>
@@ -194,7 +194,7 @@ export default function SettingsView({
           {/* Tactical color preset matrix */}
           <div className="lg:col-span-8 space-y-2">
             <p className="text-[10px]  font-bold tracking-widest text-zinc-500 uppercase">
-              TACTICAL FREQUENCY PRESETS:
+              {t("tablet.settings.tactical_presets")}
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {colorPresets.map((preset) => {

@@ -207,7 +207,7 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
               )}
               <div className="flex items-center gap-2">
                 <label className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
-                  Auto Delete
+                  {t("tablet.blackboard.auto_delete")}
                 </label>
                 <select
                   value={expiryHours}
