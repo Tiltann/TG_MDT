@@ -8,6 +8,8 @@
 
 ## 🇩🇪 Deutsch
 
+**Tablet Vorschau:** [https://tiltann.github.io/TG_MDT/](https://tiltann.github.io/TG_MDT/)
+
 Ein freies, modulares **MDT (Mobile Data Terminal)** als Ingame-Tablet für **alle Fraktionen** — nicht nur Polizei, sondern auch Medic, Mechanic, Justiz und mehr. Jede Fraktion sieht ihre eigenen Daten, kann aber je nach Rechten auch auf relevante Informationen anderer Fraktionen zugreifen (z. B. Medic → Krankenakte, Polizei → Strafakte).
 
 Entwickelt als **Community-Projekt** von Mitgliedern des Tubehosting Discord. **Nicht offiziell mit Tubehosting affiliiert.**
@@ -97,6 +99,8 @@ Support gibt es aktuell **ausschließlich über GitHub Issues**. Bitte keine Sup
 ---
 
 ## 🇬🇧 English
+
+**Tablet Preview:** [https://tiltann.github.io/TG_MDT/](https://tiltann.github.io/TG_MDT/)
 
 A free, modular **MDT (Mobile Data Terminal)** as an in-game tablet for **every faction** — not only police, but also medic, mechanic, judiciary and more. Each faction sees its own data, but depending on permissions can also access relevant information from other factions (e.g. medic → medical records, police → criminal records).
 
