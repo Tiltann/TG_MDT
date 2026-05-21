@@ -259,6 +259,10 @@ type RadioMember = {
   status?: string;
 };
 
+type HomeProps = {
+  devMode?: boolean;
+};
+
 const STORAGE_KEYS = {
   profile: "tg_mdt_profile",
   chat: "tg_mdt_chat_messages",
@@ -280,6 +284,230 @@ const DEFAULT_BOLOS: BoloRecord[] = [];
 const DEFAULT_BOARD_POSTS: BoardPost[] = [];
 const DEFAULT_DISPATCH_STATUSES: Record<string, DispatchStatus> = {};
 const DEFAULT_DISPATCH_GROUPS: DispatchGroup[] = [];
+const DEV_PROFILE: ProfileData = {
+  name: "Tiltann",
+  imageUrl: "",
+};
+
+const DEV_TRANSLATIONS_EN: Record<string, string> = {
+  "tablet.sidebar.dashboard": "Dashboard",
+  "tablet.sidebar.blackboard": "Blackboard",
+  "tablet.sidebar.dispatch": "Dispatch",
+  "tablet.sidebar.persons": "Persons",
+  "tablet.sidebar.vehicles": "Vehicles",
+  "tablet.sidebar.penalty_catalog": "Penalties",
+  "tablet.sidebar.livemap": "Live Map",
+  "tablet.sidebar.chat": "Chat",
+  "tablet.sidebar.live_chat": "Live Chat",
+  "tablet.sidebar.settings": "Settings",
+  "tablet.actions.back": "Back",
+  "tablet.form.save_akte": "Save Akte",
+  "tablet.dashboard.greeting_morning": "Good morning, {name}",
+  "tablet.dashboard.greeting_evening": "Good evening, {name}",
+};
+
+const DEV_PERSONS: PersonRecord[] = [
+  {
+    identifier: "char-001",
+    firstname: "Maya",
+    lastname: "Carter",
+    name: "Maya Carter",
+    dob: "1994-03-12",
+    gender: "F",
+    job: "police",
+  },
+  {
+    identifier: "char-002",
+    firstname: "Noah",
+    lastname: "Mercer",
+    name: "Noah Mercer",
+    dob: "1989-11-05",
+    gender: "M",
+    job: "police",
+  },
+  {
+    identifier: "char-003",
+    firstname: "Lea",
+    lastname: "Ortiz",
+    name: "Lea Ortiz",
+    dob: "1998-08-23",
+    gender: "F",
+    job: "ambulance",
+  },
+];
+
+const DEV_VEHICLES: VehicleRecord[] = [
+  {
+    plate: "LSPD-204",
+    ownerIdentifier: "char-001",
+    ownerName: "Maya Carter",
+    model: "Buffalo STX",
+    state: "garage",
+  },
+  {
+    plate: "EMS-911",
+    ownerIdentifier: "char-003",
+    ownerName: "Lea Ortiz",
+    model: "Ambulance",
+    state: "out",
+  },
+];
+
+const DEV_PERSON_AKTEN: Record<string, PersonAkte> = {
+  "char-001": {
+    personImage: JSON.stringify(["https://picsum.photos/seed/mdt-char-001/1200/800"]),
+    phone: "+1-555-0114",
+    warrantStatus: "none",
+    dangerLevel: "low",
+    driverLicense: "valid",
+    weaponLicense: "valid",
+    notes: JSON.stringify([
+      {
+        id: "n1",
+        text: "Known to cooperate with officers.",
+        author: "Sgt. Hale",
+        createdAt: "2026-05-20T09:15:00.000Z",
+      },
+    ]),
+  },
+  "char-002": {
+    personImage: JSON.stringify(["https://picsum.photos/seed/mdt-char-002/1200/800"]),
+    phone: "+1-555-0188",
+    warrantStatus: "active",
+    dangerLevel: "medium",
+    driverLicense: "suspended",
+    weaponLicense: "none",
+    notes: JSON.stringify([
+      {
+        id: "n2",
+        text: "Open warrant linked to traffic evasion.",
+        author: "Officer Tiltann",
+        createdAt: "2026-05-21T18:40:00.000Z",
+      },
+    ]),
+    searchStatus: "searched",
+    searchedAt: "2026-05-21T18:42:00.000Z",
+  },
+};
+
+const DEV_VEHICLE_AKTEN: Record<string, VehicleAkte> = {
+  "LSPD-204": {
+    notes: "Unit vehicle in active patrol rotation.",
+  },
+  "EMS-911": {
+    notes: "Medical response unit.",
+  },
+};
+
+const DEV_META: NuiMetaPayload = {
+  locale: "en",
+  modules: defaultMockupModules,
+  translations: DEV_TRANSLATIONS_EN,
+  translationsByLocale: {
+    en: DEV_TRANSLATIONS_EN,
+  },
+  branding: {
+    accent: "#ff9100",
+    dateLabel: "May 22, 2026",
+  },
+  mdt: {
+    player_name_mode: "fullname",
+    allow_map_style_change: true,
+    default_map_style: "styleAtlas",
+    allowed_jobs: ["police", "ambulance"],
+    departments: {
+      police: {
+        label: "Police Department",
+        jobs: ["police"],
+      },
+      ambulance: {
+        label: "Emergency Medical",
+        jobs: ["ambulance"],
+      },
+    },
+    dispatch: {
+      share_between_jobs: true,
+      default_status: "10-8",
+      off_duty_status: "10-7",
+      status_codes: [
+        { code: "10-8", label: "Available", color: "green" },
+        { code: "10-6", label: "Busy", color: "yellow" },
+        { code: "10-97", label: "On Scene", color: "blue" },
+        { code: "10-7", label: "Off Duty", color: "gray" },
+      ],
+    },
+  },
+  akteModels: {
+    job_models: {
+      police: {
+        compartment: "police",
+      },
+      ambulance: {
+        compartment: "ambulance",
+        shared_with: ["police"],
+      },
+    },
+  },
+};
+
+function buildDevScreenData(): Record<string, unknown> {
+  return {
+    meta: DEV_META,
+    player: {
+      name: "Tiltann",
+      firstname: "Tiltann",
+      lastname: "",
+      gradeDisplay: "Sergeant",
+      gradeLevel: 3,
+      gradeCount: 5,
+    },
+    duty: {
+      enabled: true,
+      onDuty: true,
+      framework: "dev",
+      jobName: "police",
+      dutyJobName: "police",
+      switchJobEnabled: false,
+      offDutyJobName: "offpolice",
+    },
+    session: {
+      job: "police",
+    },
+    clock: {
+      hour: 10,
+      minute: 32,
+      period: "morning",
+      label: "10:32",
+    },
+    persons: DEV_PERSONS,
+    vehicles: DEV_VEHICLES,
+    personAkten: DEV_PERSON_AKTEN,
+    vehicleAkten: DEV_VEHICLE_AKTEN,
+    map: {
+      markers: [
+        { x: 0.41, y: 0.52, label: "Downtown" },
+        { x: 0.58, y: 0.37, label: "Mission Row" },
+      ],
+      playerPosition: { x: 0.54, y: 0.46 },
+    },
+    radioMembers: [
+      {
+        source: 12,
+        name: "Unit 12 - R. Hale",
+        gradeDisplay: "Officer",
+        jobName: "police",
+        status: "10-23",
+      },
+      {
+        source: 21,
+        name: "Medic 21 - L. Ortiz",
+        gradeDisplay: "Paramedic",
+        jobName: "ambulance",
+        status: "10-8",
+      },
+    ],
+  };
+}
 
 const BOARD_POST_DEFAULT_EXPIRY_HOURS = 48;
 
@@ -385,11 +613,11 @@ function normalizeScreenId(screen?: string | null): string | null {
   return screen === "shifts" ? "chat" : screen;
 }
 
-export default function Home() {
+export default function Home({ devMode = false }: HomeProps) {
   const [isHandshakeDone, setHandshakeDone] = useState(true);
-  const [isVisible, setVisible] = useState(false);
-  const [activeScreen, setActiveScreen] = useState<string | null>(null);
-  const [screenData, setScreenData] = useState<Record<string, unknown>>({});
+  const [isVisible, setVisible] = useState(devMode);
+  const [activeScreen, setActiveScreen] = useState<string | null>(devMode ? "dashboard" : null);
+  const [screenData, setScreenData] = useState<Record<string, unknown>>(() => (devMode ? buildDevScreenData() : {}));
   const [localeOverride, setLocaleOverride] = useState<SupportedLocale | null>(null);
   const [accentOverride, setAccentOverride] = useState<string | null>(null);
   const [isLocaleReady, setLocaleReady] = useState(false);
@@ -409,9 +637,34 @@ export default function Home() {
   const seededActivityRef = useRef(false);
   const previousDutyRef = useRef<boolean | null>(null);
   const previousAkteSyncRef = useRef<string | null>(null);
+  const hasSeededDevDataRef = useRef(false);
+
+  useEffect(() => {
+    if (!devMode) return;
+    if (hasSeededDevDataRef.current) return;
+
+    hasSeededDevDataRef.current = true;
+    setVisible(true);
+    setActiveScreen("dashboard");
+    setScreenData((prev) => ({
+      ...buildDevScreenData(),
+      ...prev,
+    }));
+  }, [devMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    if (devMode) {
+      setProfileData(DEV_PROFILE);
+      setChatMessages(DEFAULT_CHAT_MESSAGES);
+      setIncidentRecords(DEFAULT_INCIDENTS);
+      setBoloRecords(DEFAULT_BOLOS);
+      setBoardPosts(DEFAULT_BOARD_POSTS);
+      setDispatchStatuses(DEFAULT_DISPATCH_STATUSES);
+      setDispatchGroups(DEFAULT_DISPATCH_GROUPS);
+      return;
+    }
 
     const storedProfile = loadJsonObject<ProfileData>(STORAGE_KEYS.profile, DEFAULT_PROFILE);
     const storedChat = loadJsonArray<ChatMessage>(STORAGE_KEYS.chat, DEFAULT_CHAT_MESSAGES);
@@ -438,7 +691,7 @@ export default function Home() {
     setBoardPosts(storedBoardPosts);
     setDispatchStatuses(storedDispatchStatuses);
     setDispatchGroups(storedDispatchGroups);
-  }, []);
+  }, [devMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -619,7 +872,7 @@ export default function Home() {
 
   // Fallback for browser dev mode to always show UI
   const is_browser = typeof window !== "undefined" && !("invokeNative" in window);
-  const show_ui = is_browser || isVisible || activeScreen !== null;
+  const show_ui = devMode || is_browser || isVisible || activeScreen !== null;
 
   const meta = (screenData?.meta as any) || {};
   const typedMeta = meta as NuiMetaPayload;
@@ -1556,10 +1809,15 @@ export default function Home() {
   };
 
   // show absolutely nothing until NUI handshake is done.
-  if (!isHandshakeDone && !is_browser) return null;
+  if (!isHandshakeDone && !is_browser && !devMode) return null;
 
   return (
     <main className="nui-root" data-visible={show_ui ? "true" : "false"} style={rootStyle}>
+      {devMode && (
+        <div className="fixed right-5 top-5 z-130 rounded-md border border-amber-400/60 bg-black/75 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.22)]">
+          Dev Mock Mode
+        </div>
+      )}
       <div className="nui-layer nui-layer-bg" />
 
       {show_ui && (
