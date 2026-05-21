@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
-import IncidentsView, { type IncidentRecord } from "./incidents-view";
+import Modal from "../ui/modal";
 import type { TFunction } from "../../lib/i18n";
 
 type PersonRecord = { identifier: string; name?: string | null; firstname?: string | null; lastname?: string | null };
@@ -22,7 +22,9 @@ export type DispatchOfficer = {
   name: string;
   gradeDisplay?: string;
   job?: string;
+  jobLabel?: string;
   online: boolean;
+  onDuty?: boolean;
   status: DispatchStatus;
 };
 
@@ -69,10 +71,9 @@ function statusBadgeClass(color?: DispatchStatusOption["color"]): string {
 
 export default function DispatchView({
   t,
-  incidents,
-  persons,
   vehicles,
   officers,
+  showSharedJobLabel,
   liveCalls,
   statusOptions,
   groups,
@@ -85,15 +86,13 @@ export default function DispatchView({
   onCreateGroup,
   onUpdateGroupMembers,
   onDeleteGroup,
-  onCreateIncident,
-  onUpdateIncident,
-  onDeleteIncident,
+  onAcceptCase,
+  onCloseCase,
 }: {
   t: TFunction;
-  incidents: IncidentRecord[];
-  persons: PersonRecord[];
   vehicles: VehicleRecord[];
   officers: DispatchOfficer[];
+  showSharedJobLabel?: boolean;
   liveCalls: DispatchLiveCall[];
   statusOptions: DispatchStatusOption[];
   groups: DispatchGroup[];
@@ -106,17 +105,20 @@ export default function DispatchView({
   onCreateGroup: (name: string, memberIds: string[]) => void;
   onUpdateGroupMembers: (groupId: string, memberIds: string[]) => void;
   onDeleteGroup: (groupId: string) => void;
-  onCreateIncident: (incident: Omit<IncidentRecord, "id" | "createdAt" | "updatedAt">) => void;
-  onUpdateIncident: (id: string, patch: Partial<IncidentRecord>) => void;
-  onDeleteIncident: (id: string) => void;
+  onAcceptCase: (dispatchId: string) => void;
+  onCloseCase: (dispatchId: string) => void;
 }) {
   const [officerQuery, setOfficerQuery] = useState("");
   const [draftGroupName, setDraftGroupName] = useState("");
-  const [draftMemberIds, setDraftMemberIds] = useState<string[]>([]);
   const [selectedOfficerByCall, setSelectedOfficerByCall] = useState<Record<string, string>>({});
   const [selectedVehicleByCall, setSelectedVehicleByCall] = useState<Record<string, string>>({});
   const [selectedGroupByCall, setSelectedGroupByCall] = useState<Record<string, string>>({});
+  const [assignModeByCall, setAssignModeByCall] = useState<Record<string, "officer" | "group">>({});
   const [isStatusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [isGroupModalOpen, setGroupModalOpen] = useState(false);
+  const [groupModalTargetId, setGroupModalTargetId] = useState<string | null>(null);
+  const [groupModalName, setGroupModalName] = useState("");
+  const [groupModalMemberIds, setGroupModalMemberIds] = useState<string[]>([]);
 
   const selfOfficer = officers.find((officer) => officer.id === currentOfficerId) || null;
 
@@ -140,18 +142,46 @@ export default function DispatchView({
     });
   }, [officerQuery, officers]);
 
-  const toggleDraftMember = (officerId: string) => {
-    setDraftMemberIds((prev) =>
+  const resolveDutyState = (officer: DispatchOfficer): boolean => {
+    if (typeof officer.onDuty === "boolean") {
+      return officer.onDuty;
+    }
+    return officer.online;
+  };
+
+  const toggleGroupModalMember = (officerId: string) => {
+    setGroupModalMemberIds((prev) =>
       prev.includes(officerId) ? prev.filter((id) => id !== officerId) : [...prev, officerId]
     );
   };
 
-  const handleCreateGroup = () => {
-    const name = draftGroupName.trim();
-    if (name === "" || draftMemberIds.length === 0) return;
-    onCreateGroup(name, draftMemberIds);
+  const openCreateGroupModal = () => {
+    setGroupModalTargetId(null);
+    setGroupModalName(draftGroupName.trim());
+    setGroupModalMemberIds([]);
+    setGroupModalOpen(true);
+  };
+
+  const openAddMembersModal = (group: DispatchGroup) => {
+    setGroupModalTargetId(group.id);
+    setGroupModalName(group.name);
+    setGroupModalMemberIds(group.memberIds);
+    setGroupModalOpen(true);
+  };
+
+  const handleSaveGroupModal = () => {
+    const selectedMembers = Array.from(new Set(groupModalMemberIds));
+    if (groupModalTargetId) {
+      onUpdateGroupMembers(groupModalTargetId, selectedMembers);
+      setGroupModalOpen(false);
+      return;
+    }
+
+    const name = groupModalName.trim();
+    if (name === "" || selectedMembers.length === 0) return;
+    onCreateGroup(name, selectedMembers);
     setDraftGroupName("");
-    setDraftMemberIds([]);
+    setGroupModalOpen(false);
   };
 
   return (
@@ -162,13 +192,12 @@ export default function DispatchView({
           <p className="card-sub mt-1">{t("tablet.dispatch.console", undefined, "Dispatch Console")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost">{t("tablet.dispatch.active_units", undefined, "Active Units")}</Button>
           <Button>{t("tablet.dispatch.assign", undefined, "Assign")}</Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 flex-1 min-h-0">
-        <Card className="p-4 xl:col-span-2 min-h-0 overflow-hidden flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 flex-1 min-h-0">
+        <Card className="p-4 min-h-0 overflow-hidden flex flex-col gap-4">
           <div className="dispatch-block p-3">
             <p className="card-sub mb-2">{t("tablet.dispatch.my_status", undefined, "My Status")}</p>
             <div className="flex items-center gap-2">
@@ -238,59 +267,99 @@ export default function DispatchView({
 
                       <div className="mt-2 grid grid-cols-1 gap-2">
                         <div className="flex items-center gap-2">
-                          <select
-                            className="dispatch-input flex-1 px-2 py-1 text-xs"
-                            value={selectedOfficerByCall[call.id] || ""}
-                            onChange={(event) =>
-                              setSelectedOfficerByCall((prev) => ({ ...prev, [call.id]: event.target.value }))
-                            }
-                          >
-                            <option value="">{t("tablet.dispatch.select_unit", undefined, "Select unit")}</option>
-                            {officers.map((officer) => (
-                              <option key={`${call.id}-${officer.id}`} value={officer.id}>
-                                {officer.name}
-                              </option>
-                            ))}
-                          </select>
                           <button
                             className="dispatch-action px-2 py-1 text-xs"
-                            onClick={() => selectedOfficer && onAssignUnit(call.id, selectedOfficer)}
+                            onClick={() => onAcceptCase(call.id)}
                           >
-                            {t("tablet.dispatch.assign_unit", undefined, "Assign Unit")}
+                            {t("tablet.dispatch.accept_case", undefined, "Accept Case")}
+                          </button>
+                          <button
+                            className="dispatch-action px-2 py-1 text-xs"
+                            onClick={() => onCloseCase(call.id)}
+                          >
+                            {t("tablet.dispatch.close_case", undefined, "Close Case")}
                           </button>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <select
-                            className="dispatch-input flex-1 px-2 py-1 text-xs"
-                            value={selectedGroupByCall[call.id] || ""}
-                            onChange={(event) =>
-                              setSelectedGroupByCall((prev) => ({ ...prev, [call.id]: event.target.value }))
+                          <button
+                            className={`dispatch-action px-2 py-1 text-xs ${
+                              (assignModeByCall[call.id] || "officer") === "officer" ? "border-(--mdt-accent-primary)" : ""
+                            }`}
+                            onClick={() =>
+                              setAssignModeByCall((prev) => ({ ...prev, [call.id]: "officer" }))
                             }
                           >
-                            <option value="">{t("tablet.dispatch.select_group", undefined, "Select group")}</option>
-                            {groups.map((group) => (
-                              <option key={`${call.id}-group-${group.id}`} value={group.id}>
-                                {group.name}
-                              </option>
-                            ))}
-                          </select>
+                            {t("tablet.dispatch.select_unit", undefined, "Select unit")}
+                          </button>
                           <button
-                            className="dispatch-action px-2 py-1 text-xs"
-                            onClick={() => {
-                              const selectedGroup = groups.find((group) => group.id === selectedGroupByCall[call.id]);
-                              if (!selectedGroup) return;
-                              for (const memberId of selectedGroup.memberIds) {
-                                const member = officers.find((officer) => officer.id === memberId);
-                                if (member) {
-                                  onAssignUnit(call.id, member);
-                                }
-                              }
-                            }}
+                            className={`dispatch-action px-2 py-1 text-xs ${
+                              (assignModeByCall[call.id] || "officer") === "group" ? "border-(--mdt-accent-primary)" : ""
+                            }`}
+                            onClick={() =>
+                              setAssignModeByCall((prev) => ({ ...prev, [call.id]: "group" }))
+                            }
                           >
-                            {t("tablet.dispatch.assign_group", undefined, "Assign Group")}
+                            {t("tablet.dispatch.select_group", undefined, "Select group")}
                           </button>
                         </div>
+
+                        {(assignModeByCall[call.id] || "officer") === "officer" ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              className="dispatch-input flex-1 px-2 py-1 text-xs"
+                              value={selectedOfficerByCall[call.id] || ""}
+                              onChange={(event) =>
+                                setSelectedOfficerByCall((prev) => ({ ...prev, [call.id]: event.target.value }))
+                              }
+                            >
+                              <option value="">{t("tablet.dispatch.select_unit", undefined, "Select unit")}</option>
+                              {officers.map((officer) => (
+                                <option key={`${call.id}-${officer.id}`} value={officer.id}>
+                                  {officer.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              className="dispatch-action px-2 py-1 text-xs"
+                              onClick={() => selectedOfficer && onAssignUnit(call.id, selectedOfficer)}
+                            >
+                              {t("tablet.dispatch.assign_unit", undefined, "Assign Unit")}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <select
+                              className="dispatch-input flex-1 px-2 py-1 text-xs"
+                              value={selectedGroupByCall[call.id] || ""}
+                              onChange={(event) =>
+                                setSelectedGroupByCall((prev) => ({ ...prev, [call.id]: event.target.value }))
+                              }
+                            >
+                              <option value="">{t("tablet.dispatch.select_group", undefined, "Select group")}</option>
+                              {groups.map((group) => (
+                                <option key={`${call.id}-group-${group.id}`} value={group.id}>
+                                  {group.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              className="dispatch-action px-2 py-1 text-xs"
+                              onClick={() => {
+                                const selectedGroup = groups.find((group) => group.id === selectedGroupByCall[call.id]);
+                                if (!selectedGroup) return;
+                                for (const memberId of selectedGroup.memberIds) {
+                                  const member = officers.find((officer) => officer.id === memberId);
+                                  if (member) {
+                                    onAssignUnit(call.id, member);
+                                  }
+                                }
+                              }}
+                            >
+                              {t("tablet.dispatch.assign_group", undefined, "Assign Group")}
+                            </button>
+                          </div>
+                        )}
 
                         <div className="flex items-center gap-2">
                           <select
@@ -369,7 +438,7 @@ export default function DispatchView({
                     <div>
                       <p className="text-sm font-semibold text-white leading-tight">{officer.name}</p>
                       <p className="text-xs text-(--mdt-text-muted)">
-                        {(officer.gradeDisplay || "Officer") + (officer.job ? ` - ${officer.job}` : "")}
+                        {showSharedJobLabel && officer.jobLabel ? officer.jobLabel : (officer.gradeDisplay || "Officer")}
                       </p>
                     </div>
                     <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-wide ${statusBadgeClass(resolveStatusColor(officer.status))}`}>
@@ -377,15 +446,10 @@ export default function DispatchView({
                     </span>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-(--mdt-text-muted)">
-                    <span>{officer.online ? "Online" : "Offline"}</span>
-                    <button
-                      className="dispatch-action px-2 py-1"
-                      onClick={() => toggleDraftMember(officer.id)}
-                    >
-                      {draftMemberIds.includes(officer.id)
-                        ? t("tablet.dispatch.remove_from_group", undefined, "Remove")
-                        : t("tablet.dispatch.add_to_group", undefined, "Add")}
-                    </button>
+                    <span>
+                      {officer.online ? "Online" : "Offline"} - {resolveDutyState(officer) ? "On Duty" : "Off Duty"}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wide">#{officer.id}</span>
                   </div>
                 </div>
               ))}
@@ -401,7 +465,7 @@ export default function DispatchView({
                 value={draftGroupName}
                 onChange={(event) => setDraftGroupName(event.target.value)}
               />
-              <Button onClick={handleCreateGroup}>{t("tablet.dispatch.create_group", undefined, "Create")}</Button>
+              <Button onClick={openCreateGroupModal}>{t("tablet.dispatch.create_group", undefined, "Create")}</Button>
             </div>
 
             <div className="dispatch-list mt-3 max-h-36 overflow-auto space-y-2 pr-1">
@@ -412,12 +476,20 @@ export default function DispatchView({
                 <div key={group.id} className="dispatch-item p-2">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-white">{group.name}</p>
-                    <button
-                      className="text-xs text-red-300 hover:text-red-200"
-                      onClick={() => onDeleteGroup(group.id)}
-                    >
-                      {t("tablet.dispatch.delete_group", undefined, "Delete")}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="dispatch-action px-2 py-1 text-xs"
+                        onClick={() => openAddMembersModal(group)}
+                      >
+                        {t("tablet.dispatch.add_to_group", undefined, "Add")}
+                      </button>
+                      <button
+                        className="text-xs text-red-300 hover:text-red-200"
+                        onClick={() => onDeleteGroup(group.id)}
+                      >
+                        {t("tablet.dispatch.delete_group", undefined, "Delete")}
+                      </button>
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {group.memberIds.map((memberId) => {
@@ -444,19 +516,51 @@ export default function DispatchView({
             </div>
           </div>
         </Card>
-
-        <div className="xl:col-span-3 min-h-0 overflow-hidden">
-          <IncidentsView
-            t={t}
-            incidents={incidents}
-            persons={persons}
-            vehicles={vehicles}
-            onCreate={onCreateIncident}
-            onUpdate={onUpdateIncident}
-            onDelete={onDeleteIncident}
-          />
-        </div>
       </div>
+
+      <Modal
+        open={isGroupModalOpen}
+        onClose={() => setGroupModalOpen(false)}
+        title={groupModalTargetId ? t("tablet.dispatch.add_to_group", undefined, "Add") : t("tablet.dispatch.create_group", undefined, "Create")}
+      >
+        <div className="space-y-3">
+          {!groupModalTargetId && (
+            <input
+              className="dispatch-input w-full px-3 py-2 text-sm"
+              placeholder={t("tablet.dispatch.group_name", undefined, "Group name")}
+              value={groupModalName}
+              onChange={(event) => setGroupModalName(event.target.value)}
+            />
+          )}
+
+          <div className="dispatch-list max-h-72 overflow-auto space-y-2 pr-1">
+            {officers.map((officer) => {
+              const selected = groupModalMemberIds.includes(officer.id);
+              return (
+                <button
+                  key={`group-modal-${officer.id}`}
+                  type="button"
+                  className={`dispatch-item w-full p-2 text-left ${selected ? "border-(--mdt-accent-primary)" : ""}`}
+                  onClick={() => toggleGroupModalMember(officer.id)}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-white leading-tight">{officer.name}</p>
+                      <p className="text-xs text-(--mdt-text-muted)">{officer.gradeDisplay || "Officer"}</p>
+                    </div>
+                    <span className="text-xs text-(--mdt-text-muted)">{selected ? "Selected" : "Select"}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" onClick={() => setGroupModalOpen(false)}>{t("tablet.actions.close", undefined, "Close")}</Button>
+            <Button onClick={handleSaveGroupModal}>{t("tablet.dispatch.add_to_group", undefined, "Add")}</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

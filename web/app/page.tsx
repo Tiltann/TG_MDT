@@ -18,7 +18,6 @@ import type {
 } from "./tablet/components/views/dispatch-view";
 import ChatView from "./tablet/components/views/chat-view";
 import BoloView from "./tablet/components/views/bolo-view";
-import WarrantsView from "./tablet/components/views/warrants-view";
 import PenaltiesView from "./tablet/components/views/penalties-view";
 import PersonsView from "./tablet/components/views/persons-view";
 import VehiclesView from "./tablet/components/views/vehicles-view";
@@ -73,6 +72,7 @@ type NuiMetaPayload = {
       job_overrides?: Record<string, { title?: string; logo_url?: string }>;
     };
     dispatch?: {
+      share_between_jobs?: boolean;
       default_status?: string;
       off_duty_status?: string;
       status_codes?: Array<{ code?: string; label?: string; color?: "green" | "blue" | "yellow" | "purple" | "gray" | "red" }>;
@@ -197,6 +197,20 @@ type BoardPost = {
   images: string[];
   author: string;
   createdAt: string;
+  expiresAt?: string;
+};
+
+type DispatchHistoryEntry = {
+  id: string;
+  title: string;
+  location?: string;
+  createdAt: string;
+  closedAt?: string;
+  callerIdentifier?: string;
+  callerName?: string;
+  anonymous?: boolean;
+  acceptedBy?: Array<{ id: string; name: string; at?: string }>;
+  assignedUnits?: Array<{ id: string; name: string }>;
 };
 
 
@@ -239,6 +253,8 @@ type RadioMember = {
   source: number;
   name: string;
   gradeDisplay?: string;
+  jobName?: string;
+  jobLabel?: string;
   avatarUrl?: string;
   status?: string;
 };
@@ -265,6 +281,8 @@ const DEFAULT_BOARD_POSTS: BoardPost[] = [];
 const DEFAULT_DISPATCH_STATUSES: Record<string, DispatchStatus> = {};
 const DEFAULT_DISPATCH_GROUPS: DispatchGroup[] = [];
 
+const BOARD_POST_DEFAULT_EXPIRY_HOURS = 48;
+
 const MAP_STYLE_KEY = "tg_mdt_map_style";
 
 function normalizeMapStyle(value?: string): MapStyle {
@@ -277,6 +295,17 @@ function isMapStyle(value?: string | null): value is MapStyle {
 
 function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function boardPostExpiresAtFrom(createdAt: string, expiresAt?: string): string {
+  if (typeof expiresAt === "string" && expiresAt.trim() !== "") return expiresAt;
+  const created = Date.parse(createdAt);
+  const base = Number.isNaN(created) ? Date.now() : created;
+  return new Date(base + BOARD_POST_DEFAULT_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+}
+
+function isBoardPostExpired(post: BoardPost): boolean {
+  return Date.parse(boardPostExpiresAtFrom(post.createdAt, post.expiresAt)) <= Date.now();
 }
 
 function loadJsonArray<T>(key: string, fallback: T[]): T[] {
@@ -388,7 +417,9 @@ export default function Home() {
     const storedChat = loadJsonArray<ChatMessage>(STORAGE_KEYS.chat, DEFAULT_CHAT_MESSAGES);
     const storedIncidents = loadJsonArray<IncidentRecord>(STORAGE_KEYS.incidents, DEFAULT_INCIDENTS);
     const storedBolos = loadJsonArray<BoloRecord>(STORAGE_KEYS.bolos, DEFAULT_BOLOS);
-    const storedBoardPosts = loadJsonArray<BoardPost>(STORAGE_KEYS.boardPosts, DEFAULT_BOARD_POSTS);
+    const storedBoardPosts = loadJsonArray<BoardPost>(STORAGE_KEYS.boardPosts, DEFAULT_BOARD_POSTS).filter(
+      (post) => !isBoardPostExpired(post)
+    );
     const storedDispatchStatuses = loadJsonObject<Record<string, DispatchStatus>>(
       STORAGE_KEYS.dispatchStatuses,
       DEFAULT_DISPATCH_STATUSES
@@ -453,6 +484,14 @@ export default function Home() {
       // Ignore storage errors.
     }
   }, [boardPosts]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setBoardPosts((prev) => prev.filter((post) => !isBoardPostExpired(post)));
+    }, 60 * 1000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -827,6 +866,9 @@ export default function Home() {
   const liveDispatchCalls = Array.isArray((screenData as { dispatchState?: unknown[] })?.dispatchState)
     ? (((screenData as { dispatchState?: DispatchLiveCall[] }).dispatchState || []) as DispatchLiveCall[])
     : [];
+  const dispatchHistory = Array.isArray((screenData as { dispatchHistory?: unknown[] })?.dispatchHistory)
+    ? (((screenData as { dispatchHistory?: DispatchHistoryEntry[] }).dispatchHistory || []) as DispatchHistoryEntry[])
+    : [];
   const personsData = Array.isArray(screenData?.persons)
     ? (screenData.persons as PersonRecord[])
     : [];
@@ -873,6 +915,33 @@ export default function Home() {
   const dispatchOffDutyStatus =
     (typeof typedMeta.mdt?.dispatch?.off_duty_status === "string" && typedMeta.mdt?.dispatch?.off_duty_status) ||
     "10-7";
+  const dispatchShareBetweenJobs = typedMeta.mdt?.dispatch?.share_between_jobs !== false;
+
+  const departmentLabelByJob = useMemo(() => {
+    const map = new Map<string, string>();
+    const departments = typedMeta.mdt?.departments || {};
+
+    for (const department of Object.values(departments)) {
+      if (!department || !Array.isArray(department.jobs)) continue;
+      for (const jobName of department.jobs) {
+        const key = normalizeJobKey(jobName);
+        if (!key) continue;
+        map.set(key, department.label || jobName.toUpperCase());
+      }
+    }
+
+    return map;
+  }, [typedMeta.mdt?.departments]);
+
+  const resolveDispatchJobLabel = (jobName?: string, fallbackLabel?: string): string | undefined => {
+    if (typeof fallbackLabel === "string" && fallbackLabel.trim() !== "") {
+      return fallbackLabel.trim();
+    }
+
+    const normalized = normalizeJobKey(jobName);
+    if (!normalized) return undefined;
+    return departmentLabelByJob.get(normalized) || normalized.toUpperCase();
+  };
 
   const currentDispatchStatus =
     dispatchStatuses[currentOfficerId] ||
@@ -880,23 +949,37 @@ export default function Home() {
 
   const dispatchOfficers = useMemo<DispatchOfficer[]>(() => {
     const officersById = new Map<string, DispatchOfficer>();
+    const normalizedProfileName = profileName.trim().toLowerCase();
 
     officersById.set(currentOfficerId, {
       id: currentOfficerId,
       name: profileName,
       gradeDisplay: actorGrade,
       job: sessionJob || undefined,
+      jobLabel: resolveDispatchJobLabel(sessionJob),
       online: true,
+      onDuty: dutyState?.onDuty !== false,
       status: dispatchStatuses[currentOfficerId] || (dutyState?.onDuty === false ? dispatchOffDutyStatus : dispatchDefaultStatus),
     });
 
     for (const member of radioMembers) {
+      if (/^colleague\s+\d+$/i.test(member.name || "")) {
+        continue;
+      }
+
+      if ((member.name || "").trim().toLowerCase() === normalizedProfileName) {
+        continue;
+      }
+
       const id = `radio:${member.source}`;
       officersById.set(id, {
         id,
         name: member.name,
         gradeDisplay: member.gradeDisplay,
+        job: normalizeJobKey(member.jobName),
+        jobLabel: resolveDispatchJobLabel(member.jobName, member.jobLabel),
         online: true,
+        onDuty: (dispatchStatuses[id] || member.status || dispatchDefaultStatus) !== dispatchOffDutyStatus,
         status: dispatchStatuses[id] || member.status || dispatchDefaultStatus,
       });
     }
@@ -923,7 +1006,9 @@ export default function Home() {
         id,
         name: personName,
         job: job || undefined,
+        jobLabel: resolveDispatchJobLabel(job),
         online: false,
+        onDuty: false,
         status: dispatchStatuses[id] || dispatchOffDutyStatus,
       });
     }
@@ -944,6 +1029,7 @@ export default function Home() {
     personsData,
     profileName,
     radioMembers,
+    resolveDispatchJobLabel,
     sessionJob,
     t,
   ]);
@@ -1037,7 +1123,7 @@ export default function Home() {
     recentChat: chatMessages.slice(0, 5),
     recentIncidents: incidentRecords.slice().sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 4),
     recentBolos: boloRecords.slice().sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 4),
-    boardPosts,
+    boardPosts: boardPosts.filter((post) => !isBoardPostExpired(post)),
     boardAdmin: isBoardAdmin,
   };
   const sidebarProfileData = {
@@ -1178,6 +1264,28 @@ export default function Home() {
     );
 
     await fetchNui<{ ok?: boolean }>("unassignDispatchVehicle", { dispatchId, plate }).catch(() => null);
+  };
+
+  const handleAcceptDispatchCase = async (dispatchId: string) => {
+    if (!dispatchId) return;
+
+    await handleAssignDispatchUnit(dispatchId, {
+      id: currentOfficerId,
+      name: profileName,
+      gradeDisplay: actorGrade,
+      online: true,
+      onDuty: dutyState?.onDuty !== false,
+      status: currentDispatchStatus,
+    });
+
+    await fetchNui<{ ok?: boolean }>("acceptDispatchCase", { dispatchId }).catch(() => null);
+  };
+
+  const handleCloseDispatchCase = async (dispatchId: string) => {
+    if (!dispatchId) return;
+
+    updateDispatchCallsLocal((prev) => prev.filter((call) => call.id !== dispatchId));
+    await fetchNui<{ ok?: boolean }>("closeDispatchCase", { dispatchId }).catch(() => null);
   };
 
   const handleToggleDuty = async () => {
@@ -1416,16 +1524,17 @@ export default function Home() {
     setBoloRecords((prev) => prev.filter((bolo) => bolo.id !== id));
   };
 
-  const createBoardPost = (post: Omit<BoardPost, "id" | "createdAt" | "author">) => {
+  const createBoardPost = (post: Omit<BoardPost, "id" | "createdAt" | "author"> & { expiresAt?: string }) => {
     if (!isBoardAdmin) return;
     const timestamp = new Date().toISOString();
     const nextPost: BoardPost = {
       id: createId("board-post"),
       author: profileName,
       createdAt: timestamp,
+      expiresAt: boardPostExpiresAtFrom(timestamp, post.expiresAt),
       ...post,
     };
-    setBoardPosts((prev) => [nextPost, ...prev].slice(0, 20));
+    setBoardPosts((prev) => [nextPost, ...prev].filter((entry) => !isBoardPostExpired(entry)).slice(0, 20));
   };
 
   const captureBoardImage = async () => {
@@ -1483,7 +1592,7 @@ export default function Home() {
               />
               
               <div className="flex-1 overflow-hidden p-6">
-                <div key={activeScreen || "dashboard"} className="h-full w-full animate-mdt-view">
+                <div className="h-full w-full animate-mdt-view">
                   {startupValidationError ? (
                     <div className="h-full flex items-center justify-center">
                       <div className="w-full max-w-xl rounded-2xl border border-red-500/40 bg-[rgba(20,0,0,0.7)] p-6 text-center shadow-2xl">
@@ -1510,7 +1619,7 @@ export default function Home() {
                   {activeScreen === "blackboard" && (
                     <BlackboardView
                       t={t}
-                      boardPosts={boardPosts}
+                      boardPosts={boardPosts.filter((post) => !isBoardPostExpired(post))}
                       boardAdmin={isBoardAdmin}
                       onTakeBoardImage={captureBoardImage}
                       onCreateBoardPost={createBoardPost}
@@ -1535,6 +1644,7 @@ export default function Home() {
                       persons={personsData}
                       vehicles={vehiclesData}
                       officers={dispatchOfficers}
+                      showSharedJobLabel={dispatchShareBetweenJobs}
                       liveCalls={liveDispatchCalls}
                       statusOptions={dispatchStatusOptions}
                       groups={dispatchGroups}
@@ -1547,6 +1657,8 @@ export default function Home() {
                       onCreateGroup={handleCreateDispatchGroup}
                       onUpdateGroupMembers={handleUpdateDispatchGroupMembers}
                       onDeleteGroup={handleDeleteDispatchGroup}
+                      onAcceptCase={handleAcceptDispatchCase}
+                      onCloseCase={handleCloseDispatchCase}
                       onCreateIncident={createIncident}
                       onUpdateIncident={updateIncident}
                       onDeleteIncident={deleteIncident}
@@ -1577,6 +1689,7 @@ export default function Home() {
                       dataFields={personDataFields}
                       incidents={incidentRecords}
                       bolos={boloRecords}
+                      dispatchHistory={dispatchHistory}
                       akteScope={activeAkteCompartment}
                       meta={typedMeta}
                       viewerJob={sessionJob}
@@ -1599,7 +1712,6 @@ export default function Home() {
                       viewerJob={sessionJob}
                     />
                   )}
-                  {activeScreen === "warrants" && <WarrantsView t={t} />}
                   {activeScreen === "penalties" && <PenaltiesView t={t} />}
                   {activeScreen === "bolo" && (
                     <BoloView

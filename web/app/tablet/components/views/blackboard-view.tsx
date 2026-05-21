@@ -15,6 +15,7 @@ type BoardPost = {
   images: string[];
   author: string;
   createdAt: string;
+  expiresAt?: string;
   avatarUrl?: string;
   gradeDisplay?: string;
 };
@@ -24,7 +25,7 @@ type BlackboardViewProps = {
   boardPosts: BoardPost[];
   boardAdmin: boolean;
   onTakeBoardImage?: () => Promise<string | null>;
-  onCreateBoardPost?: (post: { title: string; body: string; images: string[] }) => void;
+  onCreateBoardPost?: (post: { title: string; body: string; images: string[]; expiresAt?: string }) => void;
 };
 
 function formatRelativeTime(timestamp: string, t: TFunction): string {
@@ -54,6 +55,7 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
   const [body, setBody] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [expiryHours, setExpiryHours] = useState("48");
 
   const handleTakeImage = async () => {
     if (!boardAdmin || !onTakeBoardImage) return;
@@ -73,10 +75,15 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
     const nextTitle = title.trim();
     const nextBody = body.trim();
     if (nextTitle === "" || nextBody === "") return;
-    onCreateBoardPost?.({ title: nextTitle, body: nextBody, images });
+    const hours = Number.parseInt(expiryHours, 10);
+    const boundedHours = Number.isFinite(hours) ? Math.max(1, Math.min(48, hours)) : 48;
+    const expiresAt = new Date(Date.now() + boundedHours * 60 * 60 * 1000).toISOString();
+
+    onCreateBoardPost?.({ title: nextTitle, body: nextBody, images, expiresAt });
     setTitle("");
     setBody("");
     setImages([]);
+    setExpiryHours("48");
   };
 
   return (
@@ -198,6 +205,23 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
                   ))}
                 </div>
               )}
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
+                  Auto Delete
+                </label>
+                <select
+                  value={expiryHours}
+                  onChange={(event) => setExpiryHours(event.target.value)}
+                  className="dispatch-input px-2 py-1 text-xs"
+                >
+                  <option value="1">1h</option>
+                  <option value="2">2h</option>
+                  <option value="6">6h</option>
+                  <option value="12">12h</option>
+                  <option value="24">24h</option>
+                  <option value="48">48h</option>
+                </select>
+              </div>
               <div className="flex items-center justify-end gap-2 pt-1">
                 <Button 
                   variant="ghost" 

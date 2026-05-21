@@ -32,22 +32,26 @@ Config.MDT = {
             label = 'LSPD',
             jobs = { 'police', 'sheriff' },
             logo_url = 'lspd.png',
+            dispatch_notify_on_accept = true,
         },
         mdt = {
             label = 'DoJ',
             jobs = { 'mdt' },
             logo_url = 'doj.png',
             shared_with = { 'police', 'sheriff' },
+            dispatch_notify_on_accept = false,
         },
         mechanic = {
             label = 'Mechanics',
             jobs = { 'mechanic' },
             logo_url = 'mechanic.png',
+            dispatch_notify_on_accept = false,
         },
         ems = {
             label = 'EMS',
             jobs = { 'ambulance' },
             logo_url = 'ems.png',
+            dispatch_notify_on_accept = true,
         },
     },
 
@@ -126,6 +130,11 @@ Config.MDT = {
 
     -- Dispatch status codes shown in tablet (dispatch + topbar when on-duty).
     dispatch = {
+        -- Share dispatch calls between different MDT jobs.
+        -- true  = everyone with MDT access sees all dispatch calls.
+        -- false = users only see calls created by their own job.
+        share_between_jobs = true,
+
         -- Default status when none is set.
         default_status = '10-8',
 
@@ -141,6 +150,9 @@ Config.MDT = {
             { code = '10-23', label = 'En Route', color = 'blue' },
             { code = '10-7', label = 'Out of Service', color = 'gray' },
         },
+
+        -- Number of closed dispatch records kept for history panels/log views.
+        history_limit = 500,
     },
 }
 

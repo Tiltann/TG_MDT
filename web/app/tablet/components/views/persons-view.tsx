@@ -71,6 +71,18 @@ type RelatedBolo = {
   linkedVehicles: string[];
 };
 
+type RelatedDispatchHistory = {
+  id: string;
+  title: string;
+  location?: string;
+  createdAt: string;
+  closedAt?: string;
+  callerIdentifier?: string;
+  callerName?: string;
+  anonymous?: boolean;
+  acceptedBy?: Array<{ id: string; name: string; at?: string }>;
+};
+
 type AkteNote = {
   id: string;
   text: string;
@@ -364,6 +376,7 @@ export default function PersonsView({
   dataFields,
   incidents,
   bolos,
+  dispatchHistory,
   akteScope,
   meta,
   viewerJob,
@@ -378,6 +391,7 @@ export default function PersonsView({
   dataFields?: DataField[];
   incidents?: RelatedIncident[];
   bolos?: RelatedBolo[];
+  dispatchHistory?: RelatedDispatchHistory[];
   akteScope?: string;
   meta?: any;
   viewerJob?: string;
@@ -673,6 +687,9 @@ export default function PersonsView({
   const expiredNotesCount = allNotes.length - activeNotes.length;
   const relatedIncidents = (incidents || []).filter((incident) => incident.linkedPersons.includes(selectedPerson?.identifier || ""));
   const relatedBolos = (bolos || []).filter((bolo) => bolo.linkedPersons.includes(selectedPerson?.identifier || ""));
+  const relatedDispatches = (dispatchHistory || [])
+    .filter((entry) => entry.callerIdentifier === (selectedPerson?.identifier || ""))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   const activeImage = personImages[activeImageIndex] || personImages[0] || "";
   const activeImageIsDataUrl = activeImage.startsWith("data:");
   const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
@@ -1519,7 +1536,7 @@ export default function PersonsView({
                 </div>
 
                 {/* Related Cards */}
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
                   <div className="rounded-xl border border-[var(--mdt-border)] bg-white/[0.01] hover:bg-white/[0.02] hover:border-zinc-800 transition-all duration-300 p-4 space-y-3">
                     <p className="text-[10px] uppercase tracking-wider text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">{t("tablet.incidents.recent_list")}</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto premium-scroll pr-1">
@@ -1546,6 +1563,29 @@ export default function PersonsView({
                           <div key={bolo.id} className="text-xs rounded-lg bg-black/25 border border-zinc-900 p-2.5 hover:border-zinc-800 transition-colors">
                             <p className="text-white font-semibold">{bolo.title}</p>
                             <p className="text-[10px] text-[var(--mdt-text-muted)] mt-1">{bolo.priority} • {bolo.status}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[var(--mdt-border)] bg-white/[0.01] hover:bg-white/[0.02] hover:border-zinc-800 transition-all duration-300 p-4 space-y-3">
+                    <p className="text-[10px] uppercase tracking-wider text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">Dispatch Calls</p>
+                    <div className="space-y-2 max-h-40 overflow-y-auto premium-scroll pr-1">
+                      {relatedDispatches.length === 0 ? (
+                        <p className="text-xs text-zinc-650 italic text-center py-2">{t("tablet.notes.none")}</p>
+                      ) : (
+                        relatedDispatches.map((dispatchEntry) => (
+                          <div key={dispatchEntry.id} className="text-xs rounded-lg bg-black/25 border border-zinc-900 p-2.5 hover:border-zinc-800 transition-colors">
+                            <p className="text-white font-semibold">{dispatchEntry.title}</p>
+                            <p className="text-[10px] text-[var(--mdt-text-muted)] mt-1">
+                              {(dispatchEntry.location || "Unknown")} • {new Date(dispatchEntry.createdAt).toLocaleString()}
+                            </p>
+                            {Array.isArray(dispatchEntry.acceptedBy) && dispatchEntry.acceptedBy.length > 0 && (
+                              <p className="text-[10px] text-[var(--mdt-text-muted)] mt-1">
+                                Accepted: {dispatchEntry.acceptedBy.map((item) => item.name).join(", ")}
+                              </p>
+                            )}
                           </div>
                         ))
                       )}

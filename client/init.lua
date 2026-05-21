@@ -357,6 +357,22 @@ NUI.onCallback('unassignDispatchVehicle', function(body, cb)
 	cb({ ok = ok and result == true })
 end)
 
+NUI.onCallback('acceptDispatchCase', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:acceptDispatchCase', false, payload)
+	end)
+	cb({ ok = ok and result == true })
+end)
+
+NUI.onCallback('closeDispatchCase', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:closeDispatchCase', false, payload)
+	end)
+	cb({ ok = ok and result == true })
+end)
+
 NUI.onCallback('getAkteCompartments', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local kind = type(payload.kind) == 'string' and payload.kind or ''
@@ -462,6 +478,14 @@ RegisterNetEvent('TG_MDT:dispatchStateChanged', function(payload)
 	if type(payload) ~= 'table' then return end
 	NUI.send('setData', {
 		key = 'dispatchState',
+		value = payload,
+	})
+end)
+
+RegisterNetEvent('TG_MDT:dispatchHistoryChanged', function(payload)
+	if type(payload) ~= 'table' then return end
+	NUI.send('setData', {
+		key = 'dispatchHistory',
 		value = payload,
 	})
 end)
@@ -582,9 +606,11 @@ function TG_MDT_sendInitialState()
 					job_overrides  = brandingCfg.job_overrides,
 				},
 				dispatch = {
+					share_between_jobs = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.share_between_jobs or nil,
 					default_status = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.default_status or nil,
 					off_duty_status = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.off_duty_status or nil,
 					status_codes = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.status_codes or nil,
+					history_limit = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.history_limit or nil,
 				},
 			},
 		},
@@ -605,6 +631,16 @@ function TG_MDT_sendInitialState()
 		})
 	end
 
+	local okDispatchHistory, dispatchHistory = pcall(function()
+		return lib.callback.await('TG_MDT:getDispatchHistory', false)
+	end)
+	if okDispatchHistory then
+		NUI.send('setData', {
+			key = 'dispatchHistory',
+			value = dispatchHistory or {},
+		})
+	end
+
 	Debug.debug('TG_MDT_sendInitialState: done')
 end
 
@@ -614,6 +650,23 @@ end
 NUI.onReady(function()
 	Debug.debug('NUI ready signal — sending initial state')
 	TG_MDT_sendInitialState()
+end)
+
+exports('CreateDispatch', function(payload)
+	local body = type(payload) == 'table' and payload or {}
+	local ok, result = pcall(function()
+		return lib.callback.await('TG_MDT:createDispatch', false, body)
+	end)
+
+	if not ok or type(result) ~= 'table' then
+		return nil
+	end
+
+	if result.ok ~= true then
+		return nil
+	end
+
+	return result.id
 end)
 
 -- Mark client as initialized so the tablet can be opened.

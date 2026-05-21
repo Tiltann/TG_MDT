@@ -1351,37 +1351,128 @@ local function getPlayerDispatchStatus(src)
     return getDispatchDefaultStatus()
 end
 
+local function isDispatchSharedBetweenJobs()
+    local dispatchCfg = Config and Config.MDT and Config.MDT.dispatch
+    if type(dispatchCfg) ~= 'table' then
+        return true
+    end
+
+    return dispatchCfg.share_between_jobs ~= false
+end
+
+local function resolvePlayerJobInfo(src)
+    local jobName = ''
+    local jobLabel = ''
+
+    if Framework and Framework.Server then
+        if type(Framework.Server.getJobData) == 'function' then
+            local okJobData, jobData = pcall(Framework.Server.getJobData, src)
+            if okJobData and type(jobData) == 'table' then
+                if type(jobData.name) == 'string' then
+                    jobName = jobData.name
+                end
+                if type(jobData.label) == 'string' then
+                    jobLabel = jobData.label
+                end
+            end
+        end
+
+        if type(Framework.Server.getJob) == 'function' and jobName == '' then
+            local okJob, resolvedJob = pcall(Framework.Server.getJob, src)
+            if okJob and type(resolvedJob) == 'string' then
+                jobName = resolvedJob
+            end
+        end
+
+        if type(Framework.Server.getPlayer) == 'function' then
+            local okPlayer, player = pcall(Framework.Server.getPlayer, src)
+            if okPlayer and type(player) == 'table' then
+                local rawJob = nil
+                if type(player.job) == 'table' then
+                    rawJob = player.job
+                elseif type(player.PlayerData) == 'table' and type(player.PlayerData.job) == 'table' then
+                    rawJob = player.PlayerData.job
+                end
+
+                if type(rawJob) == 'table' then
+                    if jobName == '' and type(rawJob.name) == 'string' then
+                        jobName = rawJob.name
+                    end
+                    if jobLabel == '' and type(rawJob.label) == 'string' then
+                        jobLabel = rawJob.label
+                    end
+                end
+            end
+        end
+    end
+
+    return jobName, jobLabel
+end
+
+local function canViewDispatchCall(src, call)
+    if isDispatchSharedBetweenJobs() then
+        return true
+    end
+
+    if type(call) ~= 'table' then
+        return false
+    end
+
+    local scopeJob = normalizeJobName(call.scopeJob)
+    if scopeJob == '' then
+        return true
+    end
+
+    return getViewerJobName(src) == scopeJob
+end
+
 local function buildPlayerRadioData(src)
     local fallback = {
         source = src,
         name = 'Colleague ' .. src,
         gradeDisplay = '',
     }
-    if not Framework or not Framework.Server or type(Framework.Server.getPlayerData) ~= 'function' then
-        return fallback
-    end
-
-    local pdata = Framework.Server.getPlayerData(src) or {}
-    local job = pdata.job or {}
-    local first = pdata.firstname
-    local last = pdata.lastname
-
-    if type(pdata.charinfo) == 'table' then
-        first = first or pdata.charinfo.firstname
-        last = last or pdata.charinfo.lastname
-    end
-
-    local name = nil
-    if type(pdata.name) == 'string' and pdata.name ~= '' then
-        name = pdata.name
-    elseif type(first) == 'string' and type(last) == 'string' then
-        name = first .. ' ' .. last
-    else
-        name = GetPlayerName(src) or fallback.name
-    end
-
+    local playerName = GetPlayerName(src)
+    local name = type(playerName) == 'string' and playerName ~= '' and playerName or fallback.name
     local gradeName = nil
     local gradeNumber = nil
+    local job = {}
+    local avatarUrl = nil
+
+    if Framework and Framework.Server and type(Framework.Server.getPlayer) == 'function' then
+        local okPlayer, player = pcall(Framework.Server.getPlayer, src)
+        if okPlayer and type(player) == 'table' then
+            local first = nil
+            local last = nil
+
+            if type(player.firstname) == 'string' then first = player.firstname end
+            if type(player.lastname) == 'string' then last = player.lastname end
+
+            if type(player.PlayerData) == 'table' and type(player.PlayerData.charinfo) == 'table' then
+                first = first or player.PlayerData.charinfo.firstname
+                last = last or player.PlayerData.charinfo.lastname
+            end
+
+            if type(player.name) == 'string' and player.name ~= '' then
+                name = player.name
+            elseif type(first) == 'string' and type(last) == 'string' then
+                name = first .. ' ' .. last
+            end
+
+            if type(player.job) == 'table' then
+                job = player.job
+            elseif type(player.PlayerData) == 'table' and type(player.PlayerData.job) == 'table' then
+                job = player.PlayerData.job
+            end
+
+            if type(player.imageUrl) == 'string' and player.imageUrl ~= '' then
+                avatarUrl = player.imageUrl
+            elseif type(player.PlayerData) == 'table' and type(player.PlayerData.imageUrl) == 'string' and player.PlayerData.imageUrl ~= '' then
+                avatarUrl = player.PlayerData.imageUrl
+            end
+        end
+    end
+
     if type(job) == 'table' then
         if type(job.grade) == 'table' then
             gradeName = job.grade.label or job.grade.name
@@ -1391,6 +1482,8 @@ local function buildPlayerRadioData(src)
             gradeNumber = job.grade
         end
     end
+
+    local jobName, jobLabel = resolvePlayerJobInfo(src)
 
     local gradeDisplay = ''
     if gradeName and gradeNumber then
@@ -1405,7 +1498,9 @@ local function buildPlayerRadioData(src)
         source = src,
         name = name,
         gradeDisplay = gradeDisplay,
-        avatarUrl = pdata.imageUrl or nil,
+        jobName = jobName,
+        jobLabel = jobLabel,
+        avatarUrl = avatarUrl,
         status = getPlayerDispatchStatus(src)
     }
 end
@@ -1503,7 +1598,73 @@ end)
 -- ══════════════════════════════════════════════════════════
 
 local dispatchCalls = {}
+local dispatchHistory = {}
 local dispatchSequence = 0
+
+local function nowIsoUtc()
+    return os.date('!%Y-%m-%dT%H:%M:%SZ')
+end
+
+local function getDispatchHistoryLimit()
+    local dispatchCfg = Config and Config.MDT and Config.MDT.dispatch
+    if type(dispatchCfg) ~= 'table' then
+        return 500
+    end
+
+    local configured = tonumber(dispatchCfg.history_limit)
+    if configured and configured > 0 then
+        return math.floor(configured)
+    end
+
+    return 500
+end
+
+local function getDepartmentConfigForJob(jobName)
+    local normalized = normalizeJobName(jobName)
+    if normalized == '' then
+        return nil
+    end
+
+    local departments = Config and Config.MDT and Config.MDT.departments
+    if type(departments) ~= 'table' then
+        return nil
+    end
+
+    for _, deptCfg in pairs(departments) do
+        if type(deptCfg) == 'table' and type(deptCfg.jobs) == 'table' then
+            for i = 1, #deptCfg.jobs do
+                if normalizeJobName(deptCfg.jobs[i]) == normalized then
+                    return deptCfg
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function shouldNotifyCallerOnAccept(call)
+    if type(call) ~= 'table' then
+        return false
+    end
+
+    local deptCfg = getDepartmentConfigForJob(call.scopeJob)
+    if type(deptCfg) ~= 'table' then
+        return false
+    end
+
+    return deptCfg.dispatch_notify_on_accept == true
+end
+
+local function getDispatchOfficerFromSource(src)
+    local member = buildPlayerRadioData(src)
+    return {
+        id = ('src:%s'):format(src),
+        name = type(member.name) == 'string' and member.name or ('Officer %s'):format(src),
+        status = getPlayerDispatchStatus(src),
+        assignedAt = os.time(),
+    }
+end
 
 local function nextDispatchId()
     dispatchSequence = dispatchSequence + 1
@@ -1584,10 +1745,12 @@ local function removeVehicle(call, plate)
     end
 end
 
-local function getDispatchCallsSnapshot()
+local function getDispatchCallsSnapshot(viewerSrc)
     local list = {}
     for _, call in pairs(dispatchCalls) do
-        list[#list + 1] = call
+        if type(viewerSrc) ~= 'number' or canViewDispatchCall(viewerSrc, call) then
+            list[#list + 1] = call
+        end
     end
     table.sort(list, function(a, b)
         return (a.createdAt or '') > (b.createdAt or '')
@@ -1595,33 +1758,104 @@ local function getDispatchCallsSnapshot()
     return list
 end
 
+local function getDispatchHistorySnapshot(viewerSrc)
+    local list = {}
+    for i = 1, #dispatchHistory do
+        local entry = dispatchHistory[i]
+        if type(viewerSrc) ~= 'number' or canViewDispatchCall(viewerSrc, entry) then
+            list[#list + 1] = entry
+        end
+    end
+
+    table.sort(list, function(a, b)
+        return (a.closedAt or a.createdAt or '') > (b.closedAt or b.createdAt or '')
+    end)
+
+    return list
+end
+
 local function broadcastDispatchState()
-    local snapshot = getDispatchCallsSnapshot()
     local players = GetPlayers()
     for i = 1, #players do
         local targetSrc = tonumber(players[i])
         if targetSrc and hasAccess(targetSrc) then
+            local snapshot = getDispatchCallsSnapshot(targetSrc)
             TriggerClientEvent('TG_MDT:dispatchStateChanged', targetSrc, snapshot)
         end
     end
 end
 
-local function createDispatchCall(payload)
+local function broadcastDispatchHistory()
+    local players = GetPlayers()
+    for i = 1, #players do
+        local targetSrc = tonumber(players[i])
+        if targetSrc and hasAccess(targetSrc) then
+            local snapshot = getDispatchHistorySnapshot(targetSrc)
+            TriggerClientEvent('TG_MDT:dispatchHistoryChanged', targetSrc, snapshot)
+        end
+    end
+end
+
+local function createDispatchCall(payload, creatorSrc)
     local title = type(payload.title) == 'string' and payload.title or ''
     if title == '' then
         return nil, 'missing_title'
     end
 
     local id = type(payload.id) == 'string' and payload.id or nextDispatchId()
+    local creatorName = ''
+    local creatorIdentifier = ''
+    local creatorSource = tonumber(creatorSrc)
+    local isAnonymous = payload.anonymous == true
+
+    if creatorSource and creatorSource > 0 then
+        local radioData = buildPlayerRadioData(creatorSource)
+        creatorName = type(radioData.name) == 'string' and radioData.name or ''
+        if Framework and Framework.Server and type(Framework.Server.getIdentifier) == 'function' then
+            creatorIdentifier = Framework.Server.getIdentifier(creatorSource) or ''
+        end
+    end
+
+    local displayCallerName = ''
+    if type(payload.who) == 'string' and payload.who ~= '' then
+        displayCallerName = payload.who
+    elseif isAnonymous then
+        displayCallerName = 'Anonymous Caller'
+    else
+        displayCallerName = creatorName
+    end
+
+    local coords = type(payload.coords) == 'table' and payload.coords or nil
+    local location = type(payload.location) == 'string' and payload.location or ''
+    if location == '' and type(coords) == 'table' then
+        local x = tonumber(coords.x)
+        local y = tonumber(coords.y)
+        local z = tonumber(coords.z)
+        if x and y and z then
+            location = ('X: %.2f | Y: %.2f | Z: %.2f'):format(x, y, z)
+        end
+    end
+    if location == '' then
+        location = 'Unknown'
+    end
+
     local call = {
         id = id,
         title = title,
         description = type(payload.description) == 'string' and payload.description or '',
-        location = type(payload.location) == 'string' and payload.location or 'Unknown',
+        location = location,
         priority = normalizeDispatchPriority(payload.priority),
         status = normalizeDispatchStatus(payload.status),
-        createdAt = type(payload.createdAt) == 'string' and payload.createdAt or os.date('!%Y-%m-%dT%H:%M:%SZ'),
-        updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ'),
+        createdAt = type(payload.createdAt) == 'string' and payload.createdAt or nowIsoUtc(),
+        updatedAt = nowIsoUtc(),
+        scopeJob = normalizeJobName(type(payload.scopeJob) == 'string' and payload.scopeJob or getViewerJobName(creatorSrc)),
+        callerSource = creatorSource,
+        callerName = displayCallerName,
+        callerIdentifier = creatorIdentifier ~= '' and creatorIdentifier or nil,
+        anonymous = isAnonymous,
+        coords = coords,
+        acceptedBy = {},
+        acceptedNotified = false,
         assignedUnits = {},
         assignedVehicles = {},
     }
@@ -1649,27 +1883,33 @@ local function createDispatchCall(payload)
     return call, nil
 end
 
--- External API: TriggerEvent('TG_MDT:server:createDispatch', payload)
-RegisterNetEvent('TG_MDT:server:createDispatch', function(payload)
-    if type(payload) ~= 'table' then return end
-    local call, err = createDispatchCall(payload)
-    if not call and err then
-        Debug.warn(('Dispatch create failed: %s'):format(err))
+lib.callback.register('TG_MDT:createDispatch', function(src, payload)
+    if not hasAccess(src) then
+        return { ok = false }
     end
-end)
 
--- Optional export for other resources
-exports('CreateDispatch', function(payload)
-    if type(payload) ~= 'table' then return nil end
-    local call = createDispatchCall(payload)
-    return call and call.id or nil
+    local body = type(payload) == 'table' and payload or {}
+    local call, err = createDispatchCall(body, src)
+    if not call then
+        Debug.warn(('Dispatch create failed: %s'):format(err or 'unknown'))
+        return { ok = false }
+    end
+
+    return { ok = true, id = call.id }
 end)
 
 lib.callback.register('TG_MDT:getDispatchState', function(src)
     if not hasAccess(src) then
         return {}
     end
-    return getDispatchCallsSnapshot()
+    return getDispatchCallsSnapshot(src)
+end)
+
+lib.callback.register('TG_MDT:getDispatchHistory', function(src)
+    if not hasAccess(src) then
+        return {}
+    end
+    return getDispatchHistorySnapshot(src)
 end)
 
 lib.callback.register('TG_MDT:assignDispatchUnit', function(src, payload)
@@ -1677,7 +1917,7 @@ lib.callback.register('TG_MDT:assignDispatchUnit', function(src, payload)
     local body = type(payload) == 'table' and payload or {}
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
     local call = dispatchCalls[dispatchId]
-    if not call then return false end
+    if not call or not canViewDispatchCall(src, call) then return false end
 
     local unit = buildUnitEntry({
         id = body.unitId,
@@ -1687,7 +1927,7 @@ lib.callback.register('TG_MDT:assignDispatchUnit', function(src, payload)
     if not unit then return false end
 
     upsertUnit(call, unit)
-    call.updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ')
+    call.updatedAt = nowIsoUtc()
     broadcastDispatchState()
     return true
 end)
@@ -1698,10 +1938,10 @@ lib.callback.register('TG_MDT:unassignDispatchUnit', function(src, payload)
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
     local unitId = type(body.unitId) == 'string' and body.unitId or ''
     local call = dispatchCalls[dispatchId]
-    if not call or unitId == '' then return false end
+    if not call or unitId == '' or not canViewDispatchCall(src, call) then return false end
 
     removeUnit(call, unitId)
-    call.updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ')
+    call.updatedAt = nowIsoUtc()
     broadcastDispatchState()
     return true
 end)
@@ -1711,7 +1951,7 @@ lib.callback.register('TG_MDT:assignDispatchVehicle', function(src, payload)
     local body = type(payload) == 'table' and payload or {}
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
     local call = dispatchCalls[dispatchId]
-    if not call then return false end
+    if not call or not canViewDispatchCall(src, call) then return false end
 
     local vehicle = buildVehicleEntry({
         plate = body.plate,
@@ -1720,7 +1960,7 @@ lib.callback.register('TG_MDT:assignDispatchVehicle', function(src, payload)
     if not vehicle then return false end
 
     upsertVehicle(call, vehicle)
-    call.updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ')
+    call.updatedAt = nowIsoUtc()
     broadcastDispatchState()
     return true
 end)
@@ -1731,11 +1971,95 @@ lib.callback.register('TG_MDT:unassignDispatchVehicle', function(src, payload)
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
     local plate = type(body.plate) == 'string' and body.plate or ''
     local call = dispatchCalls[dispatchId]
-    if not call or plate == '' then return false end
+    if not call or plate == '' or not canViewDispatchCall(src, call) then return false end
 
     removeVehicle(call, plate)
-    call.updatedAt = os.date('!%Y-%m-%dT%H:%M:%SZ')
+    call.updatedAt = nowIsoUtc()
     broadcastDispatchState()
+    return true
+end)
+
+lib.callback.register('TG_MDT:acceptDispatchCase', function(src, payload)
+    if not hasAccess(src) then return false end
+    local body = type(payload) == 'table' and payload or {}
+    local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
+    local call = dispatchCalls[dispatchId]
+    if not call or not canViewDispatchCall(src, call) then return false end
+
+    local officer = getDispatchOfficerFromSource(src)
+    upsertUnit(call, officer)
+
+    local accepted = call.acceptedBy or {}
+    local alreadyAccepted = false
+    for i = 1, #accepted do
+        if accepted[i].id == officer.id then
+            accepted[i].name = officer.name
+            accepted[i].at = nowIsoUtc()
+            alreadyAccepted = true
+            break
+        end
+    end
+    if not alreadyAccepted then
+        accepted[#accepted + 1] = {
+            id = officer.id,
+            name = officer.name,
+            at = nowIsoUtc(),
+        }
+    end
+    call.acceptedBy = accepted
+    call.updatedAt = nowIsoUtc()
+
+    if not call.acceptedNotified and shouldNotifyCallerOnAccept(call) and not call.anonymous then
+        local callerSrc = tonumber(call.callerSource)
+        if callerSrc and GetPlayerName(callerSrc) and Framework and Framework.Server and type(Framework.Server.notify) == 'function' then
+            Framework.Server.notify(callerSrc, 'Your dispatch has been accepted. Unit is on the way.', 'inform')
+            call.acceptedNotified = true
+        end
+    end
+
+    broadcastDispatchState()
+    return true
+end)
+
+lib.callback.register('TG_MDT:closeDispatchCase', function(src, payload)
+    if not hasAccess(src) then return false end
+    local body = type(payload) == 'table' and payload or {}
+    local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
+    local call = dispatchCalls[dispatchId]
+    if not call or not canViewDispatchCall(src, call) then return false end
+
+    local closer = getDispatchOfficerFromSource(src)
+    local historyEntry = {
+        id = call.id,
+        title = call.title,
+        description = call.description,
+        location = call.location,
+        priority = call.priority,
+        status = 'closed',
+        createdAt = call.createdAt,
+        closedAt = nowIsoUtc(),
+        scopeJob = call.scopeJob,
+        callerSource = call.callerSource,
+        callerIdentifier = call.callerIdentifier,
+        callerName = call.callerName,
+        anonymous = call.anonymous,
+        acceptedBy = call.acceptedBy or {},
+        assignedUnits = call.assignedUnits or {},
+        assignedVehicles = call.assignedVehicles or {},
+        closedBy = {
+            id = closer.id,
+            name = closer.name,
+        },
+    }
+
+    dispatchHistory[#dispatchHistory + 1] = historyEntry
+    while #dispatchHistory > getDispatchHistoryLimit() do
+        table.remove(dispatchHistory, 1)
+    end
+
+    dispatchCalls[dispatchId] = nil
+    broadcastDispatchState()
+    broadcastDispatchHistory()
     return true
 end)
 
