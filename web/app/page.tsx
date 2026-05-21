@@ -26,6 +26,7 @@ import LiveMapView from "./tablet/components/views/livemap-view";
 import SettingsView from "./tablet/components/views/settings-view";
 import { defaultMockupBranding, defaultMockupModules } from "./tablet/lib/mockup-config";
 import { createTranslator, normalizeLocale, type SupportedLocale } from "./tablet/lib/i18n";
+import devTranslationsEn from "./tablet/lib/dev-translations.en.json";
 
 type NuiVisibilityPayload = {
   visible?: boolean;
@@ -289,22 +290,7 @@ const DEV_PROFILE: ProfileData = {
   imageUrl: "",
 };
 
-const DEV_TRANSLATIONS_EN: Record<string, string> = {
-  "tablet.sidebar.dashboard": "Dashboard",
-  "tablet.sidebar.blackboard": "Blackboard",
-  "tablet.sidebar.dispatch": "Dispatch",
-  "tablet.sidebar.persons": "Persons",
-  "tablet.sidebar.vehicles": "Vehicles",
-  "tablet.sidebar.penalty_catalog": "Penalties",
-  "tablet.sidebar.livemap": "Live Map",
-  "tablet.sidebar.chat": "Chat",
-  "tablet.sidebar.live_chat": "Live Chat",
-  "tablet.sidebar.settings": "Settings",
-  "tablet.actions.back": "Back",
-  "tablet.form.save_akte": "Save Akte",
-  "tablet.dashboard.greeting_morning": "Good morning, {name}",
-  "tablet.dashboard.greeting_evening": "Good evening, {name}",
-};
+const DEV_TRANSLATIONS_EN = devTranslationsEn as Record<string, string>;
 
 const DEV_PERSONS: PersonRecord[] = [
   {
