@@ -99,7 +99,7 @@ export function Sidebar({
                 )}
                 
                 <item.icon className={`w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-110 ${is_active ? "scale-105" : "opacity-80"}`} style={is_active ? { filter: `drop-shadow(0 0 6px ${accent}44)` } : undefined} />
-                <span className="text-xs  tracking-widest uppercase transition-colors">{item.label}</span>
+                <span className="text-sm font-bold tracking-normal normal-case transition-colors">{item.label}</span>
               </button>
             );
           })}
@@ -166,13 +166,13 @@ export function Sidebar({
             
             <div className="min-w-0 flex-1">
               <p 
-                className="text-white font-black text-xs truncate tracking-wider group-hover:text-[var(--mdt-accent-primary)] transition-colors duration-300  uppercase"
+                className="text-white font-bold text-sm truncate tracking-normal normal-case group-hover:text-[var(--mdt-accent-primary)] transition-colors duration-300"
                 style={isOnDuty ? undefined : { color: undefined }}
               >
                 {playerData?.name || t("tablet.player.unknown_user")}
               </p>
               {playerData?.gradeDisplay && (
-                <p className="text-[9px] text-[var(--mdt-text-muted)] truncate font-semibold mt-0.5 tracking-widest uppercase ">
+                <p className="text-[11px] text-[var(--mdt-text-muted)] truncate font-semibold mt-0.5 tracking-normal normal-case">
                   {playerData?.gradeDisplay}
                 </p>
               )}
@@ -195,7 +195,7 @@ export function Sidebar({
                     <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${isOnDuty ? "bg-emerald-400" : "bg-amber-400"}`} style={isOnDuty ? undefined : { backgroundColor: accent }} />
                     <span className={`relative inline-flex rounded-full h-1 w-1 ${isOnDuty ? "bg-emerald-500" : "bg-amber-500"}`} style={isOnDuty ? undefined : { backgroundColor: accent }} />
                   </div>
-                  <span className="text-[7.5px] uppercase font-black tracking-[0.16em]  leading-none">
+                  <span className="text-[10px] normal-case font-semibold tracking-normal leading-none">
                     {isOnDuty ? t("tablet.player.on_duty") : t("tablet.topbar.duty_off")}
                   </span>
                 </div>

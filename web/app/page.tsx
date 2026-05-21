@@ -1427,6 +1427,12 @@ export default function Home() {
     const trimmed = text.trim();
     if (trimmed === "") return;
 
+    const lowered = trimmed.toLowerCase();
+    if (lowered === "/mdt" || lowered.startsWith("/mdt ")) {
+      fetchNui("hideUI", {}).catch(() => setVisible(false));
+      return;
+    }
+
     setChatMessages((prev) => [
       {
         id: createId("chat"),
@@ -1640,8 +1646,6 @@ export default function Home() {
                   {activeScreen === "dispatch" && (
                     <DispatchView
                       t={t}
-                      incidents={incidentRecords}
-                      persons={personsData}
                       vehicles={vehiclesData}
                       officers={dispatchOfficers}
                       showSharedJobLabel={dispatchShareBetweenJobs}
@@ -1659,9 +1663,6 @@ export default function Home() {
                       onDeleteGroup={handleDeleteDispatchGroup}
                       onAcceptCase={handleAcceptDispatchCase}
                       onCloseCase={handleCloseDispatchCase}
-                      onCreateIncident={createIncident}
-                      onUpdateIncident={updateIncident}
-                      onDeleteIncident={deleteIncident}
                     />
                   )}
                   {activeScreen === "chat" && (

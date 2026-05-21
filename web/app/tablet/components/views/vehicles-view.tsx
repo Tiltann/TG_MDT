@@ -1085,7 +1085,7 @@ export default function VehiclesView({
         <div className="xl:col-span-5 col-span-12 relative flex flex-col bg-zinc-950/50 rounded-2xl border border-zinc-900 shadow-xl overflow-hidden animate-mdt-scale-in max-h-[calc(100vh-260px)]">
           {/* Metal paper clip on top */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-4.5 bg-gradient-to-b from-zinc-300 to-zinc-200 border-x border-b border-zinc-500 rounded-b-lg shadow-md z-10 flex items-center justify-center">
-            <span className="text-[7px] font-semibold tracking-wide text-zinc-900">{t("tablet.common.information", undefined, "Information")}</span>
+            <span className="text-[7px] font-semibold tracking-wide text-zinc-200">{t("tablet.common.information", undefined, "Information")}</span>
           </div>
 
           <div className="p-6 pt-8 space-y-5 overflow-y-auto premium-scroll flex-1">

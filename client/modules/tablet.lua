@@ -173,9 +173,20 @@ if type(OPEN_COMMAND) ~= 'string' or OPEN_COMMAND == '' then
     OPEN_COMMAND = 'mdt'
 end
 
-RegisterCommand(OPEN_COMMAND, toggleTablet)
+local function handleTabletCommand(_, args)
+    local action = type(args) == 'table' and string.lower(tostring(args[1] or '')) or ''
+
+    if action == 'help' then
+        notifyUser(('Use /%s to open or close the MDT.'):format(OPEN_COMMAND), 'inform')
+        return
+    end
+
+    toggleTablet()
+end
+
+RegisterCommand(OPEN_COMMAND, handleTabletCommand, false)
 if OPEN_COMMAND ~= 'mdt' then
-    RegisterCommand('mdt', toggleTablet)
+    RegisterCommand('mdt', handleTabletCommand, false)
 end
 
 Debug.debug(('Tablet command registered: /%s (alias: /mdt=%s)'):format(
