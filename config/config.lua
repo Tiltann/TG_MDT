@@ -30,12 +30,14 @@ Config.MDT = {
     departments = {
         pd = {
             label = 'LSPD',
+            subtitle = 'Law Enforcement Operations Desk',
             jobs = { 'police', 'sheriff' },
             logo_url = 'lspd.png',
             dispatch_notify_on_accept = true,
         },
         mdt = {
             label = 'DoJ',
+            subtitle = 'Judicial Records & Processing Desk',
             jobs = { 'mdt' },
             logo_url = 'doj.png',
             shared_with = { 'police', 'sheriff' },
@@ -43,12 +45,14 @@ Config.MDT = {
         },
         mechanic = {
             label = 'Mechanics',
+            subtitle = 'Vehicle Service Coordination Desk',
             jobs = { 'mechanic' },
             logo_url = 'mechanic.png',
             dispatch_notify_on_accept = false,
         },
         ems = {
             label = 'EMS',
+            subtitle = 'Medical Response Coordination Desk',
             jobs = { 'ambulance' },
             logo_url = 'ems.png',
             dispatch_notify_on_accept = true,
@@ -85,14 +89,17 @@ Config.MDT = {
         -- Example output for police job: "POLICE MDT"
         title_template = '{job} MDT',
 
+        -- Default subtitle shown if no agency/job-specific subtitle is defined.
+        subtitle = 'Agency Operations Terminal',
+
         -- Optional logo image for the top-left sidebar block.
         -- Use a data URL or https URL. Empty = initials fallback.
         logo_url = '',
 
         -- Optional job-specific overrides.
         -- job_overrides = {
-        --     police = { title = 'LSPD MDT', logo_url = 'https://example.com/lspd.png' },
-        --     sheriff = { title = 'BCSO MDT', logo_url = 'https://example.com/bcso.png' },
+        --     police = { title = 'LSPD MDT', subtitle = 'Law Enforcement Desk', logo_url = 'https://example.com/lspd.png' },
+        --     sheriff = { title = 'BCSO MDT', subtitle = 'County Operations Desk', logo_url = 'https://example.com/bcso.png' },
         -- },
         job_overrides = {},
     },

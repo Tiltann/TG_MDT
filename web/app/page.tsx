@@ -66,11 +66,12 @@ type NuiMetaPayload = {
       auto_delete_after_minutes?: number;
     };
     allowed_jobs?: string[];
-    departments?: Record<string, { label: string; jobs: string[]; logo_url?: string }>;
+    departments?: Record<string, { label: string; jobs: string[]; logo_url?: string; subtitle?: string }>;
     branding?: {
       title_template?: string;
+      subtitle?: string;
       logo_url?: string;
-      job_overrides?: Record<string, { title?: string; logo_url?: string }>;
+      job_overrides?: Record<string, { title?: string; subtitle?: string; logo_url?: string }>;
     };
     dispatch?: {
       share_between_jobs?: boolean;
@@ -405,11 +406,16 @@ const DEV_META: NuiMetaPayload = {
       police: {
         label: "Police Department",
         jobs: ["police"],
+        subtitle: "Law Enforcement Operations Desk",
       },
       ambulance: {
         label: "Emergency Medical",
         jobs: ["ambulance"],
+        subtitle: "Medical Response Coordination Desk",
       },
+    },
+    branding: {
+      subtitle: "Agency Operations Terminal",
     },
     dispatch: {
       share_between_jobs: true,
@@ -1060,14 +1066,35 @@ export default function Home({ devMode = false }: HomeProps) {
         ? playerLastName
         : actorName;
   const jobBrandingOverrides = sessionJob ? typedMeta.mdt?.branding?.job_overrides?.[sessionJob] : undefined;
+  const departmentSubtitle = useMemo(() => {
+    const departments = typedMeta.mdt?.departments || {};
+    if (!sessionJob) return undefined;
+
+    for (const department of Object.values(departments)) {
+      if (!department || !Array.isArray(department.jobs)) continue;
+      const matches = department.jobs.some((job) => normalizeJobKey(job) === sessionJob);
+      if (matches && typeof department.subtitle === "string" && department.subtitle.trim() !== "") {
+        return department.subtitle.trim();
+      }
+    }
+
+    return undefined;
+  }, [typedMeta.mdt?.departments, sessionJob]);
   const jobDisplayName = sessionJob !== "" ? sessionJob.toUpperCase() : "TG";
   const computedBrandTitle =
     (jobBrandingOverrides?.title || typedMeta.mdt?.branding?.title_template || "{job} MDT").replace("{job}", jobDisplayName);
   const computedBrandLogo = jobBrandingOverrides?.logo_url || typedMeta.mdt?.branding?.logo_url || "";
+  const computedBrandSubtitle =
+    jobBrandingOverrides?.subtitle ||
+    departmentSubtitle ||
+    typedMeta.mdt?.branding?.subtitle ||
+    typedMeta.branding?.subtitle ||
+    defaultMockupBranding.subtitle;
   const branding = {
     ...defaultMockupBranding,
     ...(typedMeta.branding as NuiBrandingPayload | undefined),
     name: computedBrandTitle,
+    subtitle: computedBrandSubtitle,
     logoUrl: computedBrandLogo,
     accent: accentOverride || typedMeta.branding?.accent || defaultMockupBranding.accent,
     greeting:

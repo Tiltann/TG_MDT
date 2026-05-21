@@ -469,7 +469,7 @@ Config.AkteModels = Config.AkteModels or {
 -- ── Dynamic Department/Agency Hydration ────────────────────
 -- Processes Config.MDT.departments to automatically:
 -- 1. Hydrate job_models (compartment scopes and job sharing)
--- 2. Build branding overrides (title templates based on the agency label)
+-- 2. Build branding overrides (title/subtitle templates based on the agency label)
 if type(Config.MDT) == 'table' and type(Config.MDT.departments) == 'table' then
     Config.AkteModels.job_models = Config.AkteModels.job_models or {}
     Config.MDT.branding = Config.MDT.branding or {}
@@ -556,6 +556,9 @@ if type(Config.MDT) == 'table' and type(Config.MDT.departments) == 'table' then
                 Config.MDT.branding.job_overrides[jobLower] = Config.MDT.branding.job_overrides[jobLower] or {}
                 local override = Config.MDT.branding.job_overrides[jobLower]
                 override.title = override.title or resolvedTitle
+                if type(deptCfg.subtitle) == 'string' and deptCfg.subtitle ~= '' then
+                    override.subtitle = override.subtitle or deptCfg.subtitle
+                end
                 if deptCfg.logo_url then
                     override.logo_url = override.logo_url or deptCfg.logo_url
                 end

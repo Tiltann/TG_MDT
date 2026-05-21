@@ -685,11 +685,26 @@ export default function PersonsView({
   );
   const activeNotes = allNotes.filter((note) => !isNoteExpired(note));
   const expiredNotesCount = allNotes.length - activeNotes.length;
-  const relatedIncidents = (incidents || []).filter((incident) => incident.linkedPersons.includes(selectedPerson?.identifier || ""));
-  const relatedBolos = (bolos || []).filter((bolo) => bolo.linkedPersons.includes(selectedPerson?.identifier || ""));
   const relatedDispatches = (dispatchHistory || [])
     .filter((entry) => entry.callerIdentifier === (selectedPerson?.identifier || ""))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const searchedPeople = useMemo(() => {
+    return normalizedPersons
+      .filter((person) => {
+        const scopedAkte =
+          aktenByPerson[akteKey(person.identifier, selectedCompartment)] ||
+          aktenByPerson[akteKey(person.identifier, baseScope)] ||
+          aktenByPerson[person.identifier] ||
+          {};
+        const searchState = String(scopedAkte.searchStatus || scopedAkte.searchedAt || "").trim();
+        return searchState !== "" && searchState !== "none";
+      })
+      .sort((a, b) => {
+        const aName = (a.name || `${a.firstname || ""} ${a.lastname || ""}`).trim().toLowerCase();
+        const bName = (b.name || `${b.firstname || ""} ${b.lastname || ""}`).trim().toLowerCase();
+        return aName.localeCompare(bName);
+      });
+  }, [normalizedPersons, aktenByPerson, selectedCompartment, baseScope]);
   const activeImage = personImages[activeImageIndex] || personImages[0] || "";
   const activeImageIsDataUrl = activeImage.startsWith("data:");
   const activeImageIsHttpUrl = /^https?:\/\//i.test(activeImage);
@@ -1536,33 +1551,22 @@ export default function PersonsView({
                 </div>
 
                 {/* Related Cards */}
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-xl border border-[var(--mdt-border)] bg-white/[0.01] hover:bg-white/[0.02] hover:border-zinc-800 transition-all duration-300 p-4 space-y-3">
-                    <p className="text-[10px] uppercase tracking-wider text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">{t("tablet.incidents.recent_list")}</p>
-                    <div className="space-y-2 max-h-40 overflow-y-auto premium-scroll pr-1">
-                      {relatedIncidents.length === 0 ? (
-                        <p className="text-xs text-zinc-650 italic text-center py-2">{t("tablet.notes.none")}</p>
-                      ) : (
-                        relatedIncidents.map((incident) => (
-                          <div key={incident.id} className="text-xs rounded-lg bg-black/25 border border-zinc-900 p-2.5 hover:border-zinc-800 transition-colors">
-                            <p className="text-white font-semibold">{incident.title}</p>
-                            <p className="text-[10px] text-[var(--mdt-text-muted)] mt-1">{incident.location} • {incident.severity} • {incident.status}</p>
-                          </div>
-                        ))
-                      )}
+                    <div className="flex items-center justify-between border-b border-zinc-900 pb-1.5">
+                      <p className="text-[10px] uppercase tracking-wider text-[var(--mdt-text-muted)] font-bold">
+                        {t("tablet.persons.searched_people", undefined, "Searched People")}
+                      </p>
+                      <span className="text-[10px] text-zinc-500 font-semibold">{searchedPeople.length}</span>
                     </div>
-                  </div>
-
-                  <div className="rounded-xl border border-[var(--mdt-border)] bg-white/[0.01] hover:bg-white/[0.02] hover:border-zinc-800 transition-all duration-300 p-4 space-y-3">
-                    <p className="text-[10px] uppercase tracking-wider text-[var(--mdt-text-muted)] font-bold border-b border-zinc-900 pb-1.5">{t("tablet.bolo.title")}</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto premium-scroll pr-1">
-                      {relatedBolos.length === 0 ? (
+                      {searchedPeople.length === 0 ? (
                         <p className="text-xs text-zinc-650 italic text-center py-2">{t("tablet.notes.none")}</p>
                       ) : (
-                        relatedBolos.map((bolo) => (
-                          <div key={bolo.id} className="text-xs rounded-lg bg-black/25 border border-zinc-900 p-2.5 hover:border-zinc-800 transition-colors">
-                            <p className="text-white font-semibold">{bolo.title}</p>
-                            <p className="text-[10px] text-[var(--mdt-text-muted)] mt-1">{bolo.priority} • {bolo.status}</p>
+                        searchedPeople.map((person) => (
+                          <div key={person.identifier} className="text-xs rounded-lg bg-black/25 border border-zinc-900 p-2.5 hover:border-zinc-800 transition-colors">
+                            <p className="text-white font-semibold">{person.name || t("tablet.player.unknown_user")}</p>
+                            <p className="text-[10px] text-[var(--mdt-text-muted)] mt-1">{person.job || t("tablet.persons.not_available")} • {t("tablet.persons.flagged")}</p>
                           </div>
                         ))
                       )}

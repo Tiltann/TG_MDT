@@ -9,7 +9,7 @@ export type MockupBranding = {
 
 export const defaultMockupBranding: MockupBranding = {
   name: "TG MDT",
-  subtitle: "MULTI-FRAKTION PLATFORM",
+  subtitle: "Agency Operations Terminal",
   accent: "#ff9100",
   badge: "Duty Profile",
   greeting: "Good morning, Agent Nova.",
