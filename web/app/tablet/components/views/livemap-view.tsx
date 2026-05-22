@@ -49,15 +49,15 @@ export default function LiveMapView({ t }: { t: TFunction }) {
   // e.g. /map/styleAtlas
 
   return (
-    <div className="h-full flex flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <div>
         <h3 className="text-2xl card-title">{t("tablet.sidebar.livemap")}</h3>
         <p className="card-sub mt-1">{t("tablet.map.subtitle")}</p>
       </div>
-      <Card className="p-0 flex-1 overflow-hidden border-(--mdt-border) bg-black">
+      <Card className="flex min-h-0 flex-1 overflow-hidden border-(--mdt-border) bg-black p-0">
         {/* @ts-expect-error: Custom element not in JSX.IntrinsicElements */}
         <gta-v-map
-          style={{ width: "100%", height: "60vh", minHeight: 400, borderRadius: "0.75rem", display: "block" }}
+          style={{ width: "100%", height: "100%", minHeight: 0, borderRadius: "0.75rem", display: "block" }}
           tile-base-url="map"
           atlas-url="map/styleAtlas/{z}/{x}/{y}.jpg"
           satellite-url="map/styleAtlas/{z}/{x}/{y}.jpg"

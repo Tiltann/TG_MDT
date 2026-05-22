@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { fetchNui } from "@/lib/useNui";
@@ -82,7 +82,7 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
       .finally(() => setLoading(false));
   };
 
-  const fetchLogs = () => {
+  const fetchLogs = useCallback(() => {
     setLogsLoading(true);
     fetchNui<AuditLog[]>("getAuditLogs", {
       action: logActionFilter,
@@ -95,17 +95,21 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
       })
       .catch((err) => console.error("Error fetching audit logs:", err))
       .finally(() => setLogsLoading(false));
-  };
+  }, [logActionFilter, logSearch]);
 
   useEffect(() => {
     fetchMembers();
   }, []);
 
   useEffect(() => {
-    if (activeSubTab === "audit") {
+    if (activeSubTab !== "audit") return;
+
+    const timeout = window.setTimeout(() => {
       fetchLogs();
-    }
-  }, [activeSubTab, logActionFilter]);
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeSubTab, fetchLogs]);
 
   const selectedMember = useMemo(() => {
     return members.find((m) => m.identifier === selectedMemberId) || null;
