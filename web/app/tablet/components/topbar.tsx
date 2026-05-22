@@ -61,8 +61,8 @@ export function Topbar({
   const isOnDuty = dutyState?.onDuty !== false;
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [currentTime, setCurrentTime] = useState(branding.timeLabel || '');
-  const [currentDate, setCurrentDate] = useState(branding.dateLabel || '');
+  const [currentTime, setCurrentTime] = useState("");
+  const [currentDate, setCurrentDate] = useState("");
 
   useEffect(() => {
     if (searchValue.trim().length === 0) {
@@ -75,20 +75,14 @@ export function Topbar({
       const now = new Date();
       const hours = now.getHours();
       const minutes = now.getMinutes();
-      const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      
+      setCurrentTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
       const day = now.getDate().toString().padStart(2, '0');
       const month = (now.getMonth() + 1).toString().padStart(2, '0');
       const year = now.getFullYear();
-      const dateString = `${day}.${month}.${year}`;
-      
-      setCurrentTime(timeString);
-      setCurrentDate(dateString);
+      setCurrentDate(`${day}.${month}.${year}`);
     };
-
     updateClock();
     const interval = setInterval(updateClock, 1000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -190,8 +184,8 @@ export function Topbar({
         )}
 
         <div className="text-right">
-          <p className="text-white font-medium">{currentTime}</p>
-          <p className="text-xs text-(--mdt-text-muted) uppercase tracking-wider">{currentDate}</p>
+          <p className="text-white font-medium">{currentTime || branding.timeLabel || t("tablet.topbar.date_fallback")}</p>
+          <p className="text-xs text-(--mdt-text-muted) uppercase tracking-wider">{currentDate || branding.dateLabel || t("tablet.topbar.date_fallback")}</p>
         </div>
 
         <button 

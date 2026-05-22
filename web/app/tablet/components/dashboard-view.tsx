@@ -154,10 +154,8 @@ export function DashboardView({
       const minutes = now.getMinutes();
       setCurrentTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
     };
-
     updateClock();
     const interval = setInterval(updateClock, 1000);
-
     return () => clearInterval(interval);
   }, []);
 
