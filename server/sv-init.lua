@@ -2059,6 +2059,9 @@ lib.callback.register(CALLBACK_GET_AKTE_COMPARTMENTS, function(src, kind, value)
     return {}
 end)
 
+-- Forward-declare radio helper used by leadership and dispatch callbacks.
+local buildPlayerRadioData
+
 ---@param src number
 ---@return string
 ---@return string
@@ -3335,7 +3338,7 @@ local function isDispatchStatusAllowedForSource(src, status)
     return false
 end
 
-local function buildPlayerRadioData(src)
+buildPlayerRadioData = function(src)
     local fallback = {
         source = src,
         name = 'Colleague ' .. src,
