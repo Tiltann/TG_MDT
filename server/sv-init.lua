@@ -302,7 +302,21 @@ local function hasAccess(src)
     end
     
     if allowedJobsCache == 'all' then return true end
-    return allowedJobsCache[job] == true
+
+    if allowedJobsCache[job] == true then
+        return true
+    end
+
+    local dutyCfg = Config and Config.MDT and Config.MDT.duty or {}
+    local prefix = type(dutyCfg.offduty_job_prefix) == 'string' and string.lower((dutyCfg.offduty_job_prefix:gsub('^%s+', ''):gsub('%s+$', ''))) or 'off'
+    if prefix ~= '' and job:sub(1, #prefix) == prefix and #job > #prefix then
+        local baseJob = job:sub(#prefix + 1)
+        if baseJob ~= '' and allowedJobsCache[baseJob] == true then
+            return true
+        end
+    end
+
+    return false
 end
 
 ---@param value any
@@ -326,6 +340,26 @@ local function normalizeBossJobName(value)
 end
 
 ---@param value any
+---@return string
+local function normalizeScopeJobName(value)
+    local normalized = normalizeBossJobName(value)
+    if normalized == '' then
+        return ''
+    end
+
+    local dutyCfg = Config and Config.MDT and Config.MDT.duty or {}
+    local prefix = normalizeBossJobName(dutyCfg.offduty_job_prefix)
+    if prefix ~= '' and normalized:sub(1, #prefix) == prefix and #normalized > #prefix then
+        local base = normalized:sub(#prefix + 1)
+        if base ~= '' then
+            return base
+        end
+    end
+
+    return normalized
+end
+
+---@param value any
 ---@return number|nil
 local function resolveGradeLevel(value)
     if type(value) == 'number' or type(value) == 'string' then
@@ -344,14 +378,15 @@ end
 ---@return table|nil
 local function resolveDepartmentByJobName(jobName)
     local departments = Config and Config.MDT and Config.MDT.departments
-    if type(departments) ~= 'table' or jobName == '' then
+    local normalizedInput = normalizeScopeJobName(jobName)
+    if type(departments) ~= 'table' or normalizedInput == '' then
         return nil, nil
     end
 
     for deptKey, deptCfg in pairs(departments) do
         if type(deptCfg) == 'table' and type(deptCfg.jobs) == 'table' then
             for i = 1, #deptCfg.jobs do
-                if normalizeBossJobName(deptCfg.jobs[i]) == jobName then
+                if normalizeScopeJobName(deptCfg.jobs[i]) == normalizedInput then
                     return normalizeBossJobName(deptKey), deptCfg
                 end
             end
@@ -2071,14 +2106,15 @@ local buildPlayerRadioData
 local function getLeadershipScopeInfo(src)
     local _, agency, job = isBossSource(src)
     local scope = normalizeJobName(agency)
+    local resolvedJob = normalizeScopeJobName(job)
     if scope == '' then
-        scope = normalizeJobName(job)
+        scope = normalizeJobName(resolvedJob)
     end
     if scope == '' then
         scope = 'global'
     end
 
-    return scope, normalizeJobName(agency), normalizeJobName(job)
+    return scope, normalizeJobName(agency), normalizeJobName(resolvedJob)
 end
 
 ---@param identifier string
@@ -2737,7 +2773,7 @@ lib.callback.register(CALLBACK_GET_NEARBY_AGENCY_PLAYERS, function(src, requeste
     local players = GetPlayers()
     for i = 1, #players do
         local targetSrc = tonumber(players[i])
-        if targetSrc and targetSrc ~= src and hasAccess(targetSrc) and getAkteScope(targetSrc) == scope then
+        if targetSrc and targetSrc ~= src and hasAccess(targetSrc) then
             local targetPed = GetPlayerPed(targetSrc)
             if targetPed and targetPed > 0 then
                 local targetCoords = GetEntityCoords(targetPed)
@@ -2787,9 +2823,6 @@ lib.callback.register(CALLBACK_SHARE_AKTE_WITH_PLAYER, function(src, kind, value
     end
 
     local sourceScope = resolveRequestedAkteScope(src, compartment)
-    if getAkteScope(targetSrc) ~= sourceScope then
-        return false
-    end
 
     if not isPlayerNearby(src, targetSrc, 20.0) then
         return false

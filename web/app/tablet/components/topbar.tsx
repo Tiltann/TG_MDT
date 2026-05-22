@@ -146,7 +146,7 @@ export function Topbar({
       <div className="flex items-center gap-6">
         <button
           onClick={onToggleDuty}
-          disabled={isDutyBusy || dutyState?.enabled === false}
+          disabled={isDutyBusy}
           className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             isOnDuty
               ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/15"

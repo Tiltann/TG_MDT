@@ -420,6 +420,17 @@ local function hasAccess(src)
         end
     end
 
+    local dutyCfg = getDutyConfig()
+    local prefix = normalizeJobName(dutyCfg.offduty_job_prefix)
+    if prefix ~= '' and job:sub(1, #prefix) == prefix and #job > #prefix then
+        local baseJob = job:sub(#prefix + 1)
+        for i = 1, #allowed do
+            if normalizeJobName(allowed[i]) == baseJob then
+                return true
+            end
+        end
+    end
+
     Debug.debug(('[duty:access] src=%s denied=job_not_allowed job=%s'):format(tostring(src), tostring(job)))
     
     return false
