@@ -741,6 +741,11 @@ function TG_MDT_sendInitialState()
 		TriggerServerEvent(EVENT_SERVER_JOIN_RADIO, activeFreq)
 	end
 
+	local dispatchHistoryLimit = 200
+	if type(mdtCfg.dispatch) == 'table' and tonumber(mdtCfg.dispatch.history_limit) then
+		dispatchHistoryLimit = math.max(25, math.min(tonumber(mdtCfg.dispatch.history_limit) or dispatchHistoryLimit, 200))
+	end
+
 	local leadershipCanAccess = false
 	do
 		local okBoss, bossState = pcall(function()
@@ -816,15 +821,27 @@ function TG_MDT_sendInitialState()
 		})
 	end
 
-	local okDispatchHistory, dispatchHistory = pcall(function()
-		return lib.callback.await(CALLBACK_GET_DISPATCH_HISTORY, false)
+	CreateThread(function()
+		Wait(0)
+
+		local okDispatchHistory, dispatchHistory = pcall(function()
+			return lib.callback.await(CALLBACK_GET_DISPATCH_HISTORY, false, {
+				limit = dispatchHistoryLimit,
+			})
+		end)
+
+		if okDispatchHistory then
+			local payload = dispatchHistory
+			if type(dispatchHistory) == 'table' and type(dispatchHistory.items) == 'table' then
+				payload = dispatchHistory.items
+			end
+
+			NUI.send('setData', {
+				key = 'dispatchHistory',
+				value = payload or {},
+			})
+		end
 	end)
-	if okDispatchHistory then
-		NUI.send('setData', {
-			key = 'dispatchHistory',
-			value = dispatchHistory or {},
-		})
-	end
 
 	Debug.debug('TG_MDT_sendInitialState: done')
 end

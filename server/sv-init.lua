@@ -1912,6 +1912,72 @@ local function getMemberPermissions(identifier, agency)
     return type(decoded) == 'table' and decoded or {}
 end
 
+---@param payload table|nil
+---@param defaultPageSize number
+---@param maxPageSize number
+---@return number page
+---@return number pageSize
+---@return number offset
+local function normalizePagination(payload, defaultPageSize, maxPageSize)
+    local body = type(payload) == 'table' and payload or {}
+    local page = math.floor(tonumber(body.page) or 1)
+    if page < 1 then
+        page = 1
+    end
+
+    local pageSize = math.floor(tonumber(body.pageSize) or tonumber(body.limit) or defaultPageSize)
+    if pageSize < 1 then
+        pageSize = defaultPageSize
+    end
+    if pageSize > maxPageSize then
+        pageSize = maxPageSize
+    end
+
+    local offset = tonumber(body.offset)
+    if type(offset) ~= 'number' then
+        offset = (page - 1) * pageSize
+    end
+
+    if offset < 0 then
+        offset = 0
+    end
+
+    return page, pageSize, math.floor(offset)
+end
+
+---@param scope string
+---@param actionFilter string
+---@param search string
+---@return string whereClause
+---@return table params
+local function buildAuditLogFilters(scope, actionFilter, search)
+    local parts = { 'scope = ?' }
+    local params = { scope }
+
+    if actionFilter ~= '' and actionFilter ~= 'all' then
+        parts[#parts + 1] = 'action = ?'
+        params[#params + 1] = actionFilter
+    end
+
+    if search ~= '' then
+        parts[#parts + 1] = [[
+            (
+                LOWER(actor_name) LIKE ? OR
+                LOWER(COALESCE(target_name, '')) LIKE ? OR
+                LOWER(COALESCE(details, '')) LIKE ? OR
+                LOWER(action) LIKE ?
+            )
+        ]]
+        local needle = ('%%%s%%'):format(search)
+        params[#params + 1] = needle
+        params[#params + 1] = needle
+        params[#params + 1] = needle
+        params[#params + 1] = needle
+    end
+
+    return table.concat(parts, ' AND '), params
+end
+
 ---@param src number
 ---@return string
 local function getActorDisplayName(src)
@@ -2181,14 +2247,17 @@ lib.callback.register(CALLBACK_GET_AUDIT_LOGS, function(src, payload)
     local body = type(payload) == 'table' and payload or {}
     local scope = select(1, getLeadershipScopeInfo(src))
     local actionFilter = type(body.action) == 'string' and normalizeJobName(body.action) or ''
-    local search = type(body.search) == 'string' and string.lower(body.search) or ''
-    local rows = SQL.query([[
-        SELECT id, created_at, action, actor_name, actor_identifier, target_name, target_identifier, details
-        FROM tg_mdt_audit_logs
-        WHERE scope = ?
-        ORDER BY id DESC
-        LIMIT 500
-    ]], { scope })
+    local search = type(body.search) == 'string' and string.lower(body.search:gsub('^%s+', ''):gsub('%s+$', '')) or ''
+    local page, pageSize, offset = normalizePagination(body, 25, 100)
+    local whereClause, params = buildAuditLogFilters(scope, actionFilter, search)
+
+    local totalRow = SQL.single(('SELECT COUNT(*) AS total FROM tg_mdt_audit_logs WHERE %s'):format(whereClause), params)
+    local total = tonumber(totalRow and totalRow.total) or 0
+
+    local rows = SQL.query(
+        ('SELECT id, created_at, action, actor_name, actor_identifier, target_name, target_identifier, details FROM tg_mdt_audit_logs WHERE %s ORDER BY id DESC LIMIT ? OFFSET ?'):format(whereClause),
+        { table.unpack(params), pageSize, offset }
+    )
 
     local out = {}
     for i = 1, #rows do
@@ -2217,14 +2286,15 @@ lib.callback.register(CALLBACK_GET_AUDIT_LOGS, function(src, payload)
             job = scope,
         }
 
-        if #out >= 200 then
-            break
-        end
-
         ::continue::
     end
 
-    return out
+    return {
+        items = out,
+        total = total,
+        page = page,
+        pageSize = pageSize,
+    }
 end)
 
 lib.callback.register(CALLBACK_GET_LAWS, function(src)
@@ -3419,7 +3489,7 @@ lib.callback.register(CALLBACK_GET_DISPATCH_STATE, function(src)
     return getDispatchCallsSnapshot(src)
 end)
 
-lib.callback.register(CALLBACK_GET_DISPATCH_HISTORY, function(src)
+lib.callback.register(CALLBACK_GET_DISPATCH_HISTORY, function(src, payload)
     if not hasAccess(src) then
         return {}
     end
@@ -3428,7 +3498,32 @@ lib.callback.register(CALLBACK_GET_DISPATCH_HISTORY, function(src)
             return {}
         end
     end
-    return getDispatchHistorySnapshot(src)
+
+    local body = type(payload) == 'table' and payload or {}
+    local dispatchLimit = math.floor(tonumber(body.limit) or getDispatchHistoryLimit())
+    if dispatchLimit < 1 then
+        dispatchLimit = 25
+    end
+
+    local dispatchOffset = math.floor(tonumber(body.offset) or 0)
+    if dispatchOffset < 0 then
+        dispatchOffset = 0
+    end
+
+    local snapshot = getDispatchHistorySnapshot(src)
+    local items = {}
+    local startIndex = dispatchOffset + 1
+    local endIndex = math.min(#snapshot, dispatchOffset + dispatchLimit)
+    for i = startIndex, endIndex do
+        items[#items + 1] = snapshot[i]
+    end
+
+    return {
+        items = items,
+        total = #snapshot,
+        limit = dispatchLimit,
+        offset = dispatchOffset,
+    }
 end)
 
 lib.callback.register(CALLBACK_ASSIGN_DISPATCH_UNIT, function(src, payload)

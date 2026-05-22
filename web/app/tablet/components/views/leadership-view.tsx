@@ -42,6 +42,13 @@ type AuditLog = {
   job: string;
 };
 
+type AuditLogResponse = {
+  items?: AuditLog[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
+};
+
 type LeadershipViewProps = {
   t: TFunction;
   actorGrade?: string;
@@ -65,6 +72,7 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
 
   // Audit Logs State
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditTotal, setAuditTotal] = useState(0);
   const [logSearch, setLogSearch] = useState("");
   const [logActionFilter, setLogActionFilter] = useState("all");
   const [logsLoading, setLogsLoading] = useState(false);
@@ -86,18 +94,24 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
 
   const fetchLogs = useCallback(() => {
     setLogsLoading(true);
-    fetchNui<AuditLog[]>("getAuditLogs", {
+    fetchNui<AuditLogResponse>("getAuditLogs", {
       action: logActionFilter,
       search: logSearch,
+      page: auditPage,
+      pageSize: AUDIT_PAGE_SIZE,
     })
       .then((data) => {
         if (data) {
-          setAuditLogs(data);
+          setAuditLogs(data.items || []);
+          setAuditTotal(typeof data.total === "number" ? data.total : (data.items || []).length);
+          if (typeof data.page === "number" && data.page > 0) {
+            setAuditPage(data.page);
+          }
         }
       })
       .catch((err) => console.error("Error fetching audit logs:", err))
       .finally(() => setLogsLoading(false));
-  }, [logActionFilter, logSearch]);
+  }, [logActionFilter, logSearch, auditPage]);
 
   useEffect(() => {
     fetchMembers();
@@ -235,11 +249,8 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
     }
   };
 
-  const totalAuditPages = Math.max(1, Math.ceil(auditLogs.length / AUDIT_PAGE_SIZE));
-  const visibleAuditLogs = useMemo(() => {
-    const startIndex = (auditPage - 1) * AUDIT_PAGE_SIZE;
-    return auditLogs.slice(startIndex, startIndex + AUDIT_PAGE_SIZE);
-  }, [auditPage, auditLogs]);
+  const totalAuditPages = Math.max(1, Math.ceil(auditTotal / AUDIT_PAGE_SIZE));
+  const visibleAuditLogs = auditLogs;
 
   return (
     <div className="space-y-5 animate-mdt-view flex flex-col h-full min-h-0">
@@ -567,7 +578,7 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
               )}
             </div>
 
-            {auditLogs.length > AUDIT_PAGE_SIZE && (
+            {auditTotal > AUDIT_PAGE_SIZE && (
               <div className="flex items-center justify-between gap-3 border-t border-zinc-900 pt-3 mt-3 flex-shrink-0">
                 <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
                   Page {auditPage} of {totalAuditPages}
