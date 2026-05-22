@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | client/nui.lua
+--  TG_MDT | client/cl-nui.lua
 --  NUI bridge — all NUI interaction goes through this file.
 --
 --  NUI.show()                      open the tablet + focus

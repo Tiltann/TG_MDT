@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | server/sql.lua
+--  TG_MDT | server/sv-sql.lua
 --  OxMySQL wrapper.
 --  Provides a clean SQL table so feature code never touches
 --  MySQL directly.

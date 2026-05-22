@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | shared/framework/init.lua
+--  TG_MDT | shared/framework/sh-init.lua
 --  Auto-detects the active framework and loads the right bridge.
 --  Exposes a global `Framework` table to all contexts.
 --

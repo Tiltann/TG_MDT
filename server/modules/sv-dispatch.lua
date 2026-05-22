@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | server/modules/dispatch.lua
+--  TG_MDT | server/modules/sv-dispatch.lua
 --  Dispatch helpers: per-agency module state, payload enrichment,
 --  and SQL-backed dispatch logs/history.
 -- ============================================================

@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | config/akte_models.lua
+--  TG_MDT | config/akte-models.lua
 --  Modular Record schema definitions for persons and vehicles.
 --
 --  You can add/edit fields here without touching UI/server logic.

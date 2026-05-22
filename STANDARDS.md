@@ -43,17 +43,17 @@ TG_MDT/
 ├── config/                    # All editable config (loaded first)
 │   ├── config.lua             # Main settings (jobs, distances, toggles)
 │   └── commands.lua           # Command names and keybinds
-├── client/                    # Client-side Lua
-├── server/                    # Server-side Lua
-│   └── sql.lua                # OxMySQL wrapper
+├── client/                    # Client-side Lua (`cl-*.lua`)
+├── server/                    # Server-side Lua (`sv-*.lua`)
+│   └── sv-sql.lua             # OxMySQL wrapper
 ├── shared/                    # Shared Lua (constants, exports)
-│   ├── debug.lua              # Structured logging
+│   ├── sh-debug.lua           # Structured logging
 │   └── framework/             # Framework bridge
-│       ├── init.lua           # Detection + Framework.name
-│       ├── esx.lua
-│       ├── qbcore.lua
-│       ├── qbox.lua
-│       └── standalone.lua
+│       ├── sh-init.lua        # Detection + Framework.name
+│       ├── sh-esx.lua
+│       ├── sh-qbcore.lua
+│       ├── sh-qbox.lua
+│       └── sh-standalone.lua
 ├── locales/                   # ox_lib locale files
 ├── web/                       # Next.js NUI app
 │   └── dist/                  # Build output — served by FiveM
@@ -359,7 +359,7 @@ SetTimeout(1000, cb)            -- not Citizen.SetTimeout
 
 ## Debug Library
 
-`shared/debug.lua` — structured logging for all TG resources.
+`shared/sh-debug.lua` — structured logging for all TG resources.
 
 | Level | Always visible | Use for |
 |-------|---------------|---------|
@@ -413,7 +413,7 @@ end)
 
 ## SQL
 
-Use `server/sql.lua` — the OxMySQL wrapper. Never make direct DB calls in feature code.
+Use `server/sv-sql.lua` — the OxMySQL wrapper. Never make direct DB calls in feature code.
 
 ```lua
 -- Select multiple rows

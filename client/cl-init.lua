@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | client/init.lua
+--  TG_MDT | client/cl-init.lua
 --  Client-side startup and initialization.
 -- ============================================================
 
@@ -491,7 +491,7 @@ RegisterNetEvent('TG_MDT:dispatchHistoryChanged', function(payload)
 end)
 
 -- ── Meta / initial-state helpers ──────────────────────────
--- These are module-level so tablet.lua can also call TG_MDT_sendInitialState().
+-- These are module-level so cl-tablet.lua can also call TG_MDT_sendInitialState().
 
 local function serializeAkteField(f)
 	if type(f) ~= 'table' then return nil end

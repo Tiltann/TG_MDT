@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | shared/framework/qbox.lua
+--  TG_MDT | shared/framework/sh-qbox.lua
 --  Qbox (qbx_core) bridge — loaded when Framework.name == 'qbox'
 -- ============================================================
 

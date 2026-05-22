@@ -9,34 +9,34 @@ author 'TG (Lucentix, Tiltann, BillyG, DominikVatoo)'
 shared_scripts {
     '@ox_lib/init.lua',
     'config/config.lua',
-    'config/akte_models.lua',
+    'config/akte-models.lua',
     'config/commands.lua',
     'config/logs.lua',
     'config/modules.lua',
-    'shared/debug.lua',
-    'shared/framework/init.lua',
-    'shared/framework/esx.lua',
-    'shared/framework/qbcore.lua',
-    'shared/framework/qbox.lua',
-    'shared/framework/standalone.lua',
+    'shared/sh-debug.lua',
+    'shared/framework/sh-init.lua',
+    'shared/framework/sh-esx.lua',
+    'shared/framework/sh-qbcore.lua',
+    'shared/framework/sh-qbox.lua',
+    'shared/framework/sh-standalone.lua',
 }
 
 client_scripts {
-    'client/nui.lua',
-    'client/init.lua',
+    'client/cl-nui.lua',
+    'client/cl-init.lua',
     'client/modules/*.lua',
-    'client/exports.lua',
+    'client/cl-exports.lua',
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/sql.lua',
-    'server/logs.lua',
-    'server/updater.lua',
-    'server/duty.lua',
-    'server/init.lua',
+    'server/sv-sql.lua',
+    'server/sv-logs.lua',
+    'server/sv-updater.lua',
+    'server/sv-duty.lua',
+    'server/sv-init.lua',
     'server/modules/*.lua',
-    'server/exports.lua',
+    'server/sv-exports.lua',
 }
 
 ui_page 'web/dist/index.html'

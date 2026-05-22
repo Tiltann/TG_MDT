@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | server/init.lua
+--  TG_MDT | server/sv-init.lua
 --  Server-side startup and initialization.
 -- ============================================================
 

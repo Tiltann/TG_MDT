@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | shared/debug.lua
+--  TG_MDT | shared/sh-debug.lua
 --  Structured logging utility.
 --  Exposes a global `Debug` table loaded by every context.
 --
@@ -30,7 +30,7 @@ local function resolveFlags()
     local debug_on     = false
     local sensitive_on = false
 
-    -- check Config.Debug (set in shared/sh-config.lua or similar)
+    -- check Config.Debug (set in config/config.lua or similar)
     if type(Config) == 'table' and Config.Debug ~= nil then
         local d = Config.Debug
         if type(d) == 'boolean' then

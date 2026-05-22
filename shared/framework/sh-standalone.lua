@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | shared/framework/standalone.lua
+--  TG_MDT | shared/framework/sh-standalone.lua
 --  Standalone fallback — loaded when no framework is detected.
 --  Replace stubs with your own logic as needed.
 -- ============================================================

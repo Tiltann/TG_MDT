@@ -13,7 +13,7 @@ Config.Locale = 'en'                  -- locale file to load from locales/
 -- ── Debug ─────────────────────────────────────────────────
 -- true         = enable debug output
 -- false        = disable (default for prod)
--- table        = granular control (see debug.lua)
+-- table        = granular control (see sh-debug.lua)
 
 Config.Debug = {
     enabled   = true,

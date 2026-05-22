@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | shared/framework/esx.lua
+--  TG_MDT | shared/framework/sh-esx.lua
 --  ESX bridge — loaded when Framework.name == 'esx'
 -- ============================================================
 

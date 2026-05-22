@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | client/exports.lua
+--  TG_MDT | client/cl-exports.lua
 --  Public client exports for integrations.
 -- ============================================================
 

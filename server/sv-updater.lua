@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | server/updater.lua
+--  TG_MDT | server/sv-updater.lua
 --  Version check system with GitHub release comparison.
 --  Checks for updates on server start and prints status.
 -- ============================================================

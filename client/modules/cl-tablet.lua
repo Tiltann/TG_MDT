@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | client/modules/tablet.lua
+--  TG_MDT | client/modules/cl-tablet.lua
 --  Tablet module: permission gate + open/toggle entrypoint.
 -- ============================================================
 

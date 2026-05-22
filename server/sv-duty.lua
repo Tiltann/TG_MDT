@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | server/duty.lua
+--  TG_MDT | server/sv-duty.lua
 --  Unified duty state handling + optional off-duty job switching.
 -- ============================================================
 

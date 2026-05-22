@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | server/exports.lua
+--  TG_MDT | server/sv-exports.lua
 --  Public server exports for integrations.
 -- ============================================================
 

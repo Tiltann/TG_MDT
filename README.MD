@@ -45,7 +45,7 @@ Alle Coding- und Design-Standards für dieses Projekt sind in [`STANDARDS.md`](.
 
 ### 🧩 Modulares Akten-Modell (Lua)
 
-Alle Aktenfelder (Personen/Fahrzeuge) und Fahrzeug-Hashnamen werden zentral in `config/akte_models.lua` gepflegt.
+Alle Aktenfelder (Personen/Fahrzeuge) und Fahrzeug-Hashnamen werden zentral in `config/akte-models.lua` gepflegt.
 
 - `Config.AkteModels.person.fields` definiert alle Personenakten-Felder
 - `Config.AkteModels.vehicle.fields` definiert alle Fahrzeugakten-Felder
@@ -62,7 +62,7 @@ Jedes Feld unter `fields` unterstützt:
 
 Hinweise:
 
-- Neue Felder müssen nur in `config/akte_models.lua` ergänzt werden, die UI rendert sie dynamisch.
+- Neue Felder müssen nur in `config/akte-models.lua` ergänzt werden, die UI rendert sie dynamisch.
 - Beim Speichern akzeptiert der Server nur `editable = true` Felder.
 - Für unbekannte Fahrzeugmodelle einfach den Hash in `vehicle_model_names` ergänzen.
 
@@ -137,7 +137,7 @@ All coding and design standards for this project are documented in [`STANDARDS.m
 
 ### 🧩 Modular Akte Model (Lua)
 
-All Akte fields (persons/vehicles) and vehicle hash-name mappings are managed centrally in `config/akte_models.lua`.
+All Akte fields (persons/vehicles) and vehicle hash-name mappings are managed centrally in `config/akte-models.lua`.
 
 - `Config.AkteModels.person.fields` defines person Akte fields
 - `Config.AkteModels.vehicle.fields` defines vehicle Akte fields
@@ -154,7 +154,7 @@ Each field inside `fields` supports:
 
 Notes:
 
-- To add fields, update `config/akte_models.lua`; the UI renders them dynamically.
+- To add fields, update `config/akte-models.lua`; the UI renders them dynamically.
 - On save, the server only applies fields with `editable = true`.
 - For unknown vehicle models, add the hash to `vehicle_model_names`.
 

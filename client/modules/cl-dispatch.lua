@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | client/modules/dispatch.lua
+--  TG_MDT | client/modules/cl-dispatch.lua
 --  Dispatch module helper for agency-scoped module state.
 -- ============================================================
 

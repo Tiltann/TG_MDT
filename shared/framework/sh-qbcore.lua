@@ -1,5 +1,5 @@
 -- ============================================================
---  TG_MDT | shared/framework/qbcore.lua
+--  TG_MDT | shared/framework/sh-qbcore.lua
 --  QBCore bridge — loaded when Framework.name == 'qbcore'
 -- ============================================================
 
