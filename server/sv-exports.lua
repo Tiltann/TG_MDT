@@ -191,3 +191,63 @@ exports('GetDispatchDataBundle', function(viewerSource, options)
             or {},
     }
 end)
+
+--- Returns a person case (Akte) by identifier.
+---@param identifier string
+---@param options table|nil
+---@return table
+exports('GetPersonCaseByIdentifier', function(identifier, options)
+    if type(identifier) ~= 'string' or identifier == '' then
+        return {}
+    end
+
+    if type(TG_MDT_GetPersonCaseByIdentifier) ~= 'function' then
+        return {}
+    end
+
+    local opts = type(options) == 'table' and options or {}
+    return TG_MDT_GetPersonCaseByIdentifier(identifier, opts.src, opts.compartment)
+end)
+
+--- Returns a person case (Akte) by online player source id.
+---@param src number
+---@param options table|nil
+---@return table
+exports('GetPersonCaseBySource', function(src, options)
+    if type(src) ~= 'number' then
+        return {}
+    end
+
+    if not Framework or not Framework.Server or type(Framework.Server.getIdentifier) ~= 'function' then
+        return {}
+    end
+
+    local identifier = Framework.Server.getIdentifier(src)
+    if type(identifier) ~= 'string' or identifier == '' then
+        return {}
+    end
+
+    if type(TG_MDT_GetPersonCaseByIdentifier) ~= 'function' then
+        return {}
+    end
+
+    local opts = type(options) == 'table' and options or {}
+    return TG_MDT_GetPersonCaseByIdentifier(identifier, src, opts.compartment)
+end)
+
+--- Returns a vehicle case (Akte) by plate.
+---@param plate string
+---@param options table|nil
+---@return table
+exports('GetVehicleCaseByPlate', function(plate, options)
+    if type(plate) ~= 'string' or plate == '' then
+        return {}
+    end
+
+    if type(TG_MDT_GetVehicleCaseByPlate) ~= 'function' then
+        return {}
+    end
+
+    local opts = type(options) == 'table' and options or {}
+    return TG_MDT_GetVehicleCaseByPlate(plate, opts.src, opts.compartment)
+end)

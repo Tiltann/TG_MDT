@@ -326,6 +326,8 @@
   "tablet.map.marker.default_label": "Unit marker",
   "tablet.map.marker.player": "You",
   "tablet.actions.share_with": "Share with",
+  "tablet.actions.share_with_nearby": "Share with nearby",
+  "tablet.actions.loading": "Loading...",
   "tablet.common.recorded": "RECORDED",
   "tablet.common.unknown": "Unknown",
   "tablet.common.unknown_location": "Unknown location",

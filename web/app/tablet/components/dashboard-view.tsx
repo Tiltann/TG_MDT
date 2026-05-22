@@ -79,6 +79,11 @@ type DashboardData = {
     title: string;
     description: string;
   }>;
+  searchedPersons?: Array<{
+    identifier: string;
+    name: string;
+    status?: string;
+  }>;
   boardPosts?: BoardPost[];
 };
 
@@ -137,6 +142,7 @@ export function DashboardView({
   const recentChat = data?.recentChat || [];
   const recentIncidents = data?.recentIncidents || [];
   const recentBolos = data?.recentBolos || [];
+  const searchedPersons = data?.searchedPersons || [];
   const boardPosts = data?.boardPosts || [];
   const accent = branding.accent || "#ff9100";
   const sortedBoardPosts = useMemo(
@@ -336,6 +342,36 @@ export function DashboardView({
 
         {/* Right Column: Dynamic Side Widgets */}
         <div className="space-y-6 flex flex-col min-h-0">
+
+          {/* SEARCHED Alert Panel */}
+          <Card className="overflow-hidden border border-red-900/70 bg-gradient-to-b from-red-950/45 to-black/40 rounded-3xl p-4 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-red-300 flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                SEARCHED BY FACTION
+              </h4>
+              <span className="rounded-full border border-red-500/30 bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-300">
+                {searchedPersons.length}
+              </span>
+            </div>
+
+            {searchedPersons.length === 0 ? (
+              <p className="rounded-xl border border-zinc-900 bg-black/25 px-3 py-2 text-xs text-zinc-500 italic">
+                {t("tablet.persons.not_flagged", undefined, "No searched persons right now.")}
+              </p>
+            ) : (
+              <div className="max-h-48 overflow-y-auto premium-scroll space-y-2 pr-1">
+                {searchedPersons.map((entry) => (
+                  <div key={entry.identifier} className="rounded-xl border border-red-800/40 bg-red-950/20 px-3 py-2">
+                    <p className="text-sm font-bold text-red-200 truncate">{entry.name}</p>
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-red-300/80 mt-0.5">
+                      {entry.status || t("tablet.status.searched", undefined, "SEARCHED")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
           
           {/* Quick Actions Panel */}
           <Card className="overflow-hidden border border-zinc-900 bg-zinc-950/30 rounded-3xl p-4 shadow-xl">

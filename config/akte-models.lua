@@ -267,6 +267,17 @@ Config.AkteModels = Config.AkteModels or {
                 },
             },
             {
+                key = 'rregistered',
+                label_key = 'tablet.vehicles.akte.rregistered',
+                type = 'select',
+                default = 'false',
+                editable = true,
+                options = {
+                    { value = 'false', label_key = 'tablet.common.no' },
+                    { value = 'true', label_key = 'tablet.common.yes' },
+                },
+            },
+            {
                 key = 'notes',
                 label_key = 'tablet.vehicles.akte.notes',
                 type = 'textarea',
@@ -337,6 +348,17 @@ Config.AkteModels = Config.AkteModels or {
                             { value = 'none', label_key = 'tablet.vehicles.akte.search_status.none' },
                             { value = 'wanted', label_key = 'tablet.vehicles.akte.search_status.wanted' },
                             { value = 'stolen', label_key = 'tablet.vehicles.akte.search_status.stolen' },
+                        },
+                    },
+                    {
+                        key = 'rregistered',
+                        label_key = 'tablet.vehicles.akte.rregistered',
+                        type = 'select',
+                        default = 'false',
+                        editable = true,
+                        options = {
+                            { value = 'false', label_key = 'tablet.common.no' },
+                            { value = 'true', label_key = 'tablet.common.yes' },
                         },
                     },
                     { key = 'notes', label_key = 'tablet.vehicles.akte.notes', type = 'textarea', default = '', editable = true },

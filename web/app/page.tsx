@@ -24,6 +24,7 @@ import VehiclesView from "./tablet/components/views/vehicles-view";
 import ProfileView from "./tablet/components/views/profile-view";
 import LiveMapView from "./tablet/components/views/livemap-view";
 import SettingsView from "./tablet/components/views/settings-view";
+import LeadershipView from "./tablet/components/views/leadership-view";
 import { defaultMockupBranding, defaultMockupModules } from "./tablet/lib/mockup-config";
 import { createTranslator, normalizeLocale, type SupportedLocale } from "./tablet/lib/i18n";
 import devTranslationsEn from "./tablet/lib/dev-translations.en.json";
@@ -67,7 +68,32 @@ type NuiMetaPayload = {
       auto_delete_after_minutes?: number;
     };
     allowed_jobs?: string[];
-    departments?: Record<string, { label: string; jobs: string[]; logo_url?: string; subtitle?: string }>;
+    departments?: Record<
+      string,
+      {
+        label: string;
+        jobs: string[];
+        logo_url?: string;
+        subtitle?: string;
+        boss?: {
+          default?: {
+            rank_name?: string | string[];
+            rank_names?: string[];
+            min_grade?: number;
+            last?: number;
+          };
+          jobs?: Record<
+            string,
+            {
+              rank_name?: string | string[];
+              rank_names?: string[];
+              min_grade?: number;
+              last?: number;
+            }
+          >;
+        };
+      }
+    >;
     branding?: {
       title_template?: string;
       subtitle?: string;
@@ -87,6 +113,9 @@ type NuiMetaPayload = {
         departments?: string[];
         color?: string;
       }>;
+    };
+    leadership?: {
+      can_access?: boolean;
     };
   };
   akteModels?: {
@@ -268,6 +297,7 @@ type RadioMember = {
   jobLabel?: string;
   avatarUrl?: string;
   status?: string;
+  radioCode?: string | number;
 };
 
 type HomeProps = {
@@ -470,11 +500,25 @@ const DEV_META: NuiMetaPayload = {
         label: "Police Department",
         jobs: ["police"],
         subtitle: "Law Enforcement Operations Desk",
+        boss: {
+          jobs: {
+            police: {
+              last: 2,
+            },
+          },
+        },
       },
       ambulance: {
         label: "Emergency Medical",
         jobs: ["ambulance"],
         subtitle: "Medical Response Coordination Desk",
+        boss: {
+          jobs: {
+            ambulance: {
+              min_grade: 3,
+            },
+          },
+        },
       },
     },
     branding: {
@@ -490,6 +534,9 @@ const DEV_META: NuiMetaPayload = {
         { code: "10-97", label_key: "tablet.dispatch.status.10-97", label: "On Scene", color: "blue" },
         { code: "10-7", label_key: "tablet.dispatch.status.10-7", label: "Out of Service", color: "gray" },
       ],
+    },
+    leadership: {
+      can_access: true,
     },
   },
   akteModels: {
@@ -513,6 +560,7 @@ function buildDevScreenData(): Record<string, unknown> {
       firstname: "Tiltann",
       lastname: "",
       gradeDisplay: "Sergeant",
+      gradeName: "sergeant",
       gradeLevel: 3,
       gradeCount: 5,
     },
@@ -619,6 +667,98 @@ function normalizeJobKey(job?: string): string {
   return typeof job === "string" ? job.trim().toLowerCase() : "";
 }
 
+type BossRule = {
+  rank_name?: string | string[];
+  rank_names?: string[];
+  min_grade?: number;
+  last?: number;
+};
+
+function resolveBossRuleForJob(
+  departments: NonNullable<NuiMetaPayload["mdt"]>["departments"],
+  agencyKey: string,
+  jobKey: string
+): BossRule | null {
+  if (!departments || !agencyKey || !jobKey) return null;
+  const dept = departments[agencyKey];
+  if (!dept || typeof dept !== "object") return null;
+
+  const bossConfig = dept.boss;
+  if (!bossConfig || typeof bossConfig !== "object") return null;
+
+  const byJob = bossConfig.jobs || {};
+  const direct = byJob[jobKey];
+  if (direct && typeof direct === "object") return direct;
+
+  for (const [ruleJob, rule] of Object.entries(byJob)) {
+    if (normalizeJobKey(ruleJob) === jobKey && rule && typeof rule === "object") {
+      return rule;
+    }
+  }
+
+  if (bossConfig.default && typeof bossConfig.default === "object") {
+    return bossConfig.default;
+  }
+
+  return null;
+}
+
+function evaluateBossRule(
+  rule: BossRule | null,
+  gradeName: string,
+  gradeLevel: number | null,
+  gradeCount: number | null,
+  fallbackByTopTwo: boolean
+): boolean {
+  if (!rule) {
+    return fallbackByTopTwo;
+  }
+
+  const nameCandidates = [
+    ...(Array.isArray(rule.rank_names) ? rule.rank_names : []),
+    ...(Array.isArray(rule.rank_name) ? rule.rank_name : typeof rule.rank_name === "string" ? [rule.rank_name] : []),
+  ]
+    .map((entry) => String(entry || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  const minGrade = typeof rule.min_grade === "number" ? rule.min_grade : null;
+  const lastRanks = typeof rule.last === "number" ? rule.last : null;
+
+  let matched = false;
+
+  // Single-mode rule resolution: rank_name OR min_grade OR last (never combined).
+  // Priority: rank_name > min_grade > last.
+  if (nameCandidates.length > 0) {
+    const normalizedGradeName = gradeName.trim().toLowerCase();
+    if (normalizedGradeName !== "" && nameCandidates.includes(normalizedGradeName)) {
+      matched = true;
+    }
+
+    return matched;
+  }
+
+  if (minGrade !== null) {
+    if (gradeLevel !== null && gradeLevel >= minGrade) {
+      matched = true;
+    }
+
+    return matched;
+  }
+
+  if (lastRanks !== null && lastRanks > 0) {
+    if (gradeLevel !== null && gradeCount !== null) {
+      const threshold = Math.max(0, gradeCount - lastRanks);
+      if (gradeLevel >= threshold) {
+        matched = true;
+      }
+    }
+
+    return matched;
+  }
+
+  return false;
+}
+
 function resolveJobAkteModels(meta: NuiMetaPayload, job?: string) {
   const basePerson = meta.akteModels?.person;
   const baseVehicle = meta.akteModels?.vehicle;
@@ -671,10 +811,9 @@ function normalizeScreenId(screen?: string | null): string | null {
 function buildEffectiveModules(modules?: Record<string, boolean>): Record<string, boolean> {
   const resolved = { ...(modules || {}) };
   const tabletEnabled = resolved.tablet !== false;
-  const coupledEnabled = tabletEnabled && resolved.dispatch !== false && resolved.livemap !== false;
 
-  resolved.dispatch = coupledEnabled;
-  resolved.livemap = coupledEnabled;
+  resolved.dispatch = tabletEnabled && resolved.dispatch !== false;
+  resolved.livemap = tabletEnabled && resolved.livemap !== false;
 
   return resolved;
 }
@@ -1209,6 +1348,10 @@ export default function Home({ devMode = false }: HomeProps) {
     typeof (player_data as { gradeDisplay?: unknown })?.gradeDisplay === "string"
       ? (((player_data as { gradeDisplay?: string }).gradeDisplay as string) || "").trim()
       : "";
+  const actorGradeName =
+    typeof (player_data as { gradeName?: unknown })?.gradeName === "string"
+      ? (((player_data as { gradeName?: string }).gradeName as string) || "").trim()
+      : "";
   const actorGradeLevel =
     typeof (player_data as { gradeLevel?: unknown })?.gradeLevel === "number"
       ? ((player_data as { gradeLevel?: number }).gradeLevel as number)
@@ -1219,6 +1362,34 @@ export default function Home({ devMode = false }: HomeProps) {
       : null;
   const boardAdminThreshold = actorGradeCount !== null ? Math.max(0, actorGradeCount - 2) : 2;
   const isBoardAdmin = actorGradeLevel !== null ? actorGradeLevel >= boardAdminThreshold : false;
+  const activeDepartmentKey = useMemo(() => {
+    const departments = typedMeta.mdt?.departments || {};
+    if (!sessionJob) return "";
+
+    for (const [deptKey, department] of Object.entries(departments)) {
+      if (!department || !Array.isArray(department.jobs)) continue;
+      if (department.jobs.some((job) => normalizeJobKey(job) === sessionJob)) {
+        return normalizeJobKey(deptKey);
+      }
+    }
+
+    return "";
+  }, [typedMeta.mdt?.departments, sessionJob]);
+  const bossRule = useMemo(
+    () => resolveBossRuleForJob(typedMeta.mdt?.departments || {}, activeDepartmentKey, sessionJob),
+    [typedMeta.mdt?.departments, activeDepartmentKey, sessionJob]
+  );
+  const locallyResolvedBoss = evaluateBossRule(bossRule, actorGradeName, actorGradeLevel, actorGradeCount, isBoardAdmin);
+  const serverResolvedBoss =
+    typeof typedMeta.mdt?.leadership?.can_access === "boolean"
+      ? typedMeta.mdt.leadership.can_access
+      : null;
+  const isBoss = serverResolvedBoss !== null ? serverResolvedBoss : locallyResolvedBoss;
+  useEffect(() => {
+    if (activeScreen === "leadership" && !isBoss) {
+      setActiveScreen("dashboard");
+    }
+  }, [activeScreen, isBoss]);
   const profileName = profileData.name.trim() !== "" ? profileData.name.trim() : actorName;
   const actorLabel = actorGrade !== "" ? `${profileName} (${actorGrade})` : profileName;
   const mapData = (screenData?.map as Record<string, unknown> | undefined) || {};
@@ -1239,9 +1410,33 @@ export default function Home({ devMode = false }: HomeProps) {
   const personsData = Array.isArray(screenData?.persons)
     ? (screenData.persons as PersonRecord[])
     : [];
-  const vehiclesData = Array.isArray(screenData?.vehicles)
-    ? (screenData.vehicles as VehicleRecord[])
-    : [];
+  const vehiclesData = useMemo<VehicleRecord[]>(() => {
+    const raw = Array.isArray(screenData?.vehicles)
+      ? (screenData.vehicles as VehicleRecord[])
+      : [];
+
+    return raw.map((vehicle) => {
+      const row = vehicle as Record<string, unknown>;
+      const ownerName =
+        (typeof vehicle.ownerName === "string" && vehicle.ownerName.trim() !== "" && vehicle.ownerName) ||
+        (typeof row.owner === "string" && row.owner.trim() !== "" && row.owner) ||
+        (typeof row.halter === "string" && row.halter.trim() !== "" && row.halter) ||
+        vehicle.ownerIdentifier ||
+        null;
+      const model =
+        vehicle.model ??
+        (row.modelName as string | number | null | undefined) ??
+        (row.vehicleModel as string | number | null | undefined) ??
+        (row.displayName as string | number | null | undefined) ??
+        null;
+
+      return {
+        ...vehicle,
+        ownerName,
+        model,
+      };
+    });
+  }, [screenData?.vehicles]);
   const personAktenData = ((screenData?.personAkten as Record<string, PersonAkte>) || {});
   const vehicleAktenData = ((screenData?.vehicleAkten as Record<string, VehicleAkte>) || {});
   const akteSyncData = (screenData?.akteSync as AkteSyncPayload | undefined) || undefined;
@@ -1364,7 +1559,13 @@ export default function Home({ devMode = false }: HomeProps) {
 
   const dispatchOfficers = useMemo<DispatchOfficer[]>(() => {
     const officersById = new Map<string, DispatchOfficer>();
+    const seenNames = new Set<string>();
     const normalizedProfileName = profileName.trim().toLowerCase();
+
+    const selfRadioMember = radioMembers.find(
+      (member) => (member.name || "").trim().toLowerCase() === normalizedProfileName
+    );
+    const selfRadioCode = selfRadioMember?.radioCode;
 
     officersById.set(currentOfficerId, {
       id: currentOfficerId,
@@ -1375,14 +1576,21 @@ export default function Home({ devMode = false }: HomeProps) {
       online: true,
       onDuty: dutyState?.onDuty !== false,
       status: dispatchStatuses[currentOfficerId] || (dutyState?.onDuty === false ? dispatchOffDutyStatus : dispatchDefaultStatus),
+      radioCode: selfRadioCode ? String(selfRadioCode) : undefined,
     });
+    seenNames.add(normalizedProfileName);
 
     for (const member of radioMembers) {
       if (/^colleague\s+\d+$/i.test(member.name || "")) {
         continue;
       }
 
-      if ((member.name || "").trim().toLowerCase() === normalizedProfileName) {
+      const nameNormalized = (member.name || "").trim().toLowerCase();
+      if (nameNormalized === normalizedProfileName) {
+        continue;
+      }
+
+      if (seenNames.has(nameNormalized)) {
         continue;
       }
 
@@ -1396,36 +1604,46 @@ export default function Home({ devMode = false }: HomeProps) {
         online: true,
         onDuty: (dispatchStatuses[id] || member.status || dispatchDefaultStatus) !== dispatchOffDutyStatus,
         status: dispatchStatuses[id] || member.status || dispatchDefaultStatus,
+        radioCode: member.radioCode ? String(member.radioCode) : undefined,
       });
+      seenNames.add(nameNormalized);
     }
 
-    for (const person of personsData) {
-      const job = normalizeJobKey(person.job || "");
-      const looksLikeOfficer =
-        job.includes("police") ||
-        job.includes("sheriff") ||
-        job.includes("trooper") ||
-        job.includes("state") ||
-        job.includes("lspd") ||
-        job.includes("bcso") ||
-        job.includes("fib") ||
-        job.includes("ems") ||
-        job.includes("ambulance");
-      if (!looksLikeOfficer) continue;
+    if (radioMembers.length === 0) {
+      for (const person of personsData) {
+        const job = normalizeJobKey(person.job || "");
+        const looksLikeOfficer =
+          job.includes("police") ||
+          job.includes("sheriff") ||
+          job.includes("trooper") ||
+          job.includes("state") ||
+          job.includes("lspd") ||
+          job.includes("bcso") ||
+          job.includes("fib") ||
+          job.includes("ems") ||
+          job.includes("ambulance");
+        if (!looksLikeOfficer) continue;
 
-      const id = `person:${person.identifier}`;
-      const personName =
-        person.name || [person.firstname, person.lastname].filter(Boolean).join(" ") || t("tablet.player.unknown_user");
-      if (officersById.has(id)) continue;
-      officersById.set(id, {
-        id,
-        name: personName,
-        job: job || undefined,
-        jobLabel: resolveDispatchJobLabel(job),
-        online: false,
-        onDuty: false,
-        status: dispatchStatuses[id] || dispatchOffDutyStatus,
-      });
+        const personName =
+          person.name || [person.firstname, person.lastname].filter(Boolean).join(" ") || t("tablet.player.unknown_user");
+        
+        const nameNormalized = personName.trim().toLowerCase();
+        if (seenNames.has(nameNormalized)) {
+          continue;
+        }
+
+        const id = `person:${person.identifier}`;
+        officersById.set(id, {
+          id,
+          name: personName,
+          job: job || undefined,
+          jobLabel: resolveDispatchJobLabel(job),
+          online: false,
+          onDuty: false,
+          status: dispatchStatuses[id] || dispatchOffDutyStatus,
+        });
+        seenNames.add(nameNormalized);
+      }
     }
 
     return Array.from(officersById.values()).sort((a, b) => {
@@ -1538,6 +1756,25 @@ export default function Home({ devMode = false }: HomeProps) {
     recentChat: chatMessages.slice(0, 5),
     recentIncidents: incidentRecords.slice().sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 4),
     recentBolos: boloRecords.slice().sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 4),
+    searchedPersons: personsData
+      .map((person) => {
+        const akte = personAktenData[person.identifier] || {};
+        const searchState = String((akte as Record<string, unknown>).searchStatus || (akte as Record<string, unknown>).searchedAt || "").trim();
+        if (searchState === "" || searchState === "none") return null;
+
+        const displayName =
+          person.name ||
+          [person.firstname, person.lastname].filter(Boolean).join(" ") ||
+          t("tablet.player.unknown_user");
+
+        return {
+          identifier: person.identifier,
+          name: displayName,
+          status: searchState,
+        };
+      })
+      .filter((entry): entry is { identifier: string; name: string; status: string } => entry !== null)
+      .slice(0, 10),
     boardPosts: boardPosts.filter((post) => !isBoardPostExpired(post)),
     boardAdmin: isBoardAdmin,
   };
@@ -1992,6 +2229,7 @@ export default function Home({ devMode = false }: HomeProps) {
             <Sidebar 
               currentView={activeScreen || "dashboard"} 
               modules={current_modules}
+              isBoss={isBoss}
               playerData={sidebarProfileData}
               dutyState={dutyState}
               branding={branding}
@@ -2100,6 +2338,13 @@ export default function Home({ devMode = false }: HomeProps) {
                       meta={typedMeta}
                     />
                   )}
+                  {activeScreen === "leadership" && isBoss && (
+                    <LeadershipView
+                      t={t}
+                      actorName={profileName}
+                      actorGrade={actorGrade}
+                    />
+                  )}
                   {activeScreen === "persons" && (
                     <PersonsView
                       t={t}
@@ -2135,7 +2380,7 @@ export default function Home({ devMode = false }: HomeProps) {
                       viewerJob={sessionJob}
                     />
                   )}
-                  {activeScreen === "penalties" && <PenaltiesView t={t} />}
+                  {activeScreen === "penalties" && <PenaltiesView t={t} isBoss={isBoss} />}
                   {activeScreen === "bolo" && (
                     <BoloView
                       t={t}

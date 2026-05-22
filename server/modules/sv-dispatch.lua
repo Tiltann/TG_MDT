@@ -20,6 +20,93 @@ local function normalizeJobName(job)
     return string.lower((job:gsub('^%s+', ''):gsub('%s+$', '')))
 end
 
+---@param src number
+---@return string[]
+local function buildSourceIdentifierCandidates(src)
+    local out = {}
+    local seen = {}
+
+    local function push(value)
+        if type(value) ~= 'string' then
+            return
+        end
+
+        local normalized = value:gsub('^%s+', ''):gsub('%s+$', '')
+        if normalized == '' or seen[normalized] then
+            return
+        end
+
+        seen[normalized] = true
+        out[#out + 1] = normalized
+    end
+
+    if Framework and Framework.Server and type(Framework.Server.getIdentifier) == 'function' then
+        local ok, identifier = pcall(Framework.Server.getIdentifier, src)
+        if ok then
+            push(identifier)
+        end
+    end
+
+    if type(GetPlayerIdentifierByType) == 'function' then
+        push(GetPlayerIdentifierByType(src, 'license'))
+    end
+
+    if type(GetPlayerIdentifiers) == 'function' then
+        local identifiers = GetPlayerIdentifiers(src) or {}
+        for i = 1, #identifiers do
+            push(identifiers[i])
+        end
+    end
+
+    return out
+end
+
+---@param src number
+---@return string
+local function getIdentifierDebugSummary(src)
+    local candidates = buildSourceIdentifierCandidates(src)
+    if #candidates == 0 then
+        return 'none'
+    end
+
+    return table.concat(candidates, ',')
+end
+
+---@param src number
+---@return string
+local function resolveEsxJobFromDatabase(src)
+    if Framework.name ~= 'esx' then
+        return ''
+    end
+
+    local identifiers = buildSourceIdentifierCandidates(src)
+    if #identifiers == 0 then
+        return ''
+    end
+
+    for i = 1, #identifiers do
+        local row = SQL.single('SELECT job FROM users WHERE identifier = ? LIMIT 1', { identifiers[i] })
+        local job = normalizeJobName(type(row) == 'table' and row.job or '')
+        if job ~= '' then
+            return job
+        end
+    end
+
+    for i = 1, #identifiers do
+        local identifier = identifiers[i]
+        local licensePart = identifier:match('license:[^:]+$') or identifier:match('license:[^%s]+')
+        if licensePart then
+            local row = SQL.single('SELECT job FROM users WHERE identifier LIKE ? LIMIT 1', { ('%%' .. licensePart) })
+            local job = normalizeJobName(type(row) == 'table' and row.job or '')
+            if job ~= '' then
+                return job
+            end
+        end
+    end
+
+    return ''
+end
+
 local function getDepartmentConfigForJob(jobName)
     local normalized = normalizeJobName(jobName)
     if normalized == '' then
@@ -59,8 +146,53 @@ local function getJobNameFromSource(src)
     if type(Framework.Server.getJobData) == 'function' then
         local ok, jobData = pcall(Framework.Server.getJobData, src)
         if ok and type(jobData) == 'table' then
-            return normalizeJobName(jobData.name)
+            local byData = normalizeJobName(jobData.name)
+            if byData ~= '' then
+                return byData
+            end
         end
+    end
+
+    if type(Framework.Server.getPlayer) == 'function' then
+        local ok, player = pcall(Framework.Server.getPlayer, src)
+        if ok and type(player) == 'table' then
+            local rawJob = nil
+            if type(player.job) == 'table' then
+                rawJob = player.job
+            elseif type(player.PlayerData) == 'table' and type(player.PlayerData.job) == 'table' then
+                rawJob = player.PlayerData.job
+            end
+
+            if type(rawJob) == 'table' then
+                local byPlayer = normalizeJobName(rawJob.name)
+                if byPlayer ~= '' then
+                    return byPlayer
+                end
+            end
+
+            if type(player.getJob) == 'function' then
+                local okMethod, methodJob = pcall(player.getJob, player)
+                if okMethod and type(methodJob) == 'table' then
+                    local byMethod = normalizeJobName(methodJob.name)
+                    if byMethod ~= '' then
+                        return byMethod
+                    end
+                end
+
+                okMethod, methodJob = pcall(player.getJob)
+                if okMethod and type(methodJob) == 'table' then
+                    local byMethod = normalizeJobName(methodJob.name)
+                    if byMethod ~= '' then
+                        return byMethod
+                    end
+                end
+            end
+        end
+    end
+
+    local byDb = resolveEsxJobFromDatabase(src)
+    if byDb ~= '' then
+        return byDb
     end
 
     return ''
@@ -69,6 +201,9 @@ end
 local function hasMdtAccess(src)
     local jobName = getJobNameFromSource(src)
     if jobName == '' then
+        if Debug and type(Debug.debug) == 'function' then
+            Debug.debug(('[dispatch:access] src=%s denied=no_job_resolved identifiers=%s'):format(tostring(src), getIdentifierDebugSummary(src)))
+        end
         return false
     end
 
@@ -81,6 +216,10 @@ local function hasMdtAccess(src)
         if normalizeJobName(allowed[i]) == jobName then
             return true
         end
+    end
+
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[dispatch:access] src=%s denied=job_not_allowed job=%s'):format(tostring(src), tostring(jobName)))
     end
 
     return false

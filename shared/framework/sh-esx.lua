@@ -82,6 +82,32 @@ if IsDuplicityVersion() then
 
     Framework.Server = {}
 
+    ---@param player table|nil
+    ---@return table
+    local function resolveEsxJob(player)
+        if type(player) ~= 'table' then
+            return {}
+        end
+
+        if type(player.job) == 'table' then
+            return player.job
+        end
+
+        if type(player.getJob) == 'function' then
+            local ok, job = pcall(player.getJob, player)
+            if ok and type(job) == 'table' then
+                return job
+            end
+
+            ok, job = pcall(player.getJob)
+            if ok and type(job) == 'table' then
+                return job
+            end
+        end
+
+        return {}
+    end
+
     --- Get ESX player object by server id.
     ---@param src number
     ---@return table|nil
@@ -103,7 +129,27 @@ if IsDuplicityVersion() then
     function Framework.Server.getIdentifier(src)
         if not ESX or type(ESX.GetPlayerFromId) ~= 'function' then return nil end
         local player = ESX.GetPlayerFromId(src)
-        return player and player.identifier or nil
+        if not player then
+            return nil
+        end
+
+        if type(player.identifier) == 'string' and player.identifier ~= '' then
+            return player.identifier
+        end
+
+        if type(player.getIdentifier) == 'function' then
+            local ok, identifier = pcall(player.getIdentifier, player)
+            if ok and type(identifier) == 'string' and identifier ~= '' then
+                return identifier
+            end
+
+            ok, identifier = pcall(player.getIdentifier)
+            if ok and type(identifier) == 'string' and identifier ~= '' then
+                return identifier
+            end
+        end
+
+        return nil
     end
 
     --- Send a notification to a player.
@@ -126,7 +172,12 @@ if IsDuplicityVersion() then
     function Framework.Server.getJob(src)
         if not ESX or type(ESX.GetPlayerFromId) ~= 'function' then return nil end
         local player = ESX.GetPlayerFromId(src)
-        return player and player.job.name or nil
+        local job = resolveEsxJob(player)
+        if type(job.name) == 'string' and job.name ~= '' then
+            return job.name
+        end
+
+        return nil
     end
 
     --- Get normalized job details.
@@ -135,15 +186,17 @@ if IsDuplicityVersion() then
     function Framework.Server.getJobData(src)
         if not ESX or type(ESX.GetPlayerFromId) ~= 'function' then return {} end
         local player = ESX.GetPlayerFromId(src)
-        if not player or type(player.job) ~= 'table' then
+        local job = resolveEsxJob(player)
+        if type(job) ~= 'table' or next(job) == nil then
             return {}
         end
 
         return {
-            name = player.job.name,
-            grade = player.job.grade,
-            grade_name = player.job.grade_name,
-            onduty = player.job.onDuty ~= false,
+            name = job.name,
+            grade = job.grade,
+            grade_name = job.grade_name or (type(job.grade) == 'table' and (job.grade.name or job.grade.label) or nil),
+            label = job.label,
+            onduty = job.onDuty ~= false,
         }
     end
 

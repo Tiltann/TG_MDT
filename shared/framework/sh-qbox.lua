@@ -1,9 +1,9 @@
 -- ============================================================
 --  TG_MDT | shared/framework/sh-qbox.lua
---  Qbox (qbx_core) bridge — loaded when Framework.name == 'qbox'
+--  Qbox (qbx_core) bridge — loaded dynamically when active framework is Qbox.
 -- ============================================================
 
-if Framework.name ~= 'qbox' then return end
+local Bridge = Framework.Bridges.qbox
 
 local EVENT_OX_NOTIFY = 'ox_lib:notify'
 
@@ -40,25 +40,29 @@ end
 
 -- ── server ────────────────────────────────────────────────
 if IsDuplicityVersion() then
-    Framework.Server = {}
+    Bridge.Server = {}
+
+    function Bridge.init()
+        Bridge.initialized = true
+    end
 
     --- Get Qbox player object by server id.
     ---@param src number
     ---@return table|nil
-    function Framework.Server.getPlayer(src)
+    function Bridge.Server.getPlayer(src)
         return exports.qbx_core:GetPlayer(src)
     end
 
     --- Get all online players.
     ---@return table
-    function Framework.Server.getPlayers()
+    function Bridge.Server.getPlayers()
         return exports.qbx_core:GetPlayers()
     end
 
     --- Get player identifier (citizenid).
     ---@param src number
     ---@return string|nil
-    function Framework.Server.getIdentifier(src)
+    function Bridge.Server.getIdentifier(src)
         local player = exports.qbx_core:GetPlayer(src)
         return player and player.PlayerData.citizenid or nil
     end
@@ -67,7 +71,7 @@ if IsDuplicityVersion() then
     ---@param src number
     ---@param msg string
     ---@param type string
-    function Framework.Server.notify(src, msg, type)
+    function Bridge.Server.notify(src, msg, type)
         if notifyQbox(src, msg, type) then
             return
         end
@@ -80,7 +84,7 @@ if IsDuplicityVersion() then
     --- Get player job name.
     ---@param src number
     ---@return string|nil
-    function Framework.Server.getJob(src)
+    function Bridge.Server.getJob(src)
         local player = exports.qbx_core:GetPlayer(src)
         return player and player.PlayerData.job.name or nil
     end
@@ -88,7 +92,7 @@ if IsDuplicityVersion() then
     --- Get normalized job details.
     ---@param src number
     ---@return table
-    function Framework.Server.getJobData(src)
+    function Bridge.Server.getJobData(src)
         local player = exports.qbx_core:GetPlayer(src)
         if not player or type(player.PlayerData) ~= 'table' then
             return {}
@@ -115,7 +119,7 @@ if IsDuplicityVersion() then
     ---@param key string
     ---@param value any
     ---@return boolean
-    function Framework.Server.setPlayerState(src, key, value)
+    function Bridge.Server.setPlayerState(src, key, value)
         local player = exports.qbx_core:GetPlayer(src)
         if not player then
             return false
@@ -143,7 +147,7 @@ if IsDuplicityVersion() then
     ---@param src number
     ---@param key string
     ---@return any
-    function Framework.Server.getPlayerState(src, key)
+    function Bridge.Server.getPlayerState(src, key)
         local player = exports.qbx_core:GetPlayer(src)
         if not player then
             return nil
@@ -172,7 +176,7 @@ if IsDuplicityVersion() then
     ---@param name string
     ---@param grade number|string|nil
     ---@return boolean
-    function Framework.Server.setJob(src, name, grade)
+    function Bridge.Server.setJob(src, name, grade)
         local player = exports.qbx_core:GetPlayer(src)
         if not player then
             return false
@@ -193,7 +197,7 @@ if IsDuplicityVersion() then
     ---@param src number
     ---@param onDuty boolean
     ---@return boolean
-    function Framework.Server.setJobDuty(src, onDuty)
+    function Bridge.Server.setJobDuty(src, onDuty)
         local player = exports.qbx_core:GetPlayer(src)
         if not player then
             return false
@@ -217,35 +221,43 @@ if IsDuplicityVersion() then
 
 -- ── client ────────────────────────────────────────────────
 else
-    Framework.Client = {}
+    Bridge.Client = {}
+
+    function Bridge.init()
+        Bridge.initialized = true
+    end
 
     --- Send a local notification.
     ---@param msg string
     ---@param type string
-    function Framework.Client.notify(msg, type)
+    function Bridge.Client.notify(msg, type)
         lib.notify({ description = msg, type = type or 'inform' })
     end
 
     --- Get the local player's data.
     ---@return table|nil
-    function Framework.Client.getPlayerData()
+    function Bridge.Client.getPlayerData()
         return exports.qbx_core:GetPlayerData()
     end
 
     --- Get the local player's job.
     ---@return table|nil
-    function Framework.Client.getJob()
-        local data = Framework.Client.getPlayerData()
+    function Bridge.Client.getJob()
+        local data = Bridge.Client.getPlayerData()
         return data and data.job or nil
     end
 
     --- Get the local player's duty flag.
     ---@return boolean
-    function Framework.Client.getDuty()
-        local job = Framework.Client.getJob()
+    function Bridge.Client.getDuty()
+        local job = Bridge.Client.getJob()
         if type(job) == 'table' and job.onduty ~= nil then
             return job.onduty == true
         end
         return true
     end
+end
+
+if Framework.name == 'qbox' then
+    Bridge.init()
 end

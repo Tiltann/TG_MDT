@@ -52,6 +52,13 @@ type CompartmentOption = {
   logoUrl?: string;
 };
 
+type NearbyAgencyPlayer = {
+  source: number;
+  name: string;
+  job?: string;
+  distance?: number;
+};
+
 type RelatedIncident = {
   id: string;
   title: string;
@@ -409,6 +416,10 @@ export default function PersonsView({
   const [shareTarget, setShareTarget] = useState("");
   const [sharedCompartments, setSharedCompartments] = useState<string[]>([]);
   const [removingCompartments, setRemovingCompartments] = useState<Record<string, boolean>>({});
+  const [nearbyShareOpen, setNearbyShareOpen] = useState(false);
+  const [nearbyAgencyPlayers, setNearbyAgencyPlayers] = useState<NearbyAgencyPlayer[]>([]);
+  const [nearbyShareLoading, setNearbyShareLoading] = useState(false);
+  const [nearbyShareBusy, setNearbyShareBusy] = useState(false);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [manualImageUrl, setManualImageUrl] = useState("");
@@ -845,6 +856,55 @@ export default function PersonsView({
       });
   };
 
+  const openNearbySharePicker = () => {
+    if (!selectedPerson || nearbyShareLoading) return;
+    setNearbyShareLoading(true);
+    fetchNui<NearbyAgencyPlayer[]>("getNearbyAgencyPlayers", {
+      compartment: selectedCompartment,
+      maxDistance: 20,
+    })
+      .then((result) => {
+        const next = Array.isArray(result)
+          ? result
+              .filter((entry) => Number.isFinite(entry?.source) && entry.source > 0)
+              .map((entry) => ({
+                source: entry.source,
+                name: String(entry.name || `Player ${entry.source}`),
+                job: entry.job ? String(entry.job) : "",
+                distance: typeof entry.distance === "number" ? entry.distance : undefined,
+              }))
+          : [];
+        setNearbyAgencyPlayers(next);
+        setNearbyShareOpen(true);
+      })
+      .catch(() => {
+        setNearbyAgencyPlayers([]);
+        setNearbyShareOpen(true);
+      })
+      .finally(() => {
+        setNearbyShareLoading(false);
+      });
+  };
+
+  const shareAkteWithNearbyPlayer = (targetSource: number) => {
+    if (!selectedPerson || nearbyShareBusy) return;
+    setNearbyShareBusy(true);
+
+    fetchNui<{ ok?: boolean }>("shareAkteWithPlayer", {
+      kind: "person",
+      value: selectedPerson.identifier,
+      targetSource,
+      compartment: selectedCompartment,
+    })
+      .then((result) => {
+        if (!result?.ok) return;
+        setNearbyShareOpen(false);
+      })
+      .finally(() => {
+        setNearbyShareBusy(false);
+      });
+  };
+
   const setSelectedPersonSearchState = (searched: boolean) => {
     if (!selectedPerson) return;
     updateAkteField("searchStatus", searched ? "searched" : "", true);
@@ -1007,6 +1067,12 @@ export default function PersonsView({
     if (text === "") return;
 
     const expiresAt = getExpiryFromInput(newNoteExpiryMode, newNoteExpiryAmount, newNoteExpiryUnit, newNoteCustomAt);
+    if (expiresAt) {
+      const expiresAtMs = Date.parse(expiresAt);
+      if (!Number.isNaN(expiresAtMs) && expiresAtMs <= Date.now()) {
+        return;
+      }
+    }
 
     const nextNotes: AkteNote[] = [
       {
@@ -1233,6 +1299,16 @@ export default function PersonsView({
                   <Button variant="ghost" onClick={shareCurrentAkte} disabled={shareTarget.trim() === ""} className="px-3 py-1.5 text-xs  transition-all active:scale-95 hover:bg-zinc-800/40">
                     {t("tablet.actions.share_with")}
                   </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={openNearbySharePicker}
+                    disabled={!selectedPerson || nearbyShareLoading}
+                    className="px-3 py-1.5 text-xs transition-all active:scale-95 hover:bg-zinc-800/40"
+                  >
+                    {nearbyShareLoading
+                      ? t("tablet.actions.loading")
+                      : t("tablet.actions.share_with_nearby")}
+                  </Button>
                 </div>
               </div>
 
@@ -1272,6 +1348,63 @@ export default function PersonsView({
                 )}
               </div>
             </div>
+
+            {nearbyShareOpen && (
+              <div className="fixed inset-0 z-60 flex items-center justify-center px-4">
+                <button
+                  type="button"
+                  className="absolute inset-0 bg-black/70"
+                  onClick={() => setNearbyShareOpen(false)}
+                  aria-label="Close nearby share dialog"
+                />
+                <div className="relative w-full max-w-xl rounded-xl border border-zinc-800 bg-zinc-950/95 p-4 shadow-2xl">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h5 className="text-sm font-bold uppercase tracking-wide text-zinc-200">
+                      {t("tablet.actions.share_with_nearby")}
+                    </h5>
+                    <button
+                      type="button"
+                      className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
+                      onClick={() => setNearbyShareOpen(false)}
+                      aria-label="Close"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {nearbyAgencyPlayers.length === 0 ? (
+                    <p className="rounded-lg border border-zinc-800 bg-black/30 px-3 py-2 text-xs text-zinc-400">
+                      {t("tablet.akte.no_nearby_agency_members") || "No nearby agency members found."}
+                    </p>
+                  ) : (
+                    <div className="max-h-[320px] space-y-2 overflow-y-auto premium-scroll">
+                      {nearbyAgencyPlayers.map((entry) => (
+                        <div
+                          key={entry.source}
+                          className="flex items-center justify-between rounded-lg border border-zinc-800 bg-black/25 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-zinc-100">{entry.name}</p>
+                            <p className="truncate text-[11px] uppercase tracking-wide text-zinc-500">
+                              {entry.job || "-"}
+                              {typeof entry.distance === "number" ? ` • ${entry.distance.toFixed(1)}m` : ""}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            onClick={() => shareAkteWithNearbyPlayer(entry.source)}
+                            disabled={nearbyShareBusy}
+                            className="px-3 py-1.5 text-xs"
+                          >
+                            {t("tablet.actions.share") || "Share"}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div key={selectedCompartment} className="space-y-4 animate-mdt-view">
               {!hasAccessToJobTab(selectedCompartment) ? (() => {

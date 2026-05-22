@@ -70,7 +70,8 @@ export default function ChatView({
   const [message, setMessage] = useState("");
   
   // Radio System State
-  const activeSystem = meta?.radio?.activeSystem || "standalone";
+  const activeSystem = meta?.radio?.activeSystem || "disabled";
+  const radioEnabled = meta?.radio?.enabled !== false && activeSystem !== "disabled";
   const [radioFreq, setRadioFreq] = useState(meta?.radio?.activeFrequency || "103.5");
   const [currentFreq, setCurrentFreq] = useState(meta?.radio?.activeFrequency || "");
   const [isTransmitting, setIsTransmitting] = useState(false);
@@ -90,6 +91,7 @@ export default function ChatView({
   };
 
   const handleJoinRadio = async () => {
+    if (!radioEnabled) return;
     if (!radioFreq) return;
     try {
       setIsTransmitting(true);
@@ -105,6 +107,7 @@ export default function ChatView({
   };
 
   const handleLeaveRadio = async () => {
+    if (!radioEnabled) return;
     try {
       setIsTransmitting(true);
       const res: any = await fetchNui("leaveRadioChannel");
@@ -119,6 +122,7 @@ export default function ChatView({
   };
 
   const handleNumpadPress = (val: string) => {
+    if (!radioEnabled) return;
     if (currentFreq) return; // Disallow editing while connected
     setRadioFreq((prev: string) => {
       if (val === "C") return "";
@@ -134,7 +138,9 @@ export default function ChatView({
       ? "PMA-Voice Active"
       : activeSystem === "saltychat"
       ? "SaltyChat Active"
-      : "MDT Standalone Radio";
+      : activeSystem === "standalone"
+      ? "MDT Standalone Radio"
+      : "Radio Disabled";
 
   return (
     <div className="h-full flex flex-col gap-4 animate-in fade-in duration-500">
@@ -147,8 +153,8 @@ export default function ChatView({
           <p className="text-sm text-[var(--mdt-text-muted)] mt-1">{t("tablet.chat.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-white/5 bg-white/5 px-3 py-1.5 text-xs text-white/80 font-medium">
-          <span className={`w-2 h-2 rounded-full ${currentFreq ? "bg-emerald-400 animate-pulse" : "bg-red-400"}`} />
-          {currentFreq ? `ON AIR - Channel: ${currentFreq} MHz` : "DISCONNECTED"}
+          <span className={`w-2 h-2 rounded-full ${radioEnabled && currentFreq ? "bg-emerald-400 animate-pulse" : "bg-red-400"}`} />
+          {radioEnabled ? (currentFreq ? `ON AIR - Channel: ${currentFreq} MHz` : "DISCONNECTED") : "RADIO DISABLED"}
         </div>
       </div>
 
@@ -220,7 +226,7 @@ export default function ChatView({
                   <button
                     key={key}
                     onClick={() => handleNumpadPress(key)}
-                    disabled={!!currentFreq}
+                    disabled={!!currentFreq || !radioEnabled}
                     className="h-11 text-sm  font-semibold rounded-xl bg-zinc-900/90 border border-zinc-800/80 text-zinc-300 hover:bg-zinc-800/60 hover:text-emerald-400 hover:border-emerald-500/30 transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:hover:bg-zinc-900/90 disabled:active:scale-100 shadow-sm"
                   >
                     {key}
@@ -231,10 +237,10 @@ export default function ChatView({
 
             {/* Transmitter Controls */}
             <div className="mt-4 pt-3 border-t border-zinc-800/80 flex gap-3">
-              {currentFreq ? (
+              {currentFreq && radioEnabled ? (
                 <Button
                   onClick={handleLeaveRadio}
-                  disabled={isTransmitting}
+                  disabled={isTransmitting || !radioEnabled}
                   className="flex-1 bg-red-950/40 border border-red-800/60 hover:bg-red-900/40 text-red-300 rounded-xl h-11 transition-all duration-300 active:scale-[0.98] shadow-lg shadow-black/20"
                 >
                   <PhoneOff className="w-4 h-4 mr-2" />
@@ -243,7 +249,7 @@ export default function ChatView({
               ) : (
                 <Button
                   onClick={handleJoinRadio}
-                  disabled={isTransmitting || !radioFreq}
+                  disabled={isTransmitting || !radioFreq || !radioEnabled}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-11 transition-all duration-300 active:scale-[0.98] shadow-lg shadow-emerald-950/30"
                 >
                   <Radio className="w-4 h-4 mr-2 animate-pulse" />
@@ -262,7 +268,11 @@ export default function ChatView({
             <div className="flex-1 overflow-auto space-y-2 pr-1 premium-scroll">
               {radioMembers.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-xs text-zinc-500 italic">
-                  {currentFreq ? "No other users on this frequency." : "Join a frequency to list colleagues."}
+                  {!radioEnabled
+                    ? "Radio is disabled by server configuration."
+                    : currentFreq
+                      ? "No other users on this frequency."
+                      : "Join a frequency to list colleagues."}
                 </div>
               ) : (
                 radioMembers.map((member, i) => (

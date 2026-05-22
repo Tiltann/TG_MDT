@@ -27,6 +27,7 @@ export type DispatchOfficer = {
   online: boolean;
   onDuty?: boolean;
   status: DispatchStatus;
+  radioCode?: string;
 };
 
 export type DispatchGroup = {
@@ -485,7 +486,15 @@ export default function DispatchView({
                     <span>
                       {officer.online ? "Online" : "Offline"} - {resolveDutyState(officer) ? "On Duty" : "Off Duty"}
                     </span>
-                    <span className="text-[10px] uppercase tracking-wide">#{officer.id}</span>
+                    <span className="text-[10px] uppercase tracking-wide font-medium">
+                      {officer.radioCode ? (
+                        `${officer.radioCode} MHz`
+                      ) : officer.id === currentOfficerId ? (
+                        t("tablet.dispatch.radio_disabled", undefined, "Radio disabled")
+                      ) : (
+                        t("tablet.dispatch.radio_disabled", undefined, "Radio disabled")
+                      )}
+                    </span>
                   </div>
                 </div>
               ))}

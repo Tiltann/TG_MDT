@@ -24,7 +24,8 @@ shared_scripts {
 client_scripts {
     'client/cl-nui.lua',
     'client/cl-init.lua',
-    'client/modules/*.lua',
+    'client/modules/cl-dispatch.lua',
+    'client/modules/cl-tablet.lua',
     'client/cl-exports.lua',
 }
 
@@ -35,7 +36,7 @@ server_scripts {
     'server/sv-updater.lua',
     'server/sv-duty.lua',
     'server/sv-init.lua',
-    'server/modules/*.lua',
+    'server/modules/sv-dispatch.lua',
     'server/sv-exports.lua',
 }
 

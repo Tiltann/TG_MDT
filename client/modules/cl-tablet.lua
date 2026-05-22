@@ -3,7 +3,6 @@
 --  Tablet module: permission gate + open/toggle entrypoint.
 -- ============================================================
 
-
 local MODULE_NAME = 'tablet'
 local module_cfg = (Config.Modules and Config.Modules.tablet) or { enabled = true }
 
@@ -16,13 +15,24 @@ end
 ---@param message string
 ---@param level string|nil
 local function notifyUser(message, level)
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:notifyUser] message="%s" level="%s"'):format(tostring(message), tostring(level)))
+    end
     if Framework and Framework.Client and Framework.Client.notify then
         local ok = pcall(Framework.Client.notify, message, level or 'error')
-        if ok then return end
+        if ok then
+            if Debug and type(Debug.debug) == 'function' then
+                Debug.debug('[cl-tablet:notifyUser] successfully notified via Framework.Client.notify')
+            end
+            return
+        end
     end
 
     if lib and lib.notify then
         lib.notify({ description = message, type = level or 'error' })
+        if Debug and type(Debug.debug) == 'function' then
+            Debug.debug('[cl-tablet:notifyUser] successfully notified via lib.notify')
+        end
         return
     end
 
@@ -41,6 +51,9 @@ local loadingNoticeCooldownUntil = 0
 
 local function notifyLoadingState()
     local now = GetGameTimer()
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:notifyLoadingState] now=%s cooldownUntil=%s'):format(tostring(now), tostring(loadingNoticeCooldownUntil)))
+    end
     if now < loadingNoticeCooldownUntil then
         return
     end
@@ -52,30 +65,58 @@ end
 --- Return the local job name in lowercase, if available.
 ---@return string|nil
 local function getLocalJobName()
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:getLocalJobName] evaluating job... Framework.name=%s'):format(tostring(Framework and Framework.name or 'nil')))
+    end
     if not Framework or not Framework.Client or not Framework.Client.getJob then
+        if Debug and type(Debug.debug) == 'function' then
+            Debug.debug('[cl-tablet:getLocalJobName] Framework.Client.getJob is not a function')
+        end
         return nil
     end
 
     local job = Framework.Client.getJob()
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:getLocalJobName] raw job received=%s'):format(json.encode(job)))
+    end
+
     if type(job) == 'string' then
-        return string.lower(job)
+        local out = string.lower(job)
+        if Debug and type(Debug.debug) == 'function' then
+            Debug.debug(('[cl-tablet:getLocalJobName] resolved from string = "%s"'):format(out))
+        end
+        return out
     end
 
     if type(job) == 'table' then
         if type(job.name) == 'string' then
-            return string.lower(job.name)
+            local out = string.lower(job.name)
+            if Debug and type(Debug.debug) == 'function' then
+                Debug.debug(('[cl-tablet:getLocalJobName] resolved from table name = "%s"'):format(out))
+            end
+            return out
         end
         if type(job.id) == 'string' then
-            return string.lower(job.id)
+            local out = string.lower(job.id)
+            if Debug and type(Debug.debug) == 'function' then
+                Debug.debug(('[cl-tablet:getLocalJobName] resolved from table id = "%s"'):format(out))
+            end
+            return out
         end
     end
 
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug('[cl-tablet:getLocalJobName] unable to resolve job name from raw job')
+    end
     return nil
 end
 
 --- Build a fast lowercase lookup table from allowed jobs config.
 ---@return table
 local function buildAllowedJobLookup()
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug('[cl-tablet:buildAllowedJobLookup] building lookup cache...')
+    end
     local allowed = (Config.MDT and Config.MDT.allowed_jobs) or {}
     local lookup = {}
     local dutyCfg = (Config.MDT and Config.MDT.duty) or {}
@@ -93,6 +134,9 @@ local function buildAllowedJobLookup()
         end
     end
 
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:buildAllowedJobLookup] built lookup table keys: %s'):format(json.encode(lookup)))
+    end
     return lookup
 end
 
@@ -102,6 +146,9 @@ local allowedJobLookupCache = nil
 ---@return boolean
 ---@return string|nil
 local function canOpenTablet()
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug('[cl-tablet:canOpenTablet] evaluating access eligibility...')
+    end
     if not allowedJobLookupCache then
         allowedJobLookupCache = buildAllowedJobLookup()
     end
@@ -175,16 +222,23 @@ local function toggleTablet()
     -- Always resend meta + player when opening so the UI has fresh data
     -- even if the nuiReady handshake was skipped.
     if NUI.isVisible() and type(TG_MDT_sendInitialState) == 'function' then
+        if Debug and type(Debug.debug) == 'function' then
+            Debug.debug('[cl-tablet:toggleTablet] invoking TG_MDT_sendInitialState()...')
+        end
         TG_MDT_sendInitialState()
     end
 
+    local sessionVal = {
+        module = MODULE_NAME,
+        screen = screen,
+        job = getLocalJobName(),
+    }
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:toggleTablet] sending session data=%s'):format(json.encode(sessionVal)))
+    end
     NUI.send('setData', {
         key = 'session',
-        value = {
-            module = MODULE_NAME,
-            screen = screen,
-            job = getLocalJobName(),
-        },
+        value = sessionVal,
     })
     Debug.debug('toggleTablet: session payload sent to NUI')
 end
@@ -206,6 +260,9 @@ if type(OPEN_COMMAND) ~= 'string' or OPEN_COMMAND == '' then
 end
 
 local function handleTabletCommand(_, args)
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:handleTabletCommand] args=%s'):format(json.encode(args)))
+    end
     local action = type(args) == 'table' and string.lower(tostring(args[1] or '')) or ''
 
     if action == 'help' then
@@ -227,22 +284,40 @@ Debug.debug(('Tablet command registered: /%s (alias: /mdt=%s)'):format(
 ))
 
 local function requestModel(model)
-    if not IsModelInCdimage(model) then return false end
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:requestModel] model=%s'):format(tostring(model)))
+    end
+    if not IsModelInCdimage(model) then
+        if Debug and type(Debug.debug) == 'function' then
+            Debug.debug(('[cl-tablet:requestModel] model %s not in cdimage'):format(tostring(model)))
+        end
+        return false
+    end
     RequestModel(model)
     local timeoutAt = GetGameTimer() + 3000
     while not HasModelLoaded(model) and GetGameTimer() < timeoutAt do
         Wait(0)
     end
-    return HasModelLoaded(model)
+    local loaded = HasModelLoaded(model)
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:requestModel] model %s load status=%s'):format(tostring(model), tostring(loaded)))
+    end
+    return loaded
 end
 
 local function deleteEntitySafe(entity)
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:deleteEntitySafe] entity=%s exist=%s'):format(tostring(entity), tostring(entity and DoesEntityExist(entity))))
+    end
     if entity and DoesEntityExist(entity) then
         DeleteEntity(entity)
     end
 end
 
 local function startPhotoSelfieSetup(ped)
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:startPhotoSelfieSetup] ped=%s'):format(tostring(ped)))
+    end
     local phoneModel = joaat('prop_phone_ing_02_lod')
     local phone = nil
     local cam = nil
@@ -271,6 +346,9 @@ local function startPhotoSelfieSetup(ped)
             true
         )
         SetModelAsNoLongerNeeded(phoneModel)
+        if Debug and type(Debug.debug) == 'function' then
+            Debug.debug(('[cl-tablet:startPhotoSelfieSetup] phone prop created=%s attached to ped bone'):format(tostring(phone)))
+        end
     end
 
     if not HasAnimDictLoaded(animDict) then
@@ -282,6 +360,9 @@ local function startPhotoSelfieSetup(ped)
     end
 
     TaskPlayAnim(ped, animDict, animName, 8.0, -8.0, -1, 49, 0, false, false, false)
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug('[cl-tablet:startPhotoSelfieSetup] animation triggered cellphone_text_read_base')
+    end
 
     cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
     local camPos = GetOffsetFromEntityInWorldCoords(ped, 0.0, 1.15, 0.7)
@@ -290,6 +371,9 @@ local function startPhotoSelfieSetup(ped)
     SetCamFov(cam, 42.0)
     SetCamActive(cam, true)
     RenderScriptCams(true, false, 0, true, true)
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:startPhotoSelfieSetup] camera setup finished. cam=%s pos=%s'):format(tostring(cam), json.encode(camPos)))
+    end
 
     return {
         cam = cam,
@@ -306,7 +390,14 @@ NUI.onCallback('openAktePhotoMode', function(body, cb)
     if captureQuality < 0.1 then captureQuality = 0.1 end
     if captureQuality > 1.0 then captureQuality = 1.0 end
 
+    if Debug and type(Debug.debug) == 'function' then
+        Debug.debug(('[cl-tablet:openAktePhotoMode] targetType="%s" mode="%s" quality=%s'):format(tostring(_targetType), tostring(captureMode), tostring(captureQuality)))
+    end
+
     if GetResourceState('screenshot-basic') ~= 'started' then
+        if Debug and type(Debug.debug) == 'function' then
+            Debug.debug('[cl-tablet:openAktePhotoMode] error: screenshot-basic resource is not started')
+        end
         cb({ ok = false, error = 'screenshot_basic_not_started', images = {} })
         return
     end
@@ -328,6 +419,9 @@ NUI.onCallback('openAktePhotoMode', function(body, cb)
     local inputUnlockAt = GetGameTimer() + 300
     local selfieState = nil
     local function normalizeShotData(raw)
+        if Debug and type(Debug.debug) == 'function' then
+            Debug.debug(('[cl-tablet:openAktePhotoMode:normalizeShotData] raw type=%s'):format(type(raw)))
+        end
         if type(raw) == 'string' then
             local trimmed = raw:gsub('^%s+', ''):gsub('%s+$', '')
             if trimmed == '' then return nil end
@@ -467,6 +561,9 @@ NUI.onCallback('openAktePhotoMode', function(body, cb)
 
             running = false
         elseif justPressed(200) or justPressed(177) or justPressed(178) then
+            if Debug and type(Debug.debug) == 'function' then
+                Debug.debug('[cl-tablet:openAktePhotoMode] cancel button pressed')
+            end
             running = false
         end
 
@@ -494,7 +591,5 @@ NUI.onCallback('openAktePhotoMode', function(body, cb)
     Debug.debug(('[photo] returning images count=%s'):format(#images))
     cb({ ok = true, images = images })
 end)
-
-
 
 Debug.debug(('Tablet module loaded. Command: /%s'):format(OPEN_COMMAND))

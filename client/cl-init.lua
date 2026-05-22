@@ -38,6 +38,14 @@ local CALLBACK_SAVE_PERSON_AKTE = 'TG_MDT:savePersonAkte'
 local CALLBACK_GET_VEHICLE_AKTE = 'TG_MDT:getVehicleAkte'
 local CALLBACK_SAVE_VEHICLE_AKTE = 'TG_MDT:saveVehicleAkte'
 local CALLBACK_REMOVE_AKTE_COMPARTMENT = 'TG_MDT:removeAkteCompartment'
+local CALLBACK_GET_NEARBY_AGENCY_PLAYERS = 'TG_MDT:getNearbyAgencyPlayers'
+local CALLBACK_SHARE_AKTE_WITH_PLAYER = 'TG_MDT:shareAkteWithPlayer'
+local CALLBACK_IS_BOSS = 'TG_MDT:isBoss'
+local CALLBACK_GET_LEADERSHIP_MEMBERS = 'TG_MDT:getLeadershipMembers'
+local CALLBACK_LEADERSHIP_SET_MEMBER_PERMISSION = 'TG_MDT:leadershipSetMemberPermission'
+local CALLBACK_GET_AUDIT_LOGS = 'TG_MDT:getAuditLogs'
+local CALLBACK_GET_LAWS = 'TG_MDT:getLaws'
+local CALLBACK_SAVE_LAWS = 'TG_MDT:saveLaws'
 local CALLBACK_GET_DISPATCH_MODULE_STATE = 'TG_MDT:getDispatchModuleState'
 local CALLBACK_GET_DISPATCH_HISTORY = 'TG_MDT:getDispatchHistory'
 
@@ -203,6 +211,7 @@ local function buildPlayerUiData()
 	return {
 		name = (type(name) == 'string' and name ~= '') and name or fallback.name,
 		gradeDisplay = gradeDisplay,
+		gradeName = type(gradeName) == 'string' and gradeName or '',
 		gradeLevel = gradeLevel,
 		gradeCount = gradeCount,
 	}
@@ -241,17 +250,42 @@ end)
 
 -- ── Radio helper functions & NUI callbacks ──────────────
 
+local function isRadioFeatureEnabled()
+	local mdtCfg = Config and Config.MDT or {}
+	local radioCfg = type(mdtCfg.radio) == 'table' and mdtCfg.radio or {}
+	return radioCfg.enabled ~= false
+end
+
+local function isStandaloneRadioAllowed()
+	local mdtCfg = Config and Config.MDT or {}
+	local radioCfg = type(mdtCfg.radio) == 'table' and mdtCfg.radio or {}
+	return radioCfg.allow_standalone == true
+end
+
 local function getActiveVoiceSystem()
+	if not isRadioFeatureEnabled() then
+		return 'disabled'
+	end
+
 	if GetResourceState('pma-voice') == 'started' then
 		return 'pma-voice'
 	elseif GetResourceState('saltychat') == 'started' then
 		return 'saltychat'
 	end
-	return 'standalone'
+
+	if isStandaloneRadioAllowed() then
+		return 'standalone'
+	end
+
+	return 'disabled'
 end
 
 local function getActiveRadioFrequency()
 	local system = getActiveVoiceSystem()
+	if system == 'disabled' then
+		return ''
+	end
+
 	if system == 'pma-voice' then
 		local ok, freq = pcall(function()
 			return exports['pma-voice']:getRadioChannel()
@@ -282,6 +316,11 @@ NUI.onCallback('joinRadioChannel', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local freq = type(payload.frequency) == 'string' and payload.frequency or tostring(payload.frequency or '')
 	local system = getActiveVoiceSystem()
+	if system == 'disabled' then
+		cb({ ok = false, reason = 'radio_disabled', frequency = '', system = system })
+		return
+	end
+
 	local freqNum = tonumber(freq)
 
 	if system == 'pma-voice' and freqNum then
@@ -300,6 +339,10 @@ end)
 
 NUI.onCallback('leaveRadioChannel', function(_, cb)
 	local system = getActiveVoiceSystem()
+	if system == 'disabled' then
+		cb({ ok = false, reason = 'radio_disabled', frequency = '', system = system })
+		return
+	end
 
 	if system == 'pma-voice' then
 		pcall(function()
@@ -466,6 +509,75 @@ NUI.onCallback('removeAkteCompartment', function(body, cb)
 	cb({ ok = ok and result == true })
 end)
 
+NUI.onCallback('getNearbyAgencyPlayers', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
+	local maxDistance = tonumber(payload.maxDistance)
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_GET_NEARBY_AGENCY_PLAYERS, false, compartment, maxDistance)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('shareAkteWithPlayer', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local kind = type(payload.kind) == 'string' and payload.kind or ''
+	local value = type(payload.value) == 'string' and payload.value or ''
+	local targetSource = tonumber(payload.targetSource)
+	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_SHARE_AKTE_WITH_PLAYER, false, kind, value, targetSource, compartment)
+	end)
+	cb({ ok = ok and result == true })
+end)
+
+NUI.onCallback('getLeadershipMembers', function(_, cb)
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_GET_LEADERSHIP_MEMBERS, false)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('setLeadershipMemberPermission', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_LEADERSHIP_SET_MEMBER_PERMISSION, false, payload)
+	end)
+	if type(result) == 'table' then
+		cb(result)
+		return
+	end
+	cb({ ok = ok and result == true })
+end)
+
+NUI.onCallback('getAuditLogs', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_GET_AUDIT_LOGS, false, payload)
+	end)
+	cb(ok and result or {})
+end)
+
+NUI.onCallback('getLaws', function(_, cb)
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_GET_LAWS, false)
+	end)
+	cb(ok and result or '')
+end)
+
+NUI.onCallback('saveLaws', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local content = type(payload.content) == 'string' and payload.content or ''
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_SAVE_LAWS, false, content)
+	end)
+	if type(result) == 'table' then
+		cb(result)
+		return
+	end
+	cb({ ok = ok and result == true })
+end)
+
 RegisterNetEvent(EVENT_CLIENT_AKTE_UPDATED, function(payload)
 	if type(payload) ~= 'table' then return end
 	
@@ -625,8 +737,24 @@ function TG_MDT_sendInitialState()
 
 	local activeSystem = getActiveVoiceSystem()
 	local activeFreq = getActiveRadioFrequency()
-	if activeFreq ~= '' then
+	if activeSystem ~= 'disabled' and activeFreq ~= '' and activeFreq ~= 'none' and activeFreq ~= '0' then
 		TriggerServerEvent(EVENT_SERVER_JOIN_RADIO, activeFreq)
+	end
+
+	local leadershipCanAccess = false
+	do
+		local okBoss, bossState = pcall(function()
+			return lib.callback.await(CALLBACK_IS_BOSS, false)
+		end)
+		if okBoss and type(bossState) == 'table' and bossState.isBoss == true then
+			leadershipCanAccess = true
+		end
+		Debug.debug(('leadership canOpen=%s | callbackOk=%s | agency=%s | job=%s'):format(
+			tostring(leadershipCanAccess),
+			tostring(okBoss),
+			type(bossState) == 'table' and tostring(bossState.agency) or 'nil',
+			type(bossState) == 'table' and tostring(bossState.job) or 'nil'
+		))
 	end
 
 	NUI.send('setData', {
@@ -639,6 +767,8 @@ function TG_MDT_sendInitialState()
 			translationsByLocale = translations_by_locale,
 			akteModels           = akteModels,
 			radio = {
+				enabled = activeSystem ~= 'disabled',
+				allowStandalone = isStandaloneRadioAllowed(),
 				activeSystem = activeSystem,
 				activeFrequency = activeFreq,
 			},
@@ -663,6 +793,9 @@ function TG_MDT_sendInitialState()
 					off_duty_status = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.off_duty_status or nil,
 					status_codes = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.status_codes or nil,
 					history_limit = type(mdtCfg.dispatch) == 'table' and mdtCfg.dispatch.history_limit or nil,
+				},
+				leadership = {
+					can_access = leadershipCanAccess,
 				},
 			},
 		},

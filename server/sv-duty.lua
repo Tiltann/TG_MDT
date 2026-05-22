@@ -17,6 +17,155 @@ local CALLBACK_TOGGLE_DUTY = 'TG_MDT:toggleDuty'
 local DutyCache = {}
 local LastJobCache = {}
 
+---@param value any
+---@return string
+local function normalizeJobName(value)
+    if type(value) ~= 'string' then
+        return ''
+    end
+
+    return string.lower((value:gsub('^%s+', ''):gsub('%s+$', '')))
+end
+
+---@param src number
+---@return string[]
+local function buildSourceIdentifierCandidates(src)
+    local out = {}
+    local seen = {}
+
+    local function push(value)
+        if type(value) ~= 'string' then
+            return
+        end
+
+        local normalized = value:gsub('^%s+', ''):gsub('%s+$', '')
+        if normalized == '' or seen[normalized] then
+            return
+        end
+
+        seen[normalized] = true
+        out[#out + 1] = normalized
+    end
+
+    if Framework and Framework.Server and type(Framework.Server.getIdentifier) == 'function' then
+        local ok, identifier = pcall(Framework.Server.getIdentifier, src)
+        if ok then
+            push(identifier)
+        end
+    end
+
+    if type(GetPlayerIdentifierByType) == 'function' then
+        push(GetPlayerIdentifierByType(src, 'license'))
+    end
+
+    if type(GetPlayerIdentifiers) == 'function' then
+        local identifiers = GetPlayerIdentifiers(src) or {}
+        for i = 1, #identifiers do
+            push(identifiers[i])
+        end
+    end
+
+    return out
+end
+
+---@param src number
+---@return string
+local function getIdentifierDebugSummary(src)
+    local candidates = buildSourceIdentifierCandidates(src)
+    if #candidates == 0 then
+        return 'none'
+    end
+
+    return table.concat(candidates, ',')
+end
+
+---@param src number
+---@return string
+local function resolveEsxJobFromDatabase(src)
+    if not Framework or Framework.name ~= 'esx' or not SQL or type(SQL.single) ~= 'function' then
+        return ''
+    end
+
+    local identifiers = buildSourceIdentifierCandidates(src)
+    if #identifiers == 0 then
+        return ''
+    end
+
+    for i = 1, #identifiers do
+        local row = SQL.single('SELECT job FROM users WHERE identifier = ? LIMIT 1', { identifiers[i] })
+        local job = normalizeJobName(type(row) == 'table' and row.job or '')
+        if job ~= '' then
+            return job
+        end
+    end
+
+    for i = 1, #identifiers do
+        local identifier = identifiers[i]
+        local licensePart = identifier:match('license:[^:]+$') or identifier:match('license:[^%s]+')
+        if licensePart then
+            local row = SQL.single('SELECT job FROM users WHERE identifier LIKE ? LIMIT 1', { ('%%' .. licensePart) })
+            local job = normalizeJobName(type(row) == 'table' and row.job or '')
+            if job ~= '' then
+                return job
+            end
+        end
+    end
+
+    return ''
+end
+
+---@param src number
+---@return string
+local function resolveDutyAccessJobName(src)
+    if not Framework or not Framework.Server then
+        return ''
+    end
+
+    if type(Framework.Server.getJob) == 'function' then
+        local ok, job = pcall(Framework.Server.getJob, src)
+        local normalized = normalizeJobName(ok and job or '')
+        if normalized ~= '' then
+            return normalized
+        end
+    end
+
+    if type(Framework.Server.getJobData) == 'function' then
+        local ok, data = pcall(Framework.Server.getJobData, src)
+        if ok and type(data) == 'table' then
+            local normalized = normalizeJobName(data.name)
+            if normalized ~= '' then
+                return normalized
+            end
+        end
+    end
+
+    if type(Framework.Server.getPlayer) == 'function' then
+        local ok, player = pcall(Framework.Server.getPlayer, src)
+        if ok and type(player) == 'table' then
+            local rawJob = nil
+            if type(player.job) == 'table' then
+                rawJob = player.job
+            elseif type(player.PlayerData) == 'table' and type(player.PlayerData.job) == 'table' then
+                rawJob = player.PlayerData.job
+            end
+
+            if type(rawJob) == 'table' then
+                local normalized = normalizeJobName(rawJob.name)
+                if normalized ~= '' then
+                    return normalized
+                end
+            end
+        end
+    end
+
+    local dbJob = resolveEsxJobFromDatabase(src)
+    if dbJob ~= '' then
+        return dbJob
+    end
+
+    return ''
+end
+
 ---@return table
 local function getDutyConfig()
     local cfg = (Config.MDT and Config.MDT.duty) or {}
@@ -256,22 +405,22 @@ function Duty.toggleState(src, options)
 end
 
 local function hasAccess(src)
-    if not Framework or not Framework.Server or type(Framework.Server.getJob) ~= 'function' then
+    local job = resolveDutyAccessJobName(src)
+    if job == '' then
+        Debug.debug(('[duty:access] src=%s denied=no_job_resolved identifiers=%s'):format(tostring(src), getIdentifierDebugSummary(src)))
         return false
     end
-    
-    local ok, job = pcall(Framework.Server.getJob, src)
-    if not ok or not job then return false end
     
     local allowed = (Config.MDT and Config.MDT.allowed_jobs) or {}
     if #allowed == 0 then return true end
     
-    local job_lower = string.lower(job)
     for i = 1, #allowed do
-        if string.lower(allowed[i]) == job_lower then
+        if normalizeJobName(allowed[i]) == job then
             return true
         end
     end
+
+    Debug.debug(('[duty:access] src=%s denied=job_not_allowed job=%s'):format(tostring(src), tostring(job)))
     
     return false
 end

@@ -59,6 +59,14 @@ local CALLBACK_SAVE_PERSON_AKTE = 'TG_MDT:savePersonAkte'
 local CALLBACK_GET_VEHICLE_AKTE = 'TG_MDT:getVehicleAkte'
 local CALLBACK_SAVE_VEHICLE_AKTE = 'TG_MDT:saveVehicleAkte'
 local CALLBACK_REMOVE_AKTE_COMPARTMENT = 'TG_MDT:removeAkteCompartment'
+local CALLBACK_GET_NEARBY_AGENCY_PLAYERS = 'TG_MDT:getNearbyAgencyPlayers'
+local CALLBACK_SHARE_AKTE_WITH_PLAYER = 'TG_MDT:shareAkteWithPlayer'
+local CALLBACK_IS_BOSS = 'TG_MDT:isBoss'
+local CALLBACK_GET_LEADERSHIP_MEMBERS = 'TG_MDT:getLeadershipMembers'
+local CALLBACK_LEADERSHIP_SET_MEMBER_PERMISSION = 'TG_MDT:leadershipSetMemberPermission'
+local CALLBACK_GET_AUDIT_LOGS = 'TG_MDT:getAuditLogs'
+local CALLBACK_GET_LAWS = 'TG_MDT:getLaws'
+local CALLBACK_SAVE_LAWS = 'TG_MDT:saveLaws'
 local CALLBACK_SET_DISPATCH_STATUS = 'TG_MDT:setDispatchStatus'
 local CALLBACK_CREATE_DISPATCH = 'TG_MDT:createDispatch'
 local CALLBACK_GET_DISPATCH_STATE = 'TG_MDT:getDispatchState'
@@ -85,12 +93,175 @@ end
 
 local allowedJobsCache = nil
 
+---@param src number
+---@return string[]
+local function buildSourceIdentifierCandidates(src)
+    local out = {}
+    local seen = {}
+
+    local function push(value)
+        if type(value) ~= 'string' then
+            return
+        end
+
+        local normalized = value:gsub('^%s+', ''):gsub('%s+$', '')
+        if normalized == '' or seen[normalized] then
+            return
+        end
+
+        seen[normalized] = true
+        out[#out + 1] = normalized
+    end
+
+    if Framework and Framework.Server and type(Framework.Server.getIdentifier) == 'function' then
+        local ok, identifier = pcall(Framework.Server.getIdentifier, src)
+        if ok then
+            push(identifier)
+        end
+    end
+
+    if type(GetPlayerIdentifierByType) == 'function' then
+        push(GetPlayerIdentifierByType(src, 'license'))
+    end
+
+    if type(GetPlayerIdentifiers) == 'function' then
+        local identifiers = GetPlayerIdentifiers(src) or {}
+        for i = 1, #identifiers do
+            push(identifiers[i])
+        end
+    end
+
+    return out
+end
+
+---@param src number
+---@return string
+local function getIdentifierDebugSummary(src)
+    local candidates = buildSourceIdentifierCandidates(src)
+    if #candidates == 0 then
+        return 'none'
+    end
+
+    return table.concat(candidates, ',')
+end
+
+---@param src number
+---@return string
+---@return number|nil
+---@return string
+local function resolveEsxJobFromDatabase(src)
+    if Framework.name ~= 'esx' then
+        return '', nil, ''
+    end
+
+    local identifiers = buildSourceIdentifierCandidates(src)
+    if #identifiers == 0 then
+        return '', nil, ''
+    end
+
+    local function queryRow(identifier)
+        return SQL.single([[
+            SELECT u.job, u.job_grade, jg.name AS grade_name
+            FROM users u
+            LEFT JOIN job_grades jg ON jg.job_name = u.job AND jg.grade = u.job_grade
+            WHERE u.identifier = ?
+            LIMIT 1
+        ]], { identifier })
+    end
+
+    local row = nil
+    for i = 1, #identifiers do
+        row = queryRow(identifiers[i])
+        if type(row) == 'table' then
+            break
+        end
+    end
+
+    if type(row) ~= 'table' then
+        for i = 1, #identifiers do
+            local identifier = identifiers[i]
+            local licensePart = identifier:match('license:[^:]+$') or identifier:match('license:[^%s]+')
+            if licensePart then
+                row = SQL.single([[
+                    SELECT u.job, u.job_grade, jg.name AS grade_name
+                    FROM users u
+                    LEFT JOIN job_grades jg ON jg.job_name = u.job AND jg.grade = u.job_grade
+                    WHERE u.identifier LIKE ?
+                    LIMIT 1
+                ]], { ('%%' .. licensePart) })
+
+                if type(row) == 'table' then
+                    break
+                end
+            end
+        end
+    end
+
+    if type(row) ~= 'table' then
+        return '', nil, ''
+    end
+
+    local jobName = type(row.job) == 'string' and string.lower((row.job:gsub('^%s+', ''):gsub('%s+$', ''))) or ''
+    local gradeLevel = tonumber(row.job_grade)
+    local gradeName = type(row.grade_name) == 'string' and string.lower((row.grade_name:gsub('^%s+', ''):gsub('%s+$', ''))) or ''
+
+    return jobName, gradeLevel, gradeName
+end
+
+---@param src number
+---@return string|nil
+local function resolveAccessJobName(src)
+    if not Framework or not Framework.Server then
+        return nil
+    end
+
+    if type(Framework.Server.getJob) == 'function' then
+        local okJob, job = pcall(Framework.Server.getJob, src)
+        if okJob and type(job) == 'string' and job ~= '' then
+            return string.lower(job)
+        end
+    end
+
+    if type(Framework.Server.getJobData) == 'function' then
+        local okJobData, jobData = pcall(Framework.Server.getJobData, src)
+        if okJobData and type(jobData) == 'table' and type(jobData.name) == 'string' and jobData.name ~= '' then
+            return string.lower(jobData.name)
+        end
+    end
+
+    if type(Framework.Server.getPlayer) == 'function' then
+        local okPlayer, player = pcall(Framework.Server.getPlayer, src)
+        if okPlayer and type(player) == 'table' then
+            local rawJob = nil
+            if type(player.job) == 'table' then
+                rawJob = player.job
+            elseif type(player.PlayerData) == 'table' and type(player.PlayerData.job) == 'table' then
+                rawJob = player.PlayerData.job
+            end
+
+            if type(rawJob) == 'table' and type(rawJob.name) == 'string' and rawJob.name ~= '' then
+                return string.lower(rawJob.name)
+            end
+        end
+    end
+
+    local dbJobName = select(1, resolveEsxJobFromDatabase(src))
+    if dbJobName ~= '' then
+        return dbJobName
+    end
+
+    return nil
+end
+
 --- Check if player has MDT access based on job.
 ---@param src number Player server ID
 ---@return boolean has_access True if player job is in allowed_jobs
 local function hasAccess(src)
-    local job = Framework.Server.getJob(src)
-    if not job then return false end
+    local job = resolveAccessJobName(src)
+    if not job then
+        Debug.debug(('[access] src=%s denied=no_job_resolved identifiers=%s'):format(tostring(src), getIdentifierDebugSummary(src)))
+        return false
+    end
     
     if not allowedJobsCache then
         local allowed = Config.MDT.allowed_jobs or {}
@@ -105,7 +276,297 @@ local function hasAccess(src)
     end
     
     if allowedJobsCache == 'all' then return true end
-    return allowedJobsCache[string.lower(job)] == true
+    return allowedJobsCache[job] == true
+end
+
+---@param value any
+---@return string
+local function normalizeRankName(value)
+    if type(value) ~= 'string' then
+        return ''
+    end
+
+    return string.lower((value:gsub('^%s+', ''):gsub('%s+$', '')))
+end
+
+---@param value any
+---@return string
+local function normalizeBossJobName(value)
+    if type(value) ~= 'string' then
+        return ''
+    end
+
+    return string.lower((value:gsub('^%s+', ''):gsub('%s+$', '')))
+end
+
+---@param value any
+---@return number|nil
+local function resolveGradeLevel(value)
+    if type(value) == 'number' or type(value) == 'string' then
+        return tonumber(value)
+    end
+
+    if type(value) == 'table' then
+        return tonumber(value.level or value.grade or value.value or value.id)
+    end
+
+    return nil
+end
+
+---@param jobName string
+---@return string|nil
+---@return table|nil
+local function resolveDepartmentByJobName(jobName)
+    local departments = Config and Config.MDT and Config.MDT.departments
+    if type(departments) ~= 'table' or jobName == '' then
+        return nil, nil
+    end
+
+    for deptKey, deptCfg in pairs(departments) do
+        if type(deptCfg) == 'table' and type(deptCfg.jobs) == 'table' then
+            for i = 1, #deptCfg.jobs do
+                if normalizeBossJobName(deptCfg.jobs[i]) == jobName then
+                    return normalizeBossJobName(deptKey), deptCfg
+                end
+            end
+        end
+    end
+
+    return nil, nil
+end
+
+---@param src number
+---@return string
+---@return string
+---@return number|nil
+---@return number|nil
+local function resolvePlayerBossContext(src)
+    local jobName = ''
+    local gradeName = ''
+    local gradeLevel = nil
+    local gradeCount = nil
+
+    if Framework and Framework.Server then
+        if type(Framework.Server.getJob) == 'function' then
+            local okJob, resolvedJob = pcall(Framework.Server.getJob, src)
+            if okJob and type(resolvedJob) == 'string' then
+                jobName = normalizeBossJobName(resolvedJob)
+            end
+        end
+
+        if type(Framework.Server.getJobData) == 'function' then
+            local okJobData, jobData = pcall(Framework.Server.getJobData, src)
+            if okJobData and type(jobData) == 'table' then
+                if jobName == '' and type(jobData.name) == 'string' then
+                    jobName = normalizeBossJobName(jobData.name)
+                end
+                if type(jobData.grade_name) == 'string' and jobData.grade_name ~= '' then
+                    gradeName = normalizeRankName(jobData.grade_name)
+                end
+                if gradeLevel == nil then
+                    gradeLevel = resolveGradeLevel(jobData.grade)
+                end
+                if gradeLevel == nil then
+                    gradeLevel = resolveGradeLevel(jobData.grade_level)
+                end
+                if gradeLevel == nil then
+                    gradeLevel = resolveGradeLevel(jobData.gradeLevel)
+                end
+                if type(jobData.grade_count) == 'number' or type(jobData.grade_count) == 'string' then
+                    gradeCount = tonumber(jobData.grade_count)
+                end
+            end
+        end
+
+        if type(Framework.Server.getPlayer) == 'function' then
+            local okPlayer, player = pcall(Framework.Server.getPlayer, src)
+            if okPlayer and type(player) == 'table' then
+                local job = nil
+                if type(player.job) == 'table' then
+                    job = player.job
+                elseif type(player.PlayerData) == 'table' and type(player.PlayerData.job) == 'table' then
+                    job = player.PlayerData.job
+                end
+
+                if type(job) == 'table' then
+                    local jobNameCandidate = type(job.name) == 'string' and normalizeBossJobName(job.name) or ''
+                    if jobName == '' and jobNameCandidate ~= '' then
+                        jobName = jobNameCandidate
+                    end
+
+                    if type(job.grade) == 'table' then
+                        if gradeName == '' then
+                            gradeName = normalizeRankName(job.grade.label or job.grade.name)
+                        end
+                        if gradeLevel == nil then
+                            gradeLevel = resolveGradeLevel(job.grade)
+                        end
+                    else
+                        if gradeName == '' then
+                            gradeName = normalizeRankName(job.grade_label or job.grade_name)
+                        end
+                        if gradeLevel == nil then
+                            gradeLevel = resolveGradeLevel(job.grade)
+                        end
+                    end
+
+                    if gradeLevel == nil then
+                        gradeLevel = resolveGradeLevel(job.grade_level or job.gradeLevel)
+                    end
+
+                    if gradeCount == nil and type(job.grades) == 'table' then
+                        local total = 0
+                        for _ in pairs(job.grades) do
+                            total = total + 1
+                        end
+                        if total > 0 then
+                            gradeCount = total
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if jobName == '' or gradeLevel == nil or gradeName == '' then
+        local dbJobName, dbGradeLevel, dbGradeName = resolveEsxJobFromDatabase(src)
+        if jobName == '' and dbJobName ~= '' then
+            jobName = dbJobName
+        end
+        if gradeLevel == nil and dbGradeLevel ~= nil then
+            gradeLevel = dbGradeLevel
+        end
+        if gradeName == '' and dbGradeName ~= '' then
+            gradeName = dbGradeName
+        end
+    end
+
+    return jobName, gradeName, gradeLevel, gradeCount
+end
+
+---@param bossCfg table|nil
+---@param jobName string
+---@return table|nil
+local function resolveBossRuleForJob(bossCfg, jobName)
+    if type(bossCfg) ~= 'table' then
+        return nil
+    end
+
+    local byJobs = type(bossCfg.jobs) == 'table' and bossCfg.jobs or {}
+
+    if type(byJobs[jobName]) == 'table' then
+        return byJobs[jobName]
+    end
+
+    for configuredJob, rule in pairs(byJobs) do
+        if normalizeBossJobName(configuredJob) == jobName and type(rule) == 'table' then
+            return rule
+        end
+    end
+
+    if type(bossCfg.default) == 'table' then
+        return bossCfg.default
+    end
+
+    return nil
+end
+
+---@param src number
+---@return boolean
+---@return string|nil
+---@return string
+local function isBossSource(src)
+    local jobName, gradeName, gradeLevel, gradeCount = resolvePlayerBossContext(src)
+    local departmentKey, departmentCfg = resolveDepartmentByJobName(jobName)
+    local fallbackTopTwo = gradeLevel ~= nil and gradeLevel >= (gradeCount and math.max(0, gradeCount - 2) or 2)
+
+    local function logBossDecision(decision, reason)
+        Debug.debug(('[leadership:isBoss] src=%s job=%s agency=%s gradeName=%s gradeLevel=%s gradeCount=%s decision=%s reason=%s'):format(
+            tostring(src),
+            tostring(jobName),
+            tostring(departmentKey),
+            tostring(gradeName),
+            tostring(gradeLevel),
+            tostring(gradeCount),
+            tostring(decision),
+            tostring(reason)
+        ))
+    end
+
+    if type(departmentCfg) ~= 'table' then
+        logBossDecision(fallbackTopTwo, 'no_department_cfg_fallback_top2')
+        return fallbackTopTwo, nil, jobName
+    end
+
+    local rule = resolveBossRuleForJob(departmentCfg.boss, jobName)
+    if type(rule) ~= 'table' then
+        logBossDecision(fallbackTopTwo, 'no_rule_fallback_top2')
+        return fallbackTopTwo, departmentKey, jobName
+    end
+
+    local matched = false
+
+    local names = {}
+    if type(rule.rank_name) == 'string' then
+        names[#names + 1] = rule.rank_name
+    elseif type(rule.rank_name) == 'table' then
+        for i = 1, #rule.rank_name do
+            names[#names + 1] = rule.rank_name[i]
+        end
+    end
+    if type(rule.rank_names) == 'table' then
+        for i = 1, #rule.rank_names do
+            names[#names + 1] = rule.rank_names[i]
+        end
+    end
+
+    -- Single-mode rule resolution: rank_name OR min_grade OR last (never combined).
+    -- Priority: rank_name > min_grade > last.
+    if #names > 0 then
+        local normalizedNames = {}
+        for i = 1, #names do
+            normalizedNames[#normalizedNames + 1] = normalizeRankName(names[i])
+        end
+
+        for i = 1, #names do
+            if normalizeRankName(names[i]) == gradeName and gradeName ~= '' then
+                matched = true
+                break
+            end
+        end
+
+        logBossDecision(matched, ('rule=rank_name configured=%s'):format(table.concat(normalizedNames, ',')))
+
+        return matched, departmentKey, jobName
+    end
+
+    local minGrade = tonumber(rule.min_grade)
+    if minGrade ~= nil then
+        if gradeLevel ~= nil and gradeLevel >= minGrade then
+            matched = true
+        end
+
+        logBossDecision(matched, ('rule=min_grade configured=%s'):format(tostring(minGrade)))
+
+        return matched, departmentKey, jobName
+    end
+
+    local lastRanks = tonumber(rule.last)
+    if lastRanks ~= nil and lastRanks > 0 then
+        if gradeLevel ~= nil and gradeCount ~= nil then
+            local threshold = math.max(0, gradeCount - lastRanks)
+            if gradeLevel >= threshold then
+                matched = true
+            end
+        end
+
+        logBossDecision(matched, ('rule=last configured=%s'):format(tostring(lastRanks)))
+
+        return matched, departmentKey, jobName
+    end
+
+    logBossDecision(false, 'rule_config_present_but_no_valid_mode')
+    return false, departmentKey, jobName
 end
 
 -- ══════════════════════════════════════════════════════════
@@ -173,11 +634,7 @@ local function getViewerJobName(src)
         return ''
     end
 
-    if not Framework or not Framework.Server or type(Framework.Server.getJob) ~= 'function' then
-        return ''
-    end
-
-    return normalizeJobName(Framework.Server.getJob(src))
+    return normalizeJobName(resolveAccessJobName(src) or '')
 end
 
 ---@param modelRoot table
@@ -683,6 +1140,61 @@ local function ensureAkteTables()
         CREATE INDEX IF NOT EXISTS idx_vehicle_akten_plate 
         ON tg_mdt_vehicle_akten(plate)
     ]], {})
+
+    SQL.execute([[
+        CREATE TABLE IF NOT EXISTS tg_mdt_akte_player_shares (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            kind VARCHAR(16) NOT NULL,
+            record_key VARCHAR(80) NOT NULL,
+            source_scope VARCHAR(64) NOT NULL,
+            target_identifier VARCHAR(80) NOT NULL,
+            granted_by_identifier VARCHAR(80) NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_akte_player_share (kind, record_key, source_scope, target_identifier)
+        )
+    ]], {})
+
+    SQL.execute([[
+        CREATE INDEX IF NOT EXISTS idx_akte_player_share_lookup
+        ON tg_mdt_akte_player_shares(kind, record_key, target_identifier)
+    ]], {})
+
+    SQL.execute([[
+        CREATE TABLE IF NOT EXISTS tg_mdt_member_permissions (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            identifier VARCHAR(80) NOT NULL,
+            agency VARCHAR(64) NOT NULL,
+            permissions LONGTEXT NOT NULL,
+            updated_by VARCHAR(80) NULL,
+            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_member_permissions (identifier, agency)
+        )
+    ]], {})
+
+    SQL.execute([[
+        CREATE TABLE IF NOT EXISTS tg_mdt_audit_logs (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            scope VARCHAR(64) NOT NULL,
+            action VARCHAR(64) NOT NULL,
+            actor_identifier VARCHAR(80) NULL,
+            actor_name VARCHAR(128) NULL,
+            target_identifier VARCHAR(80) NULL,
+            target_name VARCHAR(128) NULL,
+            details LONGTEXT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_mdt_audit_scope_time (scope, created_at),
+            INDEX idx_mdt_audit_action (action)
+        )
+    ]], {})
+
+    SQL.execute([[
+        CREATE TABLE IF NOT EXISTS tg_mdt_laws (
+            scope VARCHAR(64) NOT NULL PRIMARY KEY,
+            content LONGTEXT NOT NULL,
+            updated_by VARCHAR(80) NULL,
+            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    ]], {})
 end
 
 --- Build framework defaults for a person Akte.
@@ -798,6 +1310,95 @@ local function resolveRequestedAkteScope(src, requestedScope)
     return getAkteScope(src)
 end
 
+---@param src number|nil
+---@return string
+local function getPlayerIdentifier(src)
+    if type(src) ~= 'number' then
+        return ''
+    end
+
+    if not Framework or not Framework.Server or type(Framework.Server.getIdentifier) ~= 'function' then
+        return ''
+    end
+
+    local identifier = Framework.Server.getIdentifier(src)
+    if type(identifier) ~= 'string' then
+        return ''
+    end
+
+    identifier = identifier:gsub('^%s+', ''):gsub('%s+$', '')
+    return identifier
+end
+
+---@param kind string
+---@param value string
+---@return string
+local function normalizeAkteShareRecordKey(kind, value)
+    local normalized = string.lower((type(value) == 'string' and value or ''):gsub('^%s+', ''):gsub('%s+$', ''))
+
+    if kind == 'vehicle' then
+        return normalized:sub(1, 20)
+    end
+
+    return normalized:sub(1, 80)
+end
+
+---@param src number
+---@param kind 'person'|'vehicle'
+---@param value string
+---@return string|nil
+local function getSharedAkteScopeForPlayer(src, kind, value)
+    local targetIdentifier = getPlayerIdentifier(src)
+    if targetIdentifier == '' then
+        return nil
+    end
+
+    local recordKey = normalizeAkteShareRecordKey(kind, value)
+    if recordKey == '' then
+        return nil
+    end
+
+    local row = SQL.single([[
+        SELECT source_scope
+        FROM tg_mdt_akte_player_shares
+        WHERE kind = ?
+          AND record_key = ?
+          AND target_identifier = ?
+        ORDER BY id DESC
+        LIMIT 1
+    ]], { kind, recordKey, targetIdentifier })
+
+    if not row or type(row.source_scope) ~= 'string' or row.source_scope == '' then
+        return nil
+    end
+
+    return normalizeAkteScopeName(row.source_scope)
+end
+
+---@param sourceSrc number
+---@param targetSrc number
+---@param maxDistance number
+---@return boolean
+local function isPlayerNearby(sourceSrc, targetSrc, maxDistance)
+    local sourcePed = GetPlayerPed(sourceSrc)
+    local targetPed = GetPlayerPed(targetSrc)
+    if not sourcePed or sourcePed <= 0 or not targetPed or targetPed <= 0 then
+        return false
+    end
+
+    local sourceCoords = GetEntityCoords(sourcePed)
+    local targetCoords = GetEntityCoords(targetPed)
+    if not sourceCoords or not targetCoords then
+        return false
+    end
+
+    local dx = (sourceCoords.x or 0.0) - (targetCoords.x or 0.0)
+    local dy = (sourceCoords.y or 0.0) - (targetCoords.y or 0.0)
+    local dz = (sourceCoords.z or 0.0) - (targetCoords.z or 0.0)
+    local distance = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
+    return distance <= maxDistance
+end
+
 ---@param identifier string
 ---@param src number|nil
 ---@param compartment string|nil
@@ -806,6 +1407,14 @@ local function getPersonAkte(identifier, src, compartment)
     local defaults = buildPersonAkteDefaults(identifier, src)
     local scope = resolveRequestedAkteScope(src, compartment)
     local row = loadAkteRow('tg_mdt_person_akten', 'identifier', scope, identifier)
+
+    if not row and type(src) == 'number' then
+        local sharedScope = getSharedAkteScopeForPlayer(src, 'person', identifier)
+        if sharedScope and sharedScope ~= '' and sharedScope ~= scope then
+            row = loadAkteRow('tg_mdt_person_akten', 'identifier', sharedScope, identifier)
+        end
+    end
+
     local decoded = row and decodeObject(row.data) or nil
     return normalizeAkteToSchema('person', decoded, defaults, src)
 end
@@ -818,8 +1427,40 @@ local function getVehicleAkte(plate, src, compartment)
     local defaults = buildVehicleAkteDefaults(plate, src)
     local scope = resolveRequestedAkteScope(src, compartment)
     local row = loadAkteRow('tg_mdt_vehicle_akten', 'plate', scope, plate)
+
+    if not row and type(src) == 'number' then
+        local sharedScope = getSharedAkteScopeForPlayer(src, 'vehicle', plate)
+        if sharedScope and sharedScope ~= '' and sharedScope ~= scope then
+            row = loadAkteRow('tg_mdt_vehicle_akten', 'plate', sharedScope, plate)
+        end
+    end
+
     local decoded = row and decodeObject(row.data) or nil
     return normalizeAkteToSchema('vehicle', decoded, defaults, src)
+end
+
+--- Export bridge helper: fetch a person case by identifier.
+---@param identifier string
+---@param src number|nil
+---@param compartment string|nil
+---@return table
+function TG_MDT_GetPersonCaseByIdentifier(identifier, src, compartment)
+    if type(identifier) ~= 'string' or identifier == '' then
+        return defaultPersonAkte(src)
+    end
+    return getPersonAkte(identifier, src, compartment)
+end
+
+--- Export bridge helper: fetch a vehicle case by plate.
+---@param plate string
+---@param src number|nil
+---@param compartment string|nil
+---@return table
+function TG_MDT_GetVehicleCaseByPlate(plate, src, compartment)
+    if type(plate) ~= 'string' or plate == '' then
+        return defaultVehicleAkte(src)
+    end
+    return getVehicleAkte(plate, src, compartment)
 end
 
 local personsCache = { data = nil, timestamp = 0 }
@@ -865,7 +1506,7 @@ end
 ---@return table
 local function getPersonsFromFramework(src)
     local now = GetGameTimer()
-    if personsCache.data and (now - personsCache.timestamp) < CACHE_TTL then
+    if personsCache.data and #personsCache.data > 0 and (now - personsCache.timestamp) < CACHE_TTL then
         return personsCache.data
     end
     
@@ -900,6 +1541,11 @@ local function getPersonsFromFramework(src)
         end
         personsCache.data = persons
         personsCache.timestamp = now
+
+        if #persons == 0 then
+            Debug.warn('[persons] ESX query returned 0 records. Check users/jobs/job_grades tables and identifiers.')
+        end
+
         return persons
     end
 
@@ -958,6 +1604,11 @@ local function getPersonsFromFramework(src)
         end
         personsCache.data = persons
         personsCache.timestamp = now
+
+        if #persons == 0 then
+            Debug.warn('[persons] QB query returned 0 records. Check players table, charinfo/job JSON, and database connection.')
+        end
+
         return persons
     end
 
@@ -982,6 +1633,11 @@ local function getPersonsFromFramework(src)
     end
     personsCache.data = persons
     personsCache.timestamp = now
+
+    if #persons == 0 then
+        Debug.warn('[persons] Standalone fallback has 0 online players.')
+    end
+
     return persons
 end
 
@@ -990,7 +1646,7 @@ end
 ---@return table
 local function getVehiclesFromFramework(src)
     local now = GetGameTimer()
-    if vehiclesCache.data and (now - vehiclesCache.timestamp) < CACHE_TTL then
+    if vehiclesCache.data and #vehiclesCache.data > 0 and (now - vehiclesCache.timestamp) < CACHE_TTL then
         return vehiclesCache.data
     end
     
@@ -1006,17 +1662,27 @@ local function getVehiclesFromFramework(src)
         for i = 1, #rows do
             local row = rows[i]
             local vehicleData = decodeObject(row.vehicle)
+            local ownerName = buildDisplayName(row.firstname, row.lastname, row.owner)
+            local modelName = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.displayName or vehicleData.name or vehicleData.model) or nil)
             vehicles[#vehicles + 1] = {
                 plate = row.plate or ('NO-PLATE-%s'):format(i),
                 ownerIdentifier = row.owner,
-                ownerName = buildDisplayName(row.firstname, row.lastname, row.owner),
-                model = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model) or nil),
+                ownerName = ownerName,
+                owner = ownerName,
+                halter = ownerName,
+                model = modelName,
+                modelName = modelName,
                 state = nil,
             }
             vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles], src)
         end
         vehiclesCache.data = vehicles
         vehiclesCache.timestamp = now
+
+        if #vehicles == 0 then
+            Debug.warn('[vehicles] ESX query returned 0 records. Check owned_vehicles and owner links.')
+        end
+
         return vehicles
     end
 
@@ -1038,23 +1704,33 @@ local function getVehiclesFromFramework(src)
                 charinfo and charinfo.lastname or nil,
                 row.citizenid
             )
+            local modelName = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.displayName or vehicleData.name or vehicleData.model) or nil)
 
             vehicles[#vehicles + 1] = {
                 plate = row.plate or ('NO-PLATE-%s'):format(i),
                 ownerIdentifier = row.citizenid,
                 ownerName = ownerName,
-                model = normalizeModelName(vehicleData and (vehicleData.modelName or vehicleData.model) or nil),
+                owner = ownerName,
+                halter = ownerName,
+                model = modelName,
+                modelName = modelName,
                 state = row.state,
             }
             vehicles[#vehicles] = applyDataFields('vehicle', vehicles[#vehicles], src)
         end
         vehiclesCache.data = vehicles
         vehiclesCache.timestamp = now
+
+        if #vehicles == 0 then
+            Debug.warn('[vehicles] QB query returned 0 records. Check player_vehicles and citizenid links.')
+        end
+
         return vehicles
     end
 
     vehiclesCache.data = {}
     vehiclesCache.timestamp = now
+    Debug.warn('[vehicles] No provider available for current framework, returning 0 records.')
     return {}
 end
 
@@ -1204,6 +1880,489 @@ lib.callback.register(CALLBACK_GET_AKTE_COMPARTMENTS, function(src, kind, value)
     end
 
     return {}
+end)
+
+---@param src number
+---@return string
+---@return string
+---@return string
+local function getLeadershipScopeInfo(src)
+    local _, agency, job = isBossSource(src)
+    local scope = normalizeJobName(agency)
+    if scope == '' then
+        scope = normalizeJobName(job)
+    end
+    if scope == '' then
+        scope = 'global'
+    end
+
+    return scope, normalizeJobName(agency), normalizeJobName(job)
+end
+
+---@param identifier string
+---@param agency string
+---@return table
+local function getMemberPermissions(identifier, agency)
+    if identifier == '' or agency == '' then
+        return {}
+    end
+
+    local row = SQL.single('SELECT permissions FROM tg_mdt_member_permissions WHERE identifier = ? AND agency = ? LIMIT 1', { identifier, agency })
+    local decoded = row and decodeObject(row.permissions) or nil
+    return type(decoded) == 'table' and decoded or {}
+end
+
+---@param src number
+---@return string
+local function getActorDisplayName(src)
+    local playerName = GetPlayerName(src)
+    if type(playerName) == 'string' and playerName ~= '' then
+        return playerName
+    end
+    return ('Player %s'):format(tostring(src))
+end
+
+---@param scope string
+---@param action string
+---@param actorSrc number
+---@param targetIdentifier string|nil
+---@param targetName string|nil
+---@param details table|string|nil
+local function appendLeadershipAuditLog(scope, action, actorSrc, targetIdentifier, targetName, details)
+    if scope == '' then
+        scope = 'global'
+    end
+
+    local actorIdentifier = getPlayerIdentifier(actorSrc)
+    local actorName = getActorDisplayName(actorSrc)
+    local encodedDetails = nil
+    if type(details) == 'table' then
+        encodedDetails = safeJsonEncode(details)
+    elseif type(details) == 'string' and details ~= '' then
+        encodedDetails = details
+    end
+
+    SQL.execute([[
+        INSERT INTO tg_mdt_audit_logs (scope, action, actor_identifier, actor_name, target_identifier, target_name, details)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ]], {
+        scope,
+        action,
+        actorIdentifier ~= '' and actorIdentifier or nil,
+        actorName,
+        type(targetIdentifier) == 'string' and targetIdentifier ~= '' and targetIdentifier or nil,
+        type(targetName) == 'string' and targetName ~= '' and targetName or nil,
+        encodedDetails,
+    })
+end
+
+---@param src number
+---@param agencyKey string
+---@return table
+local function buildLeadershipGrades(src, agencyKey)
+    local out = {}
+    local seen = {}
+
+    if Framework.name == 'esx' and agencyKey ~= '' then
+        local departments = Config and Config.MDT and Config.MDT.departments or {}
+        local dept = type(departments) == 'table' and departments[agencyKey] or nil
+        local jobs = type(dept) == 'table' and type(dept.jobs) == 'table' and dept.jobs or {}
+
+        for i = 1, #jobs do
+            local job = normalizeJobName(jobs[i])
+            if job ~= '' then
+                local rows = SQL.query('SELECT grade, name, label FROM job_grades WHERE job_name = ? ORDER BY grade ASC', { job })
+                for j = 1, #rows do
+                    local row = rows[j]
+                    local level = tonumber(row.grade)
+                    if level ~= nil then
+                        local key = tostring(level)
+                        if not seen[key] then
+                            seen[key] = true
+                            out[#out + 1] = {
+                                level = level,
+                                label = type(row.label) == 'string' and row.label ~= '' and row.label or (type(row.name) == 'string' and row.name or ('Grade %s'):format(level)),
+                                name = type(row.name) == 'string' and row.name or ('grade_%s'):format(level),
+                            }
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if #out == 0 then
+        for level = 0, 12 do
+            out[#out + 1] = { level = level, label = ('Grade %s'):format(level), name = ('grade_%s'):format(level) }
+        end
+    end
+
+    table.sort(out, function(a, b)
+        return (a.level or 0) < (b.level or 0)
+    end)
+
+    return out
+end
+
+lib.callback.register(CALLBACK_IS_BOSS, function(src)
+    if not hasAccess(src) then
+        Debug.debug(('[leadership:canOpen] src=%s denied=no_access'):format(tostring(src)))
+        return {
+            isBoss = false,
+            agency = nil,
+            job = '',
+        }
+    end
+
+    local boss, agency, jobName = isBossSource(src)
+    Debug.debug(('[leadership:canOpen] src=%s canOpenLeadership=%s agency=%s job=%s'):format(
+        tostring(src),
+        tostring(boss == true),
+        tostring(agency),
+        tostring(jobName)
+    ))
+    return {
+        isBoss = boss == true,
+        agency = agency,
+        job = jobName,
+    }
+end)
+
+lib.callback.register(CALLBACK_GET_LEADERSHIP_MEMBERS, function(src)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized leadership members access: Player %s'):format(src))
+        return { members = {}, grades = {} }
+    end
+
+    local boss, agencyKey = isBossSource(src)
+    if not boss then
+        Debug.warn(('Blocked leadership members access (not boss): Player %s'):format(src))
+        return { members = {}, grades = {} }
+    end
+
+    local members = {}
+    local agencyScope = normalizeJobName(agencyKey)
+    local players = GetPlayers()
+    for i = 1, #players do
+        local targetSrc = tonumber(players[i])
+        if targetSrc and hasAccess(targetSrc) then
+            local targetBoss, targetAgency = isBossSource(targetSrc)
+            local includeMember = agencyKey == nil or agencyKey == '' or targetAgency == agencyKey
+            if includeMember then
+                local data = buildPlayerRadioData(targetSrc)
+                data.isBoss = targetBoss == true
+
+                local identifier = getPlayerIdentifier(targetSrc)
+                local jobData = Framework and Framework.Server and type(Framework.Server.getJobData) == 'function'
+                    and Framework.Server.getJobData(targetSrc)
+                    or {}
+                local gradeLevel = tonumber(jobData and jobData.grade)
+                if gradeLevel == nil and type(jobData and jobData.grade) == 'table' then
+                    gradeLevel = tonumber(jobData.grade.level or jobData.grade.grade or jobData.grade.value)
+                end
+                gradeLevel = gradeLevel or 0
+                local gradeLabel = type(jobData and jobData.grade_name) == 'string' and jobData.grade_name ~= ''
+                    and jobData.grade_name
+                    or (data.gradeDisplay ~= '' and data.gradeDisplay or ('Grade %s'):format(gradeLevel))
+
+                members[#members + 1] = {
+                    identifier = identifier ~= '' and identifier or ('src:%s'):format(targetSrc),
+                    name = data.name,
+                    grade = gradeLevel,
+                    gradeLabel = gradeLabel,
+                    online = true,
+                    source = targetSrc,
+                    status = data.status,
+                    radioCode = data.radioCode,
+                    avatarUrl = data.avatarUrl,
+                    permissions = getMemberPermissions(identifier, agencyScope ~= '' and agencyScope or 'global'),
+                }
+            end
+        end
+    end
+
+    table.sort(members, function(a, b)
+        return (a.name or '') < (b.name or '')
+    end)
+
+    return {
+        members = members,
+        grades = buildLeadershipGrades(src, agencyScope),
+    }
+end)
+
+lib.callback.register(CALLBACK_LEADERSHIP_SET_MEMBER_PERMISSION, function(src, payload)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized leadership permission update: Player %s'):format(src))
+        return false
+    end
+
+    local boss = isBossSource(src)
+    if not boss then
+        Debug.warn(('Blocked leadership permission update (not boss): Player %s'):format(src))
+        return false
+    end
+
+    if type(payload) ~= 'table' then
+        return { ok = false, reason = 'invalid_payload' }
+    end
+
+    local targetIdentifier = type(payload.identifier) == 'string' and payload.identifier:gsub('^%s+', ''):gsub('%s+$', '') or ''
+    if targetIdentifier == '' then
+        return { ok = false, reason = 'missing_identifier' }
+    end
+
+    local scope, agencyScope = getLeadershipScopeInfo(src)
+    local targetName = type(payload.name) == 'string' and payload.name or nil
+
+    if type(payload.permissions) == 'table' then
+        local encoded = safeJsonEncode(payload.permissions)
+        if not encoded then
+            return { ok = false, reason = 'permissions_encode_failed' }
+        end
+
+        SQL.execute([[
+            INSERT INTO tg_mdt_member_permissions (identifier, agency, permissions, updated_by)
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE permissions = VALUES(permissions), updated_by = VALUES(updated_by), updated_at = CURRENT_TIMESTAMP
+        ]], {
+            targetIdentifier,
+            agencyScope ~= '' and agencyScope or scope,
+            encoded,
+            getPlayerIdentifier(src),
+        })
+
+        appendLeadershipAuditLog(scope, 'permission_change', src, targetIdentifier, targetName, {
+            permissions = payload.permissions,
+        })
+
+        return { ok = true }
+    end
+
+    local grade = tonumber(payload.grade)
+    if grade ~= nil then
+        local players = GetPlayers()
+        local targetSource = nil
+        for i = 1, #players do
+            local candidate = tonumber(players[i])
+            if candidate and getPlayerIdentifier(candidate) == targetIdentifier then
+                targetSource = candidate
+                break
+            end
+        end
+
+        if targetSource and Framework and Framework.Server and type(Framework.Server.setJob) == 'function' then
+            local currentJob = normalizeJobName(Framework.Server.getJob(targetSource) or '')
+            if currentJob ~= '' then
+                Framework.Server.setJob(targetSource, currentJob, grade)
+            end
+        end
+
+        appendLeadershipAuditLog(scope, 'rank_change', src, targetIdentifier, targetName, {
+            grade = grade,
+        })
+
+        return { ok = true }
+    end
+
+    return { ok = false, reason = 'nothing_to_update' }
+end)
+
+lib.callback.register(CALLBACK_GET_AUDIT_LOGS, function(src, payload)
+    if not hasAccess(src) then
+        return {}
+    end
+
+    local boss = isBossSource(src)
+    if not boss then
+        return {}
+    end
+
+    local body = type(payload) == 'table' and payload or {}
+    local scope = select(1, getLeadershipScopeInfo(src))
+    local actionFilter = type(body.action) == 'string' and normalizeJobName(body.action) or ''
+    local search = type(body.search) == 'string' and string.lower(body.search) or ''
+    local rows = SQL.query([[
+        SELECT id, created_at, action, actor_name, actor_identifier, target_name, target_identifier, details
+        FROM tg_mdt_audit_logs
+        WHERE scope = ?
+        ORDER BY id DESC
+        LIMIT 500
+    ]], { scope })
+
+    local out = {}
+    for i = 1, #rows do
+        local row = rows[i]
+        local action = type(row.action) == 'string' and row.action or 'unknown'
+        if actionFilter ~= '' and actionFilter ~= 'all' and action ~= actionFilter then
+            goto continue
+        end
+
+        local actorName = type(row.actor_name) == 'string' and row.actor_name or 'Unknown'
+        local targetName = type(row.target_name) == 'string' and row.target_name or nil
+        local details = type(row.details) == 'string' and row.details or ''
+        local searchHaystack = string.lower(table.concat({ actorName, tostring(targetName or ''), details, action }, ' '))
+        if search ~= '' and not string.find(searchHaystack, search, 1, true) then
+            goto continue
+        end
+
+        out[#out + 1] = {
+            id = tonumber(row.id) or i,
+            timestamp = type(row.created_at) == 'string' and row.created_at or os.date('!%Y-%m-%dT%H:%M:%SZ'),
+            action = action,
+            actor_name = actorName,
+            actor_identifier = type(row.actor_identifier) == 'string' and row.actor_identifier or '',
+            target_name = targetName,
+            details = details,
+            job = scope,
+        }
+
+        if #out >= 200 then
+            break
+        end
+
+        ::continue::
+    end
+
+    return out
+end)
+
+lib.callback.register(CALLBACK_GET_LAWS, function(src)
+    if not hasAccess(src) then
+        return ''
+    end
+
+    local scope = select(1, getLeadershipScopeInfo(src))
+    local row = SQL.single('SELECT content FROM tg_mdt_laws WHERE scope = ? LIMIT 1', { scope })
+    return type(row) == 'table' and type(row.content) == 'string' and row.content or ''
+end)
+
+lib.callback.register(CALLBACK_SAVE_LAWS, function(src, content)
+    if not hasAccess(src) then
+        return { ok = false, reason = 'no_access' }
+    end
+
+    local boss = isBossSource(src)
+    if not boss then
+        return { ok = false, reason = 'not_boss' }
+    end
+
+    local scope = select(1, getLeadershipScopeInfo(src))
+    local text = type(content) == 'string' and content or ''
+    SQL.execute([[
+        INSERT INTO tg_mdt_laws (scope, content, updated_by)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE content = VALUES(content), updated_by = VALUES(updated_by), updated_at = CURRENT_TIMESTAMP
+    ]], { scope, text, getPlayerIdentifier(src) })
+
+    appendLeadershipAuditLog(scope, 'laws_update', src, nil, nil, {
+        length = #text,
+    })
+
+    return { ok = true }
+end)
+
+lib.callback.register(CALLBACK_GET_NEARBY_AGENCY_PLAYERS, function(src, requestedScope, maxDistance)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized nearby-agency access: Player %s'):format(src))
+        return {}
+    end
+
+    local scope = resolveRequestedAkteScope(src, requestedScope)
+    local distanceLimit = tonumber(maxDistance) or 15.0
+    if distanceLimit < 2.0 then distanceLimit = 2.0 end
+    if distanceLimit > 40.0 then distanceLimit = 40.0 end
+
+    local sourcePed = GetPlayerPed(src)
+    if not sourcePed or sourcePed <= 0 then
+        return {}
+    end
+
+    local sourceCoords = GetEntityCoords(sourcePed)
+    if not sourceCoords then
+        return {}
+    end
+
+    local nearby = {}
+    local players = GetPlayers()
+    for i = 1, #players do
+        local targetSrc = tonumber(players[i])
+        if targetSrc and targetSrc ~= src and hasAccess(targetSrc) and getAkteScope(targetSrc) == scope then
+            local targetPed = GetPlayerPed(targetSrc)
+            if targetPed and targetPed > 0 then
+                local targetCoords = GetEntityCoords(targetPed)
+                if targetCoords then
+                    local dx = (sourceCoords.x or 0.0) - (targetCoords.x or 0.0)
+                    local dy = (sourceCoords.y or 0.0) - (targetCoords.y or 0.0)
+                    local dz = (sourceCoords.z or 0.0) - (targetCoords.z or 0.0)
+                    local distance = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
+
+                    if distance <= distanceLimit then
+                        nearby[#nearby + 1] = {
+                            source = targetSrc,
+                            name = GetPlayerName(targetSrc) or ('Player %s'):format(targetSrc),
+                            job = Framework.Server.getJob(targetSrc) or '',
+                            distance = distance,
+                        }
+                    end
+                end
+            end
+        end
+    end
+
+    table.sort(nearby, function(a, b)
+        return (a.distance or 9999.0) < (b.distance or 9999.0)
+    end)
+
+    return nearby
+end)
+
+lib.callback.register(CALLBACK_SHARE_AKTE_WITH_PLAYER, function(src, kind, value, targetSource, compartment)
+    if not hasAccess(src) then
+        Debug.warn(('Unauthorized akte share attempt: Player %s'):format(src))
+        return false
+    end
+
+    if type(kind) ~= 'string' or (kind ~= 'person' and kind ~= 'vehicle') then
+        return false
+    end
+
+    if type(value) ~= 'string' or value == '' then
+        return false
+    end
+
+    local targetSrc = tonumber(targetSource)
+    if not targetSrc or targetSrc <= 0 or targetSrc == src or not hasAccess(targetSrc) then
+        return false
+    end
+
+    local sourceScope = resolveRequestedAkteScope(src, compartment)
+    if getAkteScope(targetSrc) ~= sourceScope then
+        return false
+    end
+
+    if not isPlayerNearby(src, targetSrc, 20.0) then
+        return false
+    end
+
+    local targetIdentifier = getPlayerIdentifier(targetSrc)
+    if targetIdentifier == '' then
+        return false
+    end
+
+    local grantedByIdentifier = getPlayerIdentifier(src)
+    local recordKey = normalizeAkteShareRecordKey(kind, value)
+    if recordKey == '' then
+        return false
+    end
+
+    SQL.execute([[
+        INSERT INTO tg_mdt_akte_player_shares (kind, record_key, source_scope, target_identifier, granted_by_identifier)
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE created_at = CURRENT_TIMESTAMP, granted_by_identifier = VALUES(granted_by_identifier)
+    ]], { kind, recordKey, sourceScope, targetIdentifier, grantedByIdentifier ~= '' and grantedByIdentifier or nil })
+
+    return true
 end)
 
 lib.callback.register(CALLBACK_GET_PERSON_AKTE, function(src, identifier, compartment)
@@ -1363,6 +2522,22 @@ end)
 local activeRadioChannels = {}
 local playerActiveFrequencies = {}
 local playerDispatchStatuses = {}
+
+local function isRadioAvailable()
+    local mdtCfg = Config and Config.MDT or {}
+    local radioCfg = type(mdtCfg.radio) == 'table' and mdtCfg.radio or {}
+    if radioCfg.enabled == false then
+        return false
+    end
+
+    local hasPma = GetResourceState('pma-voice') == 'started'
+    local hasSalty = GetResourceState('saltychat') == 'started'
+    if hasPma or hasSalty then
+        return true
+    end
+
+    return radioCfg.allow_standalone == true
+end
 
 local function getDispatchDefaultStatus()
     local dispatchCfg = Config and Config.MDT and Config.MDT.dispatch
@@ -1790,6 +2965,7 @@ local function buildPlayerRadioData(src)
         jobName = jobName,
         jobLabel = jobLabel,
         avatarUrl = avatarUrl,
+        radioCode = playerActiveFrequencies[src],
         status = getPlayerDispatchStatus(src)
     }
 end
@@ -1830,6 +3006,11 @@ end
 
 RegisterNetEvent(EVENT_SERVER_JOIN_RADIO, function(freq)
     local src = source
+    if not isRadioAvailable() then
+        removePlayerFromRadio(src)
+        return
+    end
+
     if not freq or freq == '' then
         removePlayerFromRadio(src)
         return

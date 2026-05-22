@@ -1,8 +1,8 @@
-# MDT — Multi-Faction Tablet
+# MDT  Multi-Faction Tablet
 
-[🇩🇪 Deutsch](#-deutsch) · [🇬🇧 English](#-english)
+[🇩🇪 Deutsch](#-deutsch) | [🇬🇧 English](#-english)
 
-> ⚠️ **Status:** Mockup / Work in Progress — kein fertiges Script. · *Mockup / Work in Progress — not a finished script.*
+> ⚠️ **Status:** Mockup / Work in Progress  kein fertiges Script. | *Mockup / Work in Progress  not a finished script.*
 
 ---
 
@@ -10,7 +10,7 @@
 
 **Tablet Vorschau:** [https://tiltann.github.io/TG_MDT/](https://tiltann.github.io/TG_MDT/)
 
-Ein freies, modulares **MDT (Mobile Data Terminal)** als Ingame-Tablet für **alle Fraktionen** — nicht nur Polizei, sondern auch Medic, Mechanic, Justiz und mehr. Jede Fraktion sieht ihre eigenen Daten, kann aber je nach Rechten auch auf relevante Informationen anderer Fraktionen zugreifen (z. B. Medic → Krankenakte, Polizei → Strafakte).
+Ein freies, modulares **MDT (Mobile Data Terminal)** als Ingame-Tablet für **alle Fraktionen**  nicht nur Polizei, sondern auch Medic, Mechanic, Justiz und mehr. Jede Fraktion sieht ihre eigenen Daten, kann aber je nach Rechten auch auf relevante Informationen anderer Fraktionen zugreifen (z. B. Medic → Krankenakte, Polizei → Strafakte).
 
 Entwickelt als **Community-Projekt** von Mitgliedern des Tubehosting Discord. **Nicht offiziell mit Tubehosting affiliiert.**
 
@@ -59,9 +59,31 @@ Hinweis: Wenn ein Spieler `/mdt` zu früh nach Resource-Restart nutzt, erscheint
    - Scope je Status über `jobs = { ... }` und/oder `agencies = { ... }`
    - Farben als Named Color **oder Hex** (z. B. `'#ff6b00'`)
 
+### Leitungszugriff (isBoss) pro Agency/Job
+
+`Config.MDT.departments[agency].boss.jobs[job]` steuert den Zugriff auf den Leadership-Bereich.
+
+- `rank_name`: exakter Rangname (String oder Liste)
+- `min_grade`: Rangnummer muss `>=` sein
+- `last`: Top-N Ränge (Beispiel `2` = höchste 2 Ränge)
+
+Wichtig: Pro Job **genau eine** Methode nutzen (`rank_name` **oder** `min_grade` **oder** `last`), nicht kombinieren.
+
+Beispiel:
+
+```lua
+boss = {
+   jobs = {
+      police = {
+         rank_name = { 'chief', 'captain' },
+      }
+   }
+}
+```
+
 ### Design-Prinzipien
 
-- **Modular** — Module lassen sich pro Fraktion ein- und ausblenden
+- **Modular**  Module lassen sich pro Fraktion ein- und ausblenden
 - **Sauberes, modernes UI**
 - **Dark Mode** als Standard
 - **Eine Familie"** über alle Fraktionen, aber jede mit eigener Identität (Akzentfarbe, Logo, ggf. Schriftart)
@@ -93,10 +115,10 @@ Hinweise:
 - Beim Speichern akzeptiert der Server nur `editable = true` Felder.
 - Für unbekannte Fahrzeugmodelle einfach den Hash in `vehicle_model_names` ergänzen.
 
-### 🗺️ Live-Map — Karten-Tiles einrichten
+### 🗺️ Live-Map  Karten-Tiles einrichten
 
 Die Karten-Tiles sind **nicht im Repository enthalten** (zu groß für GitHub).  
-Ohne die Tiles zeigt die Live-Map nur eine leere/fehlerhafte Karte — das Script gibt beim Start eine entsprechende Warnung in der Serverkonsole aus.
+Ohne die Tiles zeigt die Live-Map nur eine leere/fehlerhafte Karte  das Script gibt beim Start eine entsprechende Warnung in der Serverkonsole aus.
 
 **So richtest du die Live-Map ein:**
 
@@ -117,11 +139,11 @@ Ohne die Tiles zeigt die Live-Map nur eine leere/fehlerhafte Karte — das Scrip
    Der Build kopiert `public/` automatisch nach `dist/`. Danach die Resource neu starten.
 
 > Die Karten-Tiles stammen ursprünglich aus dem Projekt  
-> **[RiceaRaul/gta-v-map-leaflet](https://github.com/RiceaRaul/gta-v-map-leaflet)** — alle Credits gehen an RiceaRaul und die Mitwirkenden.
+> **[RiceaRaul/gta-v-map-leaflet](https://github.com/RiceaRaul/gta-v-map-leaflet)**  alle Credits gehen an RiceaRaul und die Mitwirkenden.
 
 ### Support
 
-Support gibt es aktuell **ausschließlich über GitHub Issues**. Bitte keine Support-Anfragen per Discord, DM oder Mail — Issues sind der einzige Weg.
+Support gibt es aktuell **ausschließlich über GitHub Issues**. Bitte keine Support-Anfragen per Discord, DM oder Mail  Issues sind der einzige Weg.
 
 ---
 
@@ -129,7 +151,7 @@ Support gibt es aktuell **ausschließlich über GitHub Issues**. Bitte keine Sup
 
 **Tablet Preview:** [https://tiltann.github.io/TG_MDT/](https://tiltann.github.io/TG_MDT/)
 
-A free, modular **MDT (Mobile Data Terminal)** as an in-game tablet for **every faction** — not only police, but also medic, mechanic, judiciary and more. Each faction sees its own data, but depending on permissions can also access relevant information from other factions (e.g. medic → medical records, police → criminal records).
+A free, modular **MDT (Mobile Data Terminal)** as an in-game tablet for **every faction**  not only police, but also medic, mechanic, judiciary and more. Each faction sees its own data, but depending on permissions can also access relevant information from other factions (e.g. medic → medical records, police → criminal records).
 
 Built as a **community project** by members of the Tubehosting Discord. **Not officially affiliated with Tubehosting.**
 
@@ -143,7 +165,7 @@ An in-game tablet that every faction gets. Each faction only sees its own stuff,
 - [x] 👤 **Person records** (model-driven, photo/notes support)
 - [x] 🚗 **Vehicle records** (model-driven, owner/status fields)
 - [ ] 📝 **Reports** (full workflow)
-- [ ] ⚖️ **Penalty / fine catalog** (full workflow)
+- [ ] ⚖️ **Penalty / fine catalog + Lawbook** (full workflow)
 - [x] 🗺️ **Live map** (tile-based, module-gated)
 - [x] 📡 **Radio member sync** inside tablet
 - [x] 💬 **Live chat** inside MDT
@@ -177,9 +199,31 @@ Note: If a player runs `/mdt` too early after a resource restart, they now get a
    - per-status scope via `jobs = { ... }` and/or `agencies = { ... }`
    - named colors **and hex** (for example `'#ff6b00'`)
 
+### Leadership Access (isBoss) per agency/job
+
+Use `Config.MDT.departments[agency].boss.jobs[job]` to control access to the leadership screen.
+
+- `rank_name`: exact rank name (string or list)
+- `min_grade`: rank number must be `>=` this value
+- `last`: top-N grades (example `2` = highest 2 grades)
+
+Important: Use **exactly one** method per job (`rank_name` **or** `min_grade` **or** `last`), do not combine them.
+
+Example:
+
+```lua
+boss = {
+   jobs = {
+      police = {
+         rank_name = { 'chief', 'captain' },
+      }
+   }
+}
+```
+
 ### Design principles
 
-- **Modular** — modules can be toggled per faction
+- **Modular**  modules can be toggled per faction
 - **Clean, modern UI**
 - **Dark mode** by default
 - **"One family"** across all factions, but each with its own identity (accent color, logo, optionally font)
@@ -211,10 +255,10 @@ Notes:
 - On save, the server only applies fields with `editable = true`.
 - For unknown vehicle models, add the hash to `vehicle_model_names`.
 
-### 🗺️ Live Map — Setting up map tiles
+### 🗺️ Live Map  Setting up map tiles
 
 The map tile files are **not included in this repository** (too large for GitHub).  
-Without the tiles the live map will show a blank/broken map — the script will print a warning in the server console on startup.
+Without the tiles the live map will show a blank/broken map  the script will print a warning in the server console on startup.
 
 **How to set up the live map:**
 
@@ -235,19 +279,19 @@ Without the tiles the live map will show a blank/broken map — the script will 
    The build copies `public/` into `dist/` automatically. Then restart the resource.
 
 > Map tiles originally from  
-> **[RiceaRaul/gta-v-map-leaflet](https://github.com/RiceaRaul/gta-v-map-leaflet)** — all credit goes to RiceaRaul and contributors.
+> **[RiceaRaul/gta-v-map-leaflet](https://github.com/RiceaRaul/gta-v-map-leaflet)**  all credit goes to RiceaRaul and contributors.
 
 ### Support
 
-Support is currently provided **exclusively via GitHub Issues**. Please do not send support requests via Discord, DM, or email — issues are the only channel.
+Support is currently provided **exclusively via GitHub Issues**. Please do not send support requests via Discord, DM, or email  issues are the only channel.
 
 ---
 
-## License · Lizenz
+## License | Lizenz
 
 See [`LICENSE`](./LICENSE).
 
 ## Disclaimer
 
-This project is a community effort and is **not affiliated with, endorsed by, or connected to Tubehosting**. ·
+This project is a community effort and is **not affiliated with, endorsed by, or connected to Tubehosting**. |
 Dieses Projekt ist ein Community-Projekt und ist **nicht mit Tubehosting affiliiert, von Tubehosting unterstützt oder verbunden**.

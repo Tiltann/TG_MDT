@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, RadioReceiver, Users, Car, BookOpen, MessageSquare, Scale, Settings } from "lucide-react";
+import { Home, RadioReceiver, Users, Car, BookOpen, MessageSquare, Scale, Settings, Shield } from "lucide-react";
 import type { TFunction } from "../lib/i18n";
 
 type Branding = {
@@ -17,6 +17,7 @@ type DutyState = {
 export function Sidebar({
   currentView,
   modules,
+  isBoss,
   onScreenChange,
   onOpenProfile,
   playerData,
@@ -26,6 +27,7 @@ export function Sidebar({
 }: {
   currentView: string;
   modules: Record<string, boolean>;
+  isBoss?: boolean;
   onScreenChange: (screen: string) => void;
   onOpenProfile: () => void;
   playerData: any;
@@ -42,6 +44,7 @@ export function Sidebar({
     { id: "penalties", label: t("tablet.sidebar.penalty_catalog"), icon: Scale },
     { id: "livemap", label: t("tablet.sidebar.livemap"), icon: BookOpen },
     { id: "chat", label: t("tablet.sidebar.live_chat", undefined, t("tablet.sidebar.chat")), icon: MessageSquare },
+    { id: "leadership", label: t("tablet.sidebar.leadership", undefined, "Leadership"), icon: Shield },
     { id: "settings", label: t("tablet.sidebar.settings"), icon: Settings },
   ];
 
@@ -77,8 +80,9 @@ export function Sidebar({
           {menu_items.map((item) => {
             // Check if feature module is enabled (or if it's the base dashboard)
             const is_enabled = item.id === "dashboard" || modules[item.id] !== false;
+            const hasRoleAccess = item.id !== "leadership" || isBoss === true;
             
-            if (!is_enabled) return null;
+            if (!is_enabled || !hasRoleAccess) return null;
 
             const is_active = currentView === item.id || (currentView === "tablet" && item.id === "dashboard");
             return (

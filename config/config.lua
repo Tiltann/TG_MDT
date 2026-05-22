@@ -32,6 +32,21 @@ Config.MDT = {
             label = 'LSPD',
             subtitle = 'Law Enforcement Operations Desk',
             jobs = { 'police', 'sheriff' },
+            boss = {
+                -- Per-job leadership access rules.
+                -- IMPORTANT: Use exactly ONE rule per job (rank_name OR min_grade OR last), not multiple.
+                -- rank_name = exact grade name match (string or array)
+                -- min_grade = grade level must be >= this number
+                -- last = allow top N grades (example: 2 means highest two grades)
+                jobs = {
+                    police = {
+                        min_grade = 2,
+                    },
+                    sheriff = {
+                         rank_name = { 'chief', 'captain' },
+                    },
+                },
+            },
             logo_url = 'lspd.png',
             dispatch_notify_on_accept = true,
             modules = {
@@ -43,6 +58,13 @@ Config.MDT = {
             label = 'DoJ',
             subtitle = 'Judicial Records & Processing Desk',
             jobs = { 'mdt' },
+            boss = {
+                jobs = {
+                    mdt = {
+                        last = 2,
+                    },
+                },
+            },
             logo_url = 'doj.png',
             shared_with = { 'police', 'sheriff' },
             dispatch_notify_on_accept = false,
@@ -55,6 +77,13 @@ Config.MDT = {
             label = 'Mechanics',
             subtitle = 'Vehicle Service Coordination Desk',
             jobs = { 'mechanic' },
+            boss = {
+                jobs = {
+                    mechanic = {
+                        rank_name = { 'boss', 'owner' },
+                    },
+                },
+            },
             logo_url = 'mechanic.png',
             dispatch_notify_on_accept = false,
             modules = {
@@ -66,6 +95,13 @@ Config.MDT = {
             label = 'EMS',
             subtitle = 'Medical Response Coordination Desk',
             jobs = { 'ambulance' },
+            boss = {
+                jobs = {
+                    ambulance = {
+                        min_grade = 3,
+                    },
+                },
+            },
             logo_url = 'ems.png',
             dispatch_notify_on_accept = true,
             modules = {
@@ -93,6 +129,18 @@ Config.MDT = {
         -- Automatically delete chat messages after this many minutes.
         -- 0 disables auto-delete.
         auto_delete_after_minutes = 0,
+    },
+
+    -- Radio integration behavior for the MDT radio/chat tab.
+    radio = {
+        -- Master switch for MDT radio features.
+        -- false = fully disabled in UI and callbacks.
+        enabled = true,
+
+        -- If no supported voice script is running:
+        -- true  = allow MDT standalone radio state sync only.
+        -- false = radio is disabled entirely.
+        allow_standalone = false,
     },
 
     -- Which part of the RP name is used in dashboard greetings.
@@ -176,7 +224,7 @@ Config.MDT = {
         off_duty_status = '10-7',
 
         -- Configurable status catalog (numeric/radio-style codes).
-        -- IMPORTANT: Use label_key for localization and add the key to locales/en.json and locales/de.json.
+        -- IMPORTANT: Use label_key for localization and add the key to locales/*.json.
         -- Optional `label` acts as fallback if the localization key is missing.
         -- Optional scope fields per status entry:
         --   jobs     = { 'police', 'sheriff' }   -- only these jobs can use/see this status
