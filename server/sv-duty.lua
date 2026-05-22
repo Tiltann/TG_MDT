@@ -27,6 +27,69 @@ local function normalizeJobName(value)
     return string.lower((value:gsub('^%s+', ''):gsub('%s+$', '')))
 end
 
+---@param value any
+---@return string
+local function extractJobName(value)
+    if type(value) == 'string' then
+        return normalizeJobName(value)
+    end
+
+    if type(value) == 'table' then
+        if type(value.name) == 'string' then
+            return normalizeJobName(value.name)
+        end
+        if type(value.id) == 'string' then
+            return normalizeJobName(value.id)
+        end
+    end
+
+    return ''
+end
+
+---@param jobName string
+---@param prefix string
+---@return string
+local function resolveBaseJobName(jobName, prefix)
+    local normalized = normalizeJobName(jobName)
+    local normalizedPrefix = normalizeJobName(prefix)
+    if normalized == '' then
+        return ''
+    end
+
+    if normalizedPrefix == '' then
+        normalizedPrefix = 'off'
+    end
+
+    local candidates = {}
+
+    if #normalized > #normalizedPrefix and normalized:sub(1, #normalizedPrefix) == normalizedPrefix then
+        candidates[#candidates + 1] = normalized:sub(#normalizedPrefix + 1)
+    end
+
+    if #normalized > #normalizedPrefix and normalized:sub(-#normalizedPrefix) == normalizedPrefix then
+        candidates[#candidates + 1] = normalized:sub(1, #normalized - #normalizedPrefix)
+    end
+
+    local offPrefixCandidate = normalized:match('^off[_%-]?(.*)$')
+    if type(offPrefixCandidate) == 'string' and offPrefixCandidate ~= '' then
+        candidates[#candidates + 1] = offPrefixCandidate
+    end
+
+    local offSuffixCandidate = normalized:match('^(.*)[_%-]?off$')
+    if type(offSuffixCandidate) == 'string' and offSuffixCandidate ~= '' then
+        candidates[#candidates + 1] = offSuffixCandidate
+    end
+
+    for i = 1, #candidates do
+        local candidate = normalizeJobName(candidates[i])
+        if candidate ~= '' then
+            return candidate
+        end
+    end
+
+    return ''
+end
+
 ---@param src number
 ---@return string[]
 local function buildSourceIdentifierCandidates(src)
@@ -123,7 +186,7 @@ local function resolveDutyAccessJobName(src)
 
     if type(Framework.Server.getJob) == 'function' then
         local ok, job = pcall(Framework.Server.getJob, src)
-        local normalized = normalizeJobName(ok and job or '')
+        local normalized = extractJobName(ok and job or '')
         if normalized ~= '' then
             return normalized
         end
@@ -141,12 +204,19 @@ local function resolveDutyAccessJobName(src)
 
     if type(Framework.Server.getPlayer) == 'function' then
         local ok, player = pcall(Framework.Server.getPlayer, src)
-        if ok and type(player) == 'table' then
+        if ok and player then
             local rawJob = nil
             if type(player.job) == 'table' then
                 rawJob = player.job
             elseif type(player.PlayerData) == 'table' and type(player.PlayerData.job) == 'table' then
                 rawJob = player.PlayerData.job
+            elseif type(player.getJob) == 'function' then
+                local okGetJob, resolvedJob = pcall(function()
+                    return player.getJob()
+                end)
+                if okGetJob and type(resolvedJob) == 'table' then
+                    rawJob = resolvedJob
+                end
             end
 
             if type(rawJob) == 'table' then
@@ -422,8 +492,8 @@ local function hasAccess(src)
 
     local dutyCfg = getDutyConfig()
     local prefix = normalizeJobName(dutyCfg.offduty_job_prefix)
-    if prefix ~= '' and job:sub(1, #prefix) == prefix and #job > #prefix then
-        local baseJob = job:sub(#prefix + 1)
+    if prefix ~= '' then
+        local baseJob = resolveBaseJobName(job, prefix)
         for i = 1, #allowed do
             if normalizeJobName(allowed[i]) == baseJob then
                 return true

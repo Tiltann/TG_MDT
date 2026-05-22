@@ -97,6 +97,60 @@ end
 
 local allowedJobsCache = nil
 
+---@param value any
+---@return string
+local function normalizeJobToken(value)
+    if type(value) ~= 'string' then
+        return ''
+    end
+
+    return string.lower((value:gsub('^%s+', ''):gsub('%s+$', '')))
+end
+
+---@param jobName string
+---@param prefix string
+---@return string
+local function resolveBaseJobName(jobName, prefix)
+    local normalized = normalizeJobToken(jobName)
+    local normalizedPrefix = normalizeJobToken(prefix)
+    if normalized == '' then
+        return ''
+    end
+
+    if normalizedPrefix == '' then
+        normalizedPrefix = 'off'
+    end
+
+    local candidates = {}
+
+    if #normalized > #normalizedPrefix and normalized:sub(1, #normalizedPrefix) == normalizedPrefix then
+        candidates[#candidates + 1] = normalized:sub(#normalizedPrefix + 1)
+    end
+
+    if #normalized > #normalizedPrefix and normalized:sub(-#normalizedPrefix) == normalizedPrefix then
+        candidates[#candidates + 1] = normalized:sub(1, #normalized - #normalizedPrefix)
+    end
+
+    local offPrefixCandidate = normalized:match('^off[_%-]?(.*)$')
+    if type(offPrefixCandidate) == 'string' and offPrefixCandidate ~= '' then
+        candidates[#candidates + 1] = offPrefixCandidate
+    end
+
+    local offSuffixCandidate = normalized:match('^(.*)[_%-]?off$')
+    if type(offSuffixCandidate) == 'string' and offSuffixCandidate ~= '' then
+        candidates[#candidates + 1] = offSuffixCandidate
+    end
+
+    for i = 1, #candidates do
+        local candidate = normalizeJobToken(candidates[i])
+        if candidate ~= '' then
+            return candidate
+        end
+    end
+
+    return ''
+end
+
 ---@param src number
 ---@return string[]
 local function buildSourceIdentifierCandidates(src)
@@ -309,8 +363,8 @@ local function hasAccess(src)
 
     local dutyCfg = Config and Config.MDT and Config.MDT.duty or {}
     local prefix = type(dutyCfg.offduty_job_prefix) == 'string' and string.lower((dutyCfg.offduty_job_prefix:gsub('^%s+', ''):gsub('%s+$', ''))) or 'off'
-    if prefix ~= '' and job:sub(1, #prefix) == prefix and #job > #prefix then
-        local baseJob = job:sub(#prefix + 1)
+    if prefix ~= '' then
+        local baseJob = resolveBaseJobName(job, prefix)
         if baseJob ~= '' and allowedJobsCache[baseJob] == true then
             return true
         end
@@ -349,8 +403,8 @@ local function normalizeScopeJobName(value)
 
     local dutyCfg = Config and Config.MDT and Config.MDT.duty or {}
     local prefix = normalizeBossJobName(dutyCfg.offduty_job_prefix)
-    if prefix ~= '' and normalized:sub(1, #prefix) == prefix and #normalized > #prefix then
-        local base = normalized:sub(#prefix + 1)
+    if prefix ~= '' then
+        local base = resolveBaseJobName(normalized, prefix)
         if base ~= '' then
             return base
         end
