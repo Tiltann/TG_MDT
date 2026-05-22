@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -151,6 +151,19 @@ export function DashboardView({
   );
 
   const [chatDraft, setChatDraft] = useState("");
+  const [currentTime, setCurrentTime] = useState("");
+
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      setCurrentTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+    };
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSendChat = () => {
     if (!onSendChat) return;
@@ -242,7 +255,7 @@ export function DashboardView({
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/5 bg-white/5 px-3 py-1 text-[10px]  font-semibold text-zinc-300 shadow-md">
                 <Clock3 className="h-3 w-3 text-zinc-400" />
-                {branding.timeLabel || t("tablet.topbar.date_fallback")}
+                {currentTime || branding.timeLabel || t("tablet.topbar.date_fallback")}
               </div>
             </div>
           </div>
