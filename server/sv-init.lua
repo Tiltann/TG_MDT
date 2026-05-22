@@ -1252,6 +1252,8 @@ local function ensureReportTables()
         )
     ]], {})
 
+end
+
 
 local function trimString(value)
     if type(value) ~= 'string' then
