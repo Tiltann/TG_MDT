@@ -1576,6 +1576,12 @@ lib.callback.register('TG_MDT:setDispatchStatus', function(src, payload)
         return false
     end
 
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then
+            return false
+        end
+    end
+
     local body = type(payload) == 'table' and payload or {}
     local status = type(body.status) == 'string' and body.status or ''
     if status == '' then
@@ -1774,6 +1780,9 @@ local function getDispatchHistorySnapshot(viewerSrc)
     return list
 end
 
+TG_MDT_InternalGetDispatchCallsSnapshot = getDispatchCallsSnapshot
+TG_MDT_InternalGetDispatchHistorySnapshot = getDispatchHistorySnapshot
+
 local function broadcastDispatchState()
     local players = GetPlayers()
     for i = 1, #players do
@@ -1797,6 +1806,10 @@ local function broadcastDispatchHistory()
 end
 
 local function createDispatchCall(payload, creatorSrc)
+    if DispatchModule and type(DispatchModule.enrichPayload) == 'function' then
+        payload = DispatchModule.enrichPayload(payload, creatorSrc)
+    end
+
     local title = type(payload.title) == 'string' and payload.title or ''
     if title == '' then
         return nil, 'missing_title'
@@ -1879,13 +1892,35 @@ local function createDispatchCall(payload, creatorSrc)
     end
 
     dispatchCalls[id] = call
+
+    if DispatchModule then
+        if type(DispatchModule.persistOpenCall) == 'function' then
+            DispatchModule.persistOpenCall(call, creatorSrc)
+        end
+        if type(DispatchModule.logAction) == 'function' then
+            DispatchModule.logAction(call.id, 'created', creatorSrc, {
+                title = call.title,
+                location = call.location,
+                priority = call.priority,
+            })
+        end
+    end
+
     broadcastDispatchState()
     return call, nil
 end
 
+TG_MDT_InternalCreateDispatch = createDispatchCall
+
 lib.callback.register('TG_MDT:createDispatch', function(src, payload)
     if not hasAccess(src) then
         return { ok = false }
+    end
+
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then
+            return { ok = false, reason = 'dispatch_disabled' }
+        end
     end
 
     local body = type(payload) == 'table' and payload or {}
@@ -1902,6 +1937,11 @@ lib.callback.register('TG_MDT:getDispatchState', function(src)
     if not hasAccess(src) then
         return {}
     end
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then
+            return {}
+        end
+    end
     return getDispatchCallsSnapshot(src)
 end)
 
@@ -1909,11 +1949,19 @@ lib.callback.register('TG_MDT:getDispatchHistory', function(src)
     if not hasAccess(src) then
         return {}
     end
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then
+            return {}
+        end
+    end
     return getDispatchHistorySnapshot(src)
 end)
 
 lib.callback.register('TG_MDT:assignDispatchUnit', function(src, payload)
     if not hasAccess(src) then return false end
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then return false end
+    end
     local body = type(payload) == 'table' and payload or {}
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
     local call = dispatchCalls[dispatchId]
@@ -1928,12 +1976,23 @@ lib.callback.register('TG_MDT:assignDispatchUnit', function(src, payload)
 
     upsertUnit(call, unit)
     call.updatedAt = nowIsoUtc()
+
+    if DispatchModule and type(DispatchModule.logAction) == 'function' then
+        DispatchModule.logAction(dispatchId, 'assign_unit', src, {
+            unitId = unit.id,
+            unitName = unit.name,
+        })
+    end
+
     broadcastDispatchState()
     return true
 end)
 
 lib.callback.register('TG_MDT:unassignDispatchUnit', function(src, payload)
     if not hasAccess(src) then return false end
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then return false end
+    end
     local body = type(payload) == 'table' and payload or {}
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
     local unitId = type(body.unitId) == 'string' and body.unitId or ''
@@ -1942,12 +2001,22 @@ lib.callback.register('TG_MDT:unassignDispatchUnit', function(src, payload)
 
     removeUnit(call, unitId)
     call.updatedAt = nowIsoUtc()
+
+    if DispatchModule and type(DispatchModule.logAction) == 'function' then
+        DispatchModule.logAction(dispatchId, 'unassign_unit', src, {
+            unitId = unitId,
+        })
+    end
+
     broadcastDispatchState()
     return true
 end)
 
 lib.callback.register('TG_MDT:assignDispatchVehicle', function(src, payload)
     if not hasAccess(src) then return false end
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then return false end
+    end
     local body = type(payload) == 'table' and payload or {}
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
     local call = dispatchCalls[dispatchId]
@@ -1961,12 +2030,23 @@ lib.callback.register('TG_MDT:assignDispatchVehicle', function(src, payload)
 
     upsertVehicle(call, vehicle)
     call.updatedAt = nowIsoUtc()
+
+    if DispatchModule and type(DispatchModule.logAction) == 'function' then
+        DispatchModule.logAction(dispatchId, 'assign_vehicle', src, {
+            plate = vehicle.plate,
+            model = vehicle.model,
+        })
+    end
+
     broadcastDispatchState()
     return true
 end)
 
 lib.callback.register('TG_MDT:unassignDispatchVehicle', function(src, payload)
     if not hasAccess(src) then return false end
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then return false end
+    end
     local body = type(payload) == 'table' and payload or {}
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
     local plate = type(body.plate) == 'string' and body.plate or ''
@@ -1975,6 +2055,13 @@ lib.callback.register('TG_MDT:unassignDispatchVehicle', function(src, payload)
 
     removeVehicle(call, plate)
     call.updatedAt = nowIsoUtc()
+
+    if DispatchModule and type(DispatchModule.logAction) == 'function' then
+        DispatchModule.logAction(dispatchId, 'unassign_vehicle', src, {
+            plate = plate,
+        })
+    end
+
     broadcastDispatchState()
     return true
 end)
@@ -1986,6 +2073,9 @@ lib.callback.register('TG_MDT:acceptDispatchCase', function(src, payload)
     local call = dispatchCalls[dispatchId]
     if not call or not canViewDispatchCall(src, call) then return false end
 
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then return false end
+    end
     local officer = getDispatchOfficerFromSource(src)
     upsertUnit(call, officer)
 
@@ -2017,12 +2107,22 @@ lib.callback.register('TG_MDT:acceptDispatchCase', function(src, payload)
         end
     end
 
+    if DispatchModule and type(DispatchModule.logAction) == 'function' then
+        DispatchModule.logAction(dispatchId, 'accepted', src, {
+            officerId = officer.id,
+            officerName = officer.name,
+        })
+    end
+
     broadcastDispatchState()
     return true
 end)
 
 lib.callback.register('TG_MDT:closeDispatchCase', function(src, payload)
     if not hasAccess(src) then return false end
+    if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
+        if not DispatchModule.isDispatchEnabledForSource(src) then return false end
+    end
     local body = type(payload) == 'table' and payload or {}
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
     local call = dispatchCalls[dispatchId]
@@ -2058,6 +2158,19 @@ lib.callback.register('TG_MDT:closeDispatchCase', function(src, payload)
     end
 
     dispatchCalls[dispatchId] = nil
+
+    if DispatchModule then
+        if type(DispatchModule.persistClosedCall) == 'function' then
+            DispatchModule.persistClosedCall(historyEntry, src)
+        end
+        if type(DispatchModule.logAction) == 'function' then
+            DispatchModule.logAction(dispatchId, 'closed', src, {
+                closedBy = historyEntry.closedBy,
+                acceptedBy = historyEntry.acceptedBy,
+            })
+        end
+    end
+
     broadcastDispatchState()
     broadcastDispatchHistory()
     return true

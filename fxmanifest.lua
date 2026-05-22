@@ -19,13 +19,13 @@ shared_scripts {
     'shared/framework/qbcore.lua',
     'shared/framework/qbox.lua',
     'shared/framework/standalone.lua',
-    'shared/exports.lua',
 }
 
 client_scripts {
     'client/nui.lua',
     'client/init.lua',
     'client/modules/*.lua',
+    'client/exports.lua',
 }
 
 server_scripts {
@@ -35,6 +35,8 @@ server_scripts {
     'server/updater.lua',
     'server/duty.lua',
     'server/init.lua',
+    'server/modules/*.lua',
+    'server/exports.lua',
 }
 
 ui_page 'web/dist/index.html'

@@ -660,6 +660,28 @@ function normalizeScreenId(screen?: string | null): string | null {
   return screen === "shifts" ? "chat" : screen;
 }
 
+function buildEffectiveModules(modules?: Record<string, boolean>): Record<string, boolean> {
+  const resolved = { ...(modules || {}) };
+  const tabletEnabled = resolved.tablet !== false;
+  const coupledEnabled = tabletEnabled && resolved.dispatch !== false && resolved.livemap !== false;
+
+  resolved.dispatch = coupledEnabled;
+  resolved.livemap = coupledEnabled;
+
+  return resolved;
+}
+
+function resolveAllowedScreen(screen: string | null, modules: Record<string, boolean>): string | null {
+  const normalized = normalizeScreenId(screen);
+  if (!normalized) return null;
+
+  if ((normalized === "dispatch" || normalized === "livemap") && modules[normalized] === false) {
+    return "dashboard";
+  }
+
+  return normalized;
+}
+
 export default function Home({ devMode = false }: HomeProps) {
   const [isHandshakeDone, setHandshakeDone] = useState(true);
   const [isVisible, setVisible] = useState(devMode);
@@ -902,11 +924,11 @@ export default function Home({ devMode = false }: HomeProps) {
   useNuiEvent<NuiVisibilityPayload>("setVisible", (data) => {
     const nextVisible = Boolean(data?.visible);
     setVisible(nextVisible);
-    setActiveScreen(normalizeScreenId(data?.screen) ?? (nextVisible ? "tablet" : null));
+    setScreenSafe(normalizeScreenId(data?.screen) ?? (nextVisible ? "tablet" : null));
   });
 
   useNuiEvent<NuiScreenPayload>("setScreen", (data) => {
-    setActiveScreen(normalizeScreenId(data?.screen) ?? "tablet");
+    setScreenSafe(normalizeScreenId(data?.screen) ?? "tablet");
   });
 
   useNuiEvent<NuiDataPayload>("setData", (data) => {
@@ -923,7 +945,12 @@ export default function Home({ devMode = false }: HomeProps) {
 
   const meta = (screenData?.meta as any) || {};
   const typedMeta = meta as NuiMetaPayload;
-  const current_modules = typedMeta.modules || defaultMockupModules;
+  const current_modules = useMemo(
+    () => buildEffectiveModules((typedMeta.modules || defaultMockupModules) as Record<string, boolean>),
+    [typedMeta.modules]
+  );
+  const dispatchModuleEnabled = current_modules.dispatch !== false;
+  const livemapModuleEnabled = current_modules.livemap !== false;
   const allowMapStyleChange = Boolean(typedMeta.mdt?.allow_map_style_change);
   const baseMapStyle = normalizeMapStyle(typedMeta.mdt?.default_map_style);
   const chatAutoDeleteAfterMinutes = Number(typedMeta.mdt?.chat?.auto_delete_after_minutes ?? CHAT_AUTO_DELETE_DISABLED);
@@ -937,6 +964,17 @@ export default function Home({ devMode = false }: HomeProps) {
     (activeLocale === baseLocale ? typedMeta.translations : undefined) ||
     translationsByLocale.en ||
     typedMeta.translations;
+
+  const setScreenSafe = (nextScreen: string | null) => {
+    setActiveScreen(resolveAllowedScreen(nextScreen, current_modules));
+  };
+
+  useEffect(() => {
+    const next = resolveAllowedScreen(activeScreen, current_modules);
+    if (next !== activeScreen) {
+      setActiveScreen(next);
+    }
+  }, [activeScreen, current_modules]);
 
   useEffect(() => {
     const isOpen = isVisible || activeScreen !== null;
@@ -1458,6 +1496,7 @@ export default function Home({ devMode = false }: HomeProps) {
   } as CSSProperties;
 
   const handleSetOwnDispatchStatus = (status: DispatchStatus) => {
+    if (!dispatchModuleEnabled) return;
     setDispatchStatuses((prev) => ({ ...prev, [currentOfficerId]: status }));
     fetchNui("setDispatchStatus", { status }).catch(() => null);
   };
@@ -1469,10 +1508,11 @@ export default function Home({ devMode = false }: HomeProps) {
   }, [currentOfficerId, dispatchDefaultStatus, dispatchOffDutyStatus, dispatchStatuses, dutyState?.onDuty]);
 
   useEffect(() => {
+    if (!dispatchModuleEnabled) return;
     const status = dispatchStatuses[currentOfficerId];
     if (!status) return;
     fetchNui("setDispatchStatus", { status }).catch(() => null);
-  }, [currentOfficerId, dispatchStatuses]);
+  }, [currentOfficerId, dispatchModuleEnabled, dispatchStatuses]);
 
   const handleCreateDispatchGroup = (name: string, memberIds: string[]) => {
     const trimmed = name.trim();
@@ -1700,7 +1740,7 @@ export default function Home({ devMode = false }: HomeProps) {
     }
 
     setGlobalSearch(selected.query);
-    setActiveScreen(selected.targetScreen);
+    setScreenSafe(selected.targetScreen);
   };
 
   const handleSearchSubmit = () => {
@@ -1900,8 +1940,8 @@ export default function Home({ devMode = false }: HomeProps) {
               dutyState={dutyState}
               branding={branding}
               t={t}
-              onOpenProfile={() => setActiveScreen("profile")}
-              onScreenChange={(screen) => setActiveScreen(normalizeScreenId(screen))}
+              onOpenProfile={() => setScreenSafe("profile")}
+              onScreenChange={(screen) => setScreenSafe(normalizeScreenId(screen))}
             />
 
             {/* Main Content Area */}
@@ -1916,7 +1956,7 @@ export default function Home({ devMode = false }: HomeProps) {
                 onSearchSubmit={handleSearchSubmit}
                 dutyState={dutyState}
                 dispatchStatus={currentDispatchStatus}
-                dispatchStatusOptions={dispatchStatusOptions}
+                dispatchStatusOptions={dispatchModuleEnabled ? dispatchStatusOptions : []}
                 onDispatchStatusChange={handleSetOwnDispatchStatus}
                 isDutyBusy={isDutyBusy}
                 onToggleDuty={handleToggleDuty}
@@ -1944,7 +1984,7 @@ export default function Home({ devMode = false }: HomeProps) {
                       onSendChat={sendChatMessage}
                       onTakeBoardImage={captureBoardImage}
                       onCreateBoardPost={createBoardPost}
-                      onShortcutNavigate={(screen) => setActiveScreen(normalizeScreenId(screen))}
+                      onShortcutNavigate={(screen) => setScreenSafe(normalizeScreenId(screen))}
                       t={t}
                     />
                   )}
@@ -1969,7 +2009,7 @@ export default function Home({ devMode = false }: HomeProps) {
                       onCapturePhoto={captureProfilePhoto}
                     />
                   )}
-                  {activeScreen === "dispatch" && (
+                  {activeScreen === "dispatch" && dispatchModuleEnabled && (
                     <DispatchView
                       t={t}
                       vehicles={vehiclesData}
@@ -2051,7 +2091,7 @@ export default function Home({ devMode = false }: HomeProps) {
                       onDelete={deleteBolo}
                     />
                   )}
-                  {activeScreen === "livemap" && <LiveMapView t={t} />}
+                  {activeScreen === "livemap" && livemapModuleEnabled && <LiveMapView t={t} />}
                   {activeScreen === "settings" && (
                     <SettingsView
                       t={t}

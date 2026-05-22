@@ -545,6 +545,28 @@ function TG_MDT_sendInitialState()
 		end
 	end
 
+	if DispatchClient and type(DispatchClient.getModuleState) == 'function' then
+		local agencyModules = DispatchClient.getModuleState() or {}
+		if type(agencyModules.dispatch) == 'boolean' then
+			modules_flat.dispatch = agencyModules.dispatch
+		end
+		if type(agencyModules.livemap) == 'boolean' then
+			modules_flat.livemap = agencyModules.livemap
+		end
+	else
+		local okModules, agencyModules = pcall(function()
+			return lib.callback.await('TG_MDT:getDispatchModuleState', false)
+		end)
+		if okModules and type(agencyModules) == 'table' then
+			if type(agencyModules.dispatch) == 'boolean' then
+				modules_flat.dispatch = agencyModules.dispatch
+			end
+			if type(agencyModules.livemap) == 'boolean' then
+				modules_flat.livemap = agencyModules.livemap
+			end
+		end
+	end
+
 	local akteModels = nil
 	if type(Config.AkteModels) == 'table' then
 		akteModels = {
@@ -650,23 +672,6 @@ end
 NUI.onReady(function()
 	Debug.debug('NUI ready signal — sending initial state')
 	TG_MDT_sendInitialState()
-end)
-
-exports('CreateDispatch', function(payload)
-	local body = type(payload) == 'table' and payload or {}
-	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:createDispatch', false, body)
-	end)
-
-	if not ok or type(result) ~= 'table' then
-		return nil
-	end
-
-	if result.ok ~= true then
-		return nil
-	end
-
-	return result.id
 end)
 
 -- Mark client as initialized so the tablet can be opened.

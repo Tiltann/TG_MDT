@@ -34,6 +34,10 @@ Config.MDT = {
             jobs = { 'police', 'sheriff' },
             logo_url = 'lspd.png',
             dispatch_notify_on_accept = true,
+            modules = {
+                dispatch = true,
+                livemap = true,
+            },
         },
         mdt = {
             label = 'DoJ',
@@ -42,6 +46,10 @@ Config.MDT = {
             logo_url = 'doj.png',
             shared_with = { 'police', 'sheriff' },
             dispatch_notify_on_accept = false,
+            modules = {
+                dispatch = true,
+                livemap = true,
+            },
         },
         mechanic = {
             label = 'Mechanics',
@@ -49,6 +57,10 @@ Config.MDT = {
             jobs = { 'mechanic' },
             logo_url = 'mechanic.png',
             dispatch_notify_on_accept = false,
+            modules = {
+                dispatch = true,
+                livemap = true,
+            },
         },
         ems = {
             label = 'EMS',
@@ -56,6 +68,10 @@ Config.MDT = {
             jobs = { 'ambulance' },
             logo_url = 'ems.png',
             dispatch_notify_on_accept = true,
+            modules = {
+                dispatch = true,
+                livemap = true,
+            },
         },
     },
 
