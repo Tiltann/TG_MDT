@@ -29,7 +29,24 @@ if IsDuplicityVersion() then
     ---@return string|nil
     function Framework.Server.getIdentifier(src)
         local player = ESX.GetPlayerFromId(src)
-        return player and player.identifier or nil
+        if not player then
+            return nil
+        end
+
+        if type(player.identifier) == 'string' and player.identifier ~= '' then
+            return player.identifier
+        end
+
+        if type(player.getIdentifier) == 'function' then
+            local ok, identifier = pcall(function()
+                return player.getIdentifier()
+            end)
+            if ok and type(identifier) == 'string' and identifier ~= '' then
+                return identifier
+            end
+        end
+
+        return nil
     end
 
     --- Send a notification to a player.
@@ -45,7 +62,24 @@ if IsDuplicityVersion() then
     ---@return string|nil
     function Framework.Server.getJob(src)
         local player = ESX.GetPlayerFromId(src)
-        return player and player.job.name or nil
+        if not player then
+            return nil
+        end
+
+        if type(player.job) == 'table' and type(player.job.name) == 'string' and player.job.name ~= '' then
+            return player.job.name
+        end
+
+        if type(player.getJob) == 'function' then
+            local ok, job = pcall(function()
+                return player.getJob()
+            end)
+            if ok and type(job) == 'table' and type(job.name) == 'string' and job.name ~= '' then
+                return job.name
+            end
+        end
+
+        return nil
     end
 
     --- Get normalized job details.
@@ -53,15 +87,32 @@ if IsDuplicityVersion() then
     ---@return table
     function Framework.Server.getJobData(src)
         local player = ESX.GetPlayerFromId(src)
-        if not player or type(player.job) ~= 'table' then
+        if not player then
+            return {}
+        end
+
+        local job = nil
+
+        if type(player.job) == 'table' then
+            job = player.job
+        elseif type(player.getJob) == 'function' then
+            local ok, resolved = pcall(function()
+                return player.getJob()
+            end)
+            if ok and type(resolved) == 'table' then
+                job = resolved
+            end
+        end
+
+        if type(job) ~= 'table' then
             return {}
         end
 
         return {
-            name = player.job.name,
-            grade = player.job.grade,
-            grade_name = player.job.grade_name,
-            onduty = player.job.onDuty ~= false,
+            name = job.name,
+            grade = job.grade,
+            grade_name = job.grade_name,
+            onduty = job.onDuty ~= false,
         }
     end
 

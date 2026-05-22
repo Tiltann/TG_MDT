@@ -193,6 +193,21 @@ local function resolveEsxJobFromDatabase(src)
                 if type(row) == 'table' then
                     break
                 end
+
+                local bareLicense = licensePart:gsub('^license:', '')
+                if bareLicense ~= '' then
+                    row = SQL.single([[
+                        SELECT u.job, u.job_grade, jg.name AS grade_name
+                        FROM users u
+                        LEFT JOIN job_grades jg ON jg.job_name = u.job AND jg.grade = u.job_grade
+                        WHERE u.identifier LIKE ?
+                        LIMIT 1
+                    ]], { ('%%' .. bareLicense .. '%%') })
+
+                    if type(row) == 'table' then
+                        break
+                    end
+                end
             end
         end
     end
@@ -231,12 +246,19 @@ local function resolveAccessJobName(src)
 
     if type(Framework.Server.getPlayer) == 'function' then
         local okPlayer, player = pcall(Framework.Server.getPlayer, src)
-        if okPlayer and type(player) == 'table' then
+        if okPlayer and player then
             local rawJob = nil
             if type(player.job) == 'table' then
                 rawJob = player.job
             elseif type(player.PlayerData) == 'table' and type(player.PlayerData.job) == 'table' then
                 rawJob = player.PlayerData.job
+            elseif type(player.getJob) == 'function' then
+                local okGetJob, resolvedJob = pcall(function()
+                    return player.getJob()
+                end)
+                if okGetJob and type(resolvedJob) == 'table' then
+                    rawJob = resolvedJob
+                end
             end
 
             if type(rawJob) == 'table' and type(rawJob.name) == 'string' and rawJob.name ~= '' then
@@ -1521,6 +1543,15 @@ local function getPersonsFromFramework(src)
             ORDER BY lastname ASC, firstname ASC
         ]], {})
 
+        if #rows == 0 then
+            -- Fallback for ESX schemas without jobs/job_grades joins or partial user columns.
+            rows = SQL.query([[
+                SELECT identifier, firstname, lastname, dateofbirth, sex, job, job_grade
+                FROM users
+                ORDER BY identifier ASC
+            ]], {})
+        end
+
         local persons = {}
         for i = 1, #rows do
             local row = rows[i]
@@ -1657,6 +1688,15 @@ local function getVehiclesFromFramework(src)
             LEFT JOIN users u ON u.identifier = ov.owner
             ORDER BY ov.plate ASC
         ]], {})
+
+        if #rows == 0 then
+            -- Fallback for ESX schemas where owner join is unavailable.
+            rows = SQL.query([[
+                SELECT plate, owner, vehicle
+                FROM owned_vehicles
+                ORDER BY plate ASC
+            ]], {})
+        end
 
         local vehicles = {}
         for i = 1, #rows do
