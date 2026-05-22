@@ -85,7 +85,7 @@ type NuiMetaPayload = {
         jobs?: string[];
         agencies?: string[];
         departments?: string[];
-        color?: "green" | "blue" | "yellow" | "purple" | "gray" | "red";
+        color?: string;
       }>;
     };
   };
@@ -486,7 +486,7 @@ const DEV_META: NuiMetaPayload = {
       off_duty_status: "10-7",
       status_codes: [
         { code: "10-8", label_key: "tablet.dispatch.status.10-8", label: "Available", color: "green" },
-        { code: "10-6", label_key: "tablet.dispatch.status.10-6", label: "Busy", color: "yellow" },
+        { code: "10-6", label_key: "tablet.dispatch.status.10-6", label: "Busy", color: "#f59e0b" },
         { code: "10-97", label_key: "tablet.dispatch.status.10-97", label: "On Scene", color: "blue" },
         { code: "10-7", label_key: "tablet.dispatch.status.10-7", label: "Out of Service", color: "gray" },
       ],

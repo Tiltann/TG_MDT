@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import Modal from "../ui/modal";
@@ -14,7 +15,7 @@ export type DispatchStatus = string;
 export type DispatchStatusOption = {
   code: string;
   label: string;
-  color?: "green" | "blue" | "yellow" | "purple" | "gray" | "red";
+  color?: string;
 };
 
 export type DispatchOfficer = {
@@ -67,6 +68,38 @@ function statusBadgeClass(color?: DispatchStatusOption["color"]): string {
   if (color === "purple") return "bg-violet-500/20 text-violet-300 border-violet-500/40";
   if (color === "gray") return "bg-zinc-500/20 text-zinc-300 border-zinc-500/40";
   return "bg-red-500/20 text-red-300 border-red-500/40";
+}
+
+function normalizeHexColor(color?: string): string | null {
+  if (typeof color !== "string") return null;
+  const trimmed = color.trim();
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed)) {
+    return trimmed;
+  }
+  return null;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const raw = hex.replace("#", "");
+  const expanded = raw.length === 3
+    ? raw.split("").map((part) => part + part).join("")
+    : raw;
+
+  const r = Number.parseInt(expanded.slice(0, 2), 16);
+  const g = Number.parseInt(expanded.slice(2, 4), 16);
+  const b = Number.parseInt(expanded.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function statusBadgeStyle(color?: DispatchStatusOption["color"]): CSSProperties | undefined {
+  const hex = normalizeHexColor(color);
+  if (!hex) return undefined;
+
+  return {
+    color: hex,
+    borderColor: hexToRgba(hex, 0.45),
+    backgroundColor: hexToRgba(hex, 0.18),
+  };
 }
 
 export default function DispatchView({
@@ -441,7 +474,10 @@ export default function DispatchView({
                         {showSharedJobLabel && officer.jobLabel ? officer.jobLabel : (officer.gradeDisplay || "Officer")}
                       </p>
                     </div>
-                    <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-wide ${statusBadgeClass(resolveStatusColor(officer.status))}`}>
+                    <span
+                      className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-wide ${statusBadgeClass(resolveStatusColor(officer.status))}`}
+                      style={statusBadgeStyle(resolveStatusColor(officer.status))}
+                    >
                       {officer.status} - {resolveStatusLabel(officer.status)}
                     </span>
                   </div>

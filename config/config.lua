@@ -182,7 +182,7 @@ Config.MDT = {
         --   jobs     = { 'police', 'sheriff' }   -- only these jobs can use/see this status
         --   agencies = { 'pd', 'ems' }           -- only these department keys can use/see this status
         -- If both are set, both conditions must match.
-        -- color supports: green, blue, yellow, purple, gray, red
+        -- color supports: green, blue, yellow, purple, gray, red, or hex like '#ff6b00'
         status_codes = {
             { code = '10-8', label_key = 'tablet.dispatch.status.10-8', label = 'Available', color = 'green' },
             { code = '10-6', label_key = 'tablet.dispatch.status.10-6', label = 'Busy', color = 'yellow' },

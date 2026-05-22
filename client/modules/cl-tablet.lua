@@ -26,7 +26,27 @@ local function notifyUser(message, level)
         return
     end
 
+    pcall(function()
+        TriggerEvent('chat:addMessage', {
+            color = { 255, 255, 255 },
+            args = { 'TG_MDT', message },
+        })
+    end)
+
     Debug.warn(('notifyUser fallback: %s'):format(message))
+end
+
+local pendingOpenAfterInit = false
+local loadingNoticeCooldownUntil = 0
+
+local function notifyLoadingState()
+    local now = GetGameTimer()
+    if now < loadingNoticeCooldownUntil then
+        return
+    end
+
+    loadingNoticeCooldownUntil = now + 3500
+    notifyUser('Tablet is still loading, please wait...', 'inform')
 end
 
 --- Return the local job name in lowercase, if available.
@@ -115,7 +135,8 @@ end
 --- Open/toggle tablet only if player has an allowed job.
 local function toggleTablet()
     if not TG_MDT_CLIENT_INITIALIZED then
-        notifyUser('MDT is still loading, please wait a moment.', 'inform')
+        pendingOpenAfterInit = true
+        notifyLoadingState()
         return
     end
 
@@ -167,6 +188,17 @@ local function toggleTablet()
     })
     Debug.debug('toggleTablet: session payload sent to NUI')
 end
+
+CreateThread(function()
+    while true do
+        if pendingOpenAfterInit and TG_MDT_CLIENT_INITIALIZED then
+            pendingOpenAfterInit = false
+            toggleTablet()
+        end
+
+        Wait(250)
+    end
+end)
 
 local OPEN_COMMAND = (Config.Commands and Config.Commands.open_mdt) or 'mdt'
 if type(OPEN_COMMAND) ~= 'string' or OPEN_COMMAND == '' then

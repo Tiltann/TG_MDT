@@ -18,19 +18,46 @@ Entwickelt als **Community-Projekt** von Mitgliedern des Tubehosting Discord. **
 
 Ein Tablet ingame, das jede Fraktion bekommt. Jede Fraktion sieht nur ihre eigenen Sachen, kann aber je nach Rechten auch auf andere Daten zugreifen.
 
-### Features (geplant)
+### Feature-Status (aktuell)
 
-- 🔐 **Login** per Charakter
-- 📊 **Dashboard** mit eigenen Einsätzen, News und Statusübersicht
-- 👤 **Personenakte** — Suche nach Name, ID oder Kennzeichen inkl. Foto, Strafregister, Krankenakte, Führerscheine, Waffenschein
-- 🚗 **Fahrzeugakte** — Halter, Versicherung, Vermerke, Status
-- 📝 **Berichte** schreiben und abrufen (Einsatz, Strafanzeige, Behandlung — je nach Fraktion)
-- ⚖️ **Strafkatalog / Bußgeldkatalog** mit direkter Ausstellung
-- 🗺️ **Live-Map** mit Kollegen und Markern (Einsatzorte, POIs)
-- 📡 **Funk** zwischen Mitgliedern
-- 💬 **Live-Chat** für direkte Kommunikation im MDT
-- 🛠️ **Admin- / Leitungsbereich** — Mitglieder, Ränge, Rechte verwalten
-- 🔔 **Benachrichtigungen** (neuer Einsatz, neue Akte, etc.)
+- [ ] 🔐 **Login** per Charakter
+- [x] 📊 **Dashboard** mit Status-/Aktivitätsübersicht
+- [x] 👤 **Personenakte** (modellbasiert, mit Bild/Notizen)
+- [x] 🚗 **Fahrzeugakte** (modellbasiert, inkl. Halter-/Statusdaten)
+- [ ] 📝 **Berichte** (vollständiger Workflow)
+- [ ] ⚖️ **Strafkatalog / Bußgeldkatalog** (vollständiger Workflow)
+- [x] 🗺️ **Live-Map** (Tile-basiert, modulabhängig)
+- [x] 📡 **Funk-Mitglieder-Sync** im Tablet
+- [x] 💬 **Live-Chat** im MDT
+- [ ] 🛠️ **Admin- / Leitungsbereich** (Ränge/Rechte-Management)
+- [x] 🔔 **Benachrichtigungen**
+- [x] 🧭 **Dispatch-System** (Live Calls, Zuweisungen, Verlauf/Logs)
+- [x] 🧱 **Fraktions-/Agency-Module** (Dispatch/Livemap pro Department steuerbar)
+- [x] 🕒 **Duty-System** (Framework-Bridge + Statuswechsel)
+
+### Schnellstart (Server)
+
+1. Resource sicherstellen: `ensure TG_MDTT`
+2. Web bauen:
+    ```bash
+    cd web && bun install && bun run build
+    ```
+3. DB-Migrationen sind im Script enthalten (Dispatch-Tabellen werden beim Start angelegt).
+4. Öffnen im Spiel mit `/mdt` (oder Keybind aus `config/commands.lua`, Standard: `F6`).
+
+Hinweis: Wenn ein Spieler `/mdt` zu früh nach Resource-Restart nutzt, erscheint ein "Tablet lädt noch"-Hinweis. Der Open-Versuch wird vorgemerkt und nach Client-Init automatisch ausgeführt.
+
+### Dispatch-Konfig-Highlights
+
+- `share_between_jobs` unterstützt:
+   - `'all'`
+   - flache Gruppe: `{ 'police', 'sheriff' }`
+   - mehrere Gruppen: `{ { 'pd' }, { 'ems', 'mechanic' } }`
+   - Jobs **und** Department-Keys (Agencies) aus `Config.MDT.departments`
+- `status_codes` unterstützt:
+   - `label_key` + optionales `label` fallback
+   - Scope je Status über `jobs = { ... }` und/oder `agencies = { ... }`
+   - Farben als Named Color **oder Hex** (z. B. `'#ff6b00'`)
 
 ### Design-Prinzipien
 
@@ -110,27 +137,45 @@ Built as a **community project** by members of the Tubehosting Discord. **Not of
 
 An in-game tablet that every faction gets. Each faction only sees its own stuff, but depending on permissions can also access other data.
 
-### Features (planned)
+### Feature Status (current)
 
-- 🔐 **Login** per character
-- 📊 **Dashboard** with own calls, news and status overview
-- 👤 **Person records** — search by name, ID or license plate, incl. photo, criminal record, medical record, driver's licenses, weapon license
-- 🚗 **Vehicle records** — owner, insurance, notes, status
-- 📝 **Reports** — create and retrieve (call reports, charges, treatment — per faction)
-- ⚖️ **Penalty / fine catalog** with direct issuance
-- 🗺️ **Live map** with colleagues and markers (incidents, POIs)
-- 📡 **Radio / internal chat** between members
-- 💬 **Live chat** for direct MDT communication
-- 🛠️ **Admin / leadership area** — manage members, ranks, permissions
-- 🔔 **Notifications** (new call, new record, etc.)
-- Weapon Register
-- Medical files?
-- Emergency Vehicles System?
-- Rank Management System
-- Licenses
-- Manhunts
-- Lawbook
-- Trainings?
+- [x] 📊 **Dashboard** with status/activity overview
+- [x] 👤 **Person records** (model-driven, photo/notes support)
+- [x] 🚗 **Vehicle records** (model-driven, owner/status fields)
+- [ ] 📝 **Reports** (full workflow)
+- [ ] ⚖️ **Penalty / fine catalog** (full workflow)
+- [x] 🗺️ **Live map** (tile-based, module-gated)
+- [x] 📡 **Radio member sync** inside tablet
+- [x] 💬 **Live chat** inside MDT
+- [ ] 🛠️ **Admin / leadership area** (rank/permission management)
+- [x] 🔔 **Notifications**
+- [x] 🧭 **Dispatch system** (live calls, assignment, history/log retrieval)
+- [x] 🧱 **Agency module controls** (dispatch/livemap per department)
+- [x] 🕒 **Duty system** (framework bridge + status handling)
+
+### Quick Start (server)
+
+1. Ensure the resource: `ensure TG_MDTT`
+2. Build web assets:
+    ```bash
+    cd web && bun install && bun run build
+    ```
+3. DB bootstrap is automatic for dispatch tables during startup.
+4. Open in-game with `/mdt` (or keybind from `config/commands.lua`, default: `F6`).
+
+Note: If a player runs `/mdt` too early after a resource restart, they now get a "tablet still loading" message. The open action is queued and auto-runs after client initialization.
+
+### Dispatch Config Highlights
+
+- `share_between_jobs` supports:
+   - `'all'`
+   - flat group: `{ 'police', 'sheriff' }`
+   - multi-group: `{ { 'pd' }, { 'ems', 'mechanic' } }`
+   - both job names and department keys (agencies) from `Config.MDT.departments`
+- `status_codes` supports:
+   - `label_key` with optional `label` fallback
+   - per-status scope via `jobs = { ... }` and/or `agencies = { ... }`
+   - named colors **and hex** (for example `'#ff6b00'`)
 
 ### Design principles
 
