@@ -11,6 +11,36 @@ Debug.debug(('Framework: %s'):format(Framework.name))
 
 TG_MDT_CLIENT_INITIALIZED = false
 
+local EVENT_SERVER_JOIN_RADIO = 'TG_MDT:server:joinRadioChannel'
+local EVENT_SERVER_LEAVE_RADIO = 'TG_MDT:server:leaveRadioChannel'
+local EVENT_CLIENT_UPDATE_RADIO_MEMBERS = 'TG_MDT:client:updateRadioMembers'
+local EVENT_CLIENT_AKTE_UPDATED = 'TG_MDT:akteUpdated'
+local EVENT_CLIENT_DUTY_STATE_CHANGED = 'TG_MDT:dutyStateChanged'
+local EVENT_CLIENT_DISPATCH_STATE_CHANGED = 'TG_MDT:dispatchStateChanged'
+local EVENT_CLIENT_DISPATCH_HISTORY_CHANGED = 'TG_MDT:dispatchHistoryChanged'
+
+local CALLBACK_TOGGLE_DUTY = 'TG_MDT:toggleDuty'
+local CALLBACK_SET_DUTY_STATE = 'TG_MDT:setDutyState'
+local CALLBACK_SET_DISPATCH_STATUS = 'TG_MDT:setDispatchStatus'
+local CALLBACK_GET_PERSONS = 'TG_MDT:getPersons'
+local CALLBACK_GET_VEHICLES = 'TG_MDT:getVehicles'
+local CALLBACK_GET_AKTE_BOOTSTRAP = 'TG_MDT:getAkteBootstrap'
+local CALLBACK_GET_DISPATCH_STATE = 'TG_MDT:getDispatchState'
+local CALLBACK_ASSIGN_DISPATCH_UNIT = 'TG_MDT:assignDispatchUnit'
+local CALLBACK_UNASSIGN_DISPATCH_UNIT = 'TG_MDT:unassignDispatchUnit'
+local CALLBACK_ASSIGN_DISPATCH_VEHICLE = 'TG_MDT:assignDispatchVehicle'
+local CALLBACK_UNASSIGN_DISPATCH_VEHICLE = 'TG_MDT:unassignDispatchVehicle'
+local CALLBACK_ACCEPT_DISPATCH_CASE = 'TG_MDT:acceptDispatchCase'
+local CALLBACK_CLOSE_DISPATCH_CASE = 'TG_MDT:closeDispatchCase'
+local CALLBACK_GET_AKTE_COMPARTMENTS = 'TG_MDT:getAkteCompartments'
+local CALLBACK_GET_PERSON_AKTE = 'TG_MDT:getPersonAkte'
+local CALLBACK_SAVE_PERSON_AKTE = 'TG_MDT:savePersonAkte'
+local CALLBACK_GET_VEHICLE_AKTE = 'TG_MDT:getVehicleAkte'
+local CALLBACK_SAVE_VEHICLE_AKTE = 'TG_MDT:saveVehicleAkte'
+local CALLBACK_REMOVE_AKTE_COMPARTMENT = 'TG_MDT:removeAkteCompartment'
+local CALLBACK_GET_DISPATCH_MODULE_STATE = 'TG_MDT:getDispatchModuleState'
+local CALLBACK_GET_DISPATCH_HISTORY = 'TG_MDT:getDispatchHistory'
+
 local function countKeys(value)
 	local total = 0
 	for _ in pairs(value or {}) do
@@ -181,7 +211,7 @@ end
 NUI.onCallback('toggleDuty', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:toggleDuty', false, payload)
+		return lib.callback.await(CALLBACK_TOGGLE_DUTY, false, payload)
 	end)
 	cb(ok and result or { onDuty = true })
 end)
@@ -189,7 +219,7 @@ end)
 NUI.onCallback('setDutyState', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:setDutyState', false, payload)
+		return lib.callback.await(CALLBACK_SET_DUTY_STATE, false, payload)
 	end)
 	cb(ok and result or { onDuty = true })
 end)
@@ -203,7 +233,7 @@ NUI.onCallback('setDispatchStatus', function(body, cb)
 	end
 
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:setDispatchStatus', false, { status = status })
+		return lib.callback.await(CALLBACK_SET_DISPATCH_STATUS, false, { status = status })
 	end)
 
 	cb({ ok = ok and result == true })
@@ -264,7 +294,7 @@ NUI.onCallback('joinRadioChannel', function(body, cb)
 		end)
 	end
 
-	TriggerServerEvent('TG_MDT:server:joinRadioChannel', freq)
+	TriggerServerEvent(EVENT_SERVER_JOIN_RADIO, freq)
 	cb({ ok = true, frequency = freq, system = system })
 end)
 
@@ -281,11 +311,11 @@ NUI.onCallback('leaveRadioChannel', function(_, cb)
 		end)
 	end
 
-	TriggerServerEvent('TG_MDT:server:leaveRadioChannel')
+	TriggerServerEvent(EVENT_SERVER_LEAVE_RADIO)
 	cb({ ok = true, frequency = '', system = system })
 end)
 
-RegisterNetEvent('TG_MDT:client:updateRadioMembers', function(members)
+RegisterNetEvent(EVENT_CLIENT_UPDATE_RADIO_MEMBERS, function(members)
 	NUI.send('setData', {
 		key = 'radioMembers',
 		value = members or {}
@@ -303,9 +333,9 @@ end)
 NUI.onCallback('getTabletBootstrap', function(_, cb)
 	local ok, result = pcall(function()
 		return {
-			persons = lib.callback.await('TG_MDT:getPersons', false),
-			vehicles = lib.callback.await('TG_MDT:getVehicles', false),
-			akteBootstrap = lib.callback.await('TG_MDT:getAkteBootstrap', false),
+			persons = lib.callback.await(CALLBACK_GET_PERSONS, false),
+			vehicles = lib.callback.await(CALLBACK_GET_VEHICLES, false),
+			akteBootstrap = lib.callback.await(CALLBACK_GET_AKTE_BOOTSTRAP, false),
 		}
 	end)
 
@@ -320,7 +350,7 @@ end)
 
 NUI.onCallback('getDispatchState', function(_, cb)
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:getDispatchState', false)
+		return lib.callback.await(CALLBACK_GET_DISPATCH_STATE, false)
 	end)
 	cb(ok and result or {})
 end)
@@ -328,7 +358,7 @@ end)
 NUI.onCallback('assignDispatchUnit', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:assignDispatchUnit', false, payload)
+		return lib.callback.await(CALLBACK_ASSIGN_DISPATCH_UNIT, false, payload)
 	end)
 	cb({ ok = ok and result == true })
 end)
@@ -336,7 +366,7 @@ end)
 NUI.onCallback('unassignDispatchUnit', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:unassignDispatchUnit', false, payload)
+		return lib.callback.await(CALLBACK_UNASSIGN_DISPATCH_UNIT, false, payload)
 	end)
 	cb({ ok = ok and result == true })
 end)
@@ -344,7 +374,7 @@ end)
 NUI.onCallback('assignDispatchVehicle', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:assignDispatchVehicle', false, payload)
+		return lib.callback.await(CALLBACK_ASSIGN_DISPATCH_VEHICLE, false, payload)
 	end)
 	cb({ ok = ok and result == true })
 end)
@@ -352,7 +382,7 @@ end)
 NUI.onCallback('unassignDispatchVehicle', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:unassignDispatchVehicle', false, payload)
+		return lib.callback.await(CALLBACK_UNASSIGN_DISPATCH_VEHICLE, false, payload)
 	end)
 	cb({ ok = ok and result == true })
 end)
@@ -360,7 +390,7 @@ end)
 NUI.onCallback('acceptDispatchCase', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:acceptDispatchCase', false, payload)
+		return lib.callback.await(CALLBACK_ACCEPT_DISPATCH_CASE, false, payload)
 	end)
 	cb({ ok = ok and result == true })
 end)
@@ -368,7 +398,7 @@ end)
 NUI.onCallback('closeDispatchCase', function(body, cb)
 	local payload = type(body) == 'table' and body or {}
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:closeDispatchCase', false, payload)
+		return lib.callback.await(CALLBACK_CLOSE_DISPATCH_CASE, false, payload)
 	end)
 	cb({ ok = ok and result == true })
 end)
@@ -378,7 +408,7 @@ NUI.onCallback('getAkteCompartments', function(body, cb)
 	local kind = type(payload.kind) == 'string' and payload.kind or ''
 	local value = type(payload.value) == 'string' and payload.value or ''
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:getAkteCompartments', false, kind, value)
+		return lib.callback.await(CALLBACK_GET_AKTE_COMPARTMENTS, false, kind, value)
 	end)
 	cb(ok and result or {})
 end)
@@ -388,7 +418,7 @@ NUI.onCallback('getPersonAkte', function(body, cb)
 	local identifier = type(payload.identifier) == 'string' and payload.identifier or ''
 	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:getPersonAkte', false, identifier, compartment)
+		return lib.callback.await(CALLBACK_GET_PERSON_AKTE, false, identifier, compartment)
 	end)
 	cb(ok and result or {})
 end)
@@ -399,7 +429,7 @@ NUI.onCallback('savePersonAkte', function(body, cb)
 	local akte = type(payload.akte) == 'table' and payload.akte or {}
 	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:savePersonAkte', false, identifier, akte, compartment)
+		return lib.callback.await(CALLBACK_SAVE_PERSON_AKTE, false, identifier, akte, compartment)
 	end)
 	cb(ok and result or {})
 end)
@@ -409,7 +439,7 @@ NUI.onCallback('getVehicleAkte', function(body, cb)
 	local plate = type(payload.plate) == 'string' and payload.plate or ''
 	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:getVehicleAkte', false, plate, compartment)
+		return lib.callback.await(CALLBACK_GET_VEHICLE_AKTE, false, plate, compartment)
 	end)
 	cb(ok and result or {})
 end)
@@ -420,7 +450,7 @@ NUI.onCallback('saveVehicleAkte', function(body, cb)
 	local akte = type(payload.akte) == 'table' and payload.akte or {}
 	local compartment = type(payload.compartment) == 'string' and payload.compartment or nil
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:saveVehicleAkte', false, plate, akte, compartment)
+		return lib.callback.await(CALLBACK_SAVE_VEHICLE_AKTE, false, plate, akte, compartment)
 	end)
 	cb(ok and result or {})
 end)
@@ -431,12 +461,12 @@ NUI.onCallback('removeAkteCompartment', function(body, cb)
 	local value = type(payload.value) == 'string' and payload.value or ''
 	local compartment = type(payload.compartment) == 'string' and payload.compartment or ''
 	local ok, result = pcall(function()
-		return lib.callback.await('TG_MDT:removeAkteCompartment', false, kind, value, compartment)
+		return lib.callback.await(CALLBACK_REMOVE_AKTE_COMPARTMENT, false, kind, value, compartment)
 	end)
 	cb({ ok = ok and result == true })
 end)
 
-RegisterNetEvent('TG_MDT:akteUpdated', function(payload)
+RegisterNetEvent(EVENT_CLIENT_AKTE_UPDATED, function(payload)
 	if type(payload) ~= 'table' then return end
 	
 	if type(payload.kind) ~= 'string' or (payload.kind ~= 'person' and payload.kind ~= 'vehicle') then
@@ -461,7 +491,7 @@ RegisterNetEvent('TG_MDT:akteUpdated', function(payload)
 	})
 end)
 
-RegisterNetEvent('TG_MDT:dutyStateChanged', function(payload)
+RegisterNetEvent(EVENT_CLIENT_DUTY_STATE_CHANGED, function(payload)
 	if type(payload) ~= 'table' then return end
 	NUI.send('setData', {
 		key = 'duty',
@@ -474,7 +504,7 @@ RegisterNetEvent('TG_MDT:dutyStateChanged', function(payload)
 	})
 end)
 
-RegisterNetEvent('TG_MDT:dispatchStateChanged', function(payload)
+RegisterNetEvent(EVENT_CLIENT_DISPATCH_STATE_CHANGED, function(payload)
 	if type(payload) ~= 'table' then return end
 	NUI.send('setData', {
 		key = 'dispatchState',
@@ -482,7 +512,7 @@ RegisterNetEvent('TG_MDT:dispatchStateChanged', function(payload)
 	})
 end)
 
-RegisterNetEvent('TG_MDT:dispatchHistoryChanged', function(payload)
+RegisterNetEvent(EVENT_CLIENT_DISPATCH_HISTORY_CHANGED, function(payload)
 	if type(payload) ~= 'table' then return end
 	NUI.send('setData', {
 		key = 'dispatchHistory',
@@ -555,7 +585,7 @@ function TG_MDT_sendInitialState()
 		end
 	else
 		local okModules, agencyModules = pcall(function()
-			return lib.callback.await('TG_MDT:getDispatchModuleState', false)
+			return lib.callback.await(CALLBACK_GET_DISPATCH_MODULE_STATE, false)
 		end)
 		if okModules and type(agencyModules) == 'table' then
 			if type(agencyModules.dispatch) == 'boolean' then
@@ -596,7 +626,7 @@ function TG_MDT_sendInitialState()
 	local activeSystem = getActiveVoiceSystem()
 	local activeFreq = getActiveRadioFrequency()
 	if activeFreq ~= '' then
-		TriggerServerEvent('TG_MDT:server:joinRadioChannel', activeFreq)
+		TriggerServerEvent(EVENT_SERVER_JOIN_RADIO, activeFreq)
 	end
 
 	NUI.send('setData', {
@@ -644,7 +674,7 @@ function TG_MDT_sendInitialState()
 	})
 
 	local okDispatch, dispatchState = pcall(function()
-		return lib.callback.await('TG_MDT:getDispatchState', false)
+		return lib.callback.await(CALLBACK_GET_DISPATCH_STATE, false)
 	end)
 	if okDispatch then
 		NUI.send('setData', {
@@ -654,7 +684,7 @@ function TG_MDT_sendInitialState()
 	end
 
 	local okDispatchHistory, dispatchHistory = pcall(function()
-		return lib.callback.await('TG_MDT:getDispatchHistory', false)
+		return lib.callback.await(CALLBACK_GET_DISPATCH_HISTORY, false)
 	end)
 	if okDispatchHistory then
 		NUI.send('setData', {

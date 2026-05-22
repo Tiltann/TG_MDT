@@ -5,9 +5,79 @@
 
 if Framework.name ~= 'qbcore' then return end
 
+local EVENT_OX_NOTIFY = 'ox_lib:notify'
+local QBCore = nil
+
+local function logQbExportMissing(context)
+    local message = table.concat({
+        '[TG_MDT] QBCore export missing on ' .. context .. '.',
+        'TG_MDT requires export-only QBCore integration.',
+        'Fix checklist:',
+        '1) Ensure your folder name is exactly: qb-core',
+        '   Example path: resources/[framework]/qb-core',
+        '2) Ensure server.cfg starts that exact resource name:',
+        '   ensure qb-core',
+        '3) Update QBCore to a build that exposes exports[\'qb-core\']:GetCoreObject()',
+    }, '\n')
+
+    Debug.error(message)
+end
+
+---@param context string
+---@return table|nil
+local function getQBCoreObject(context)
+    local ok, value = pcall(function()
+        return exports['qb-core']:GetCoreObject()
+    end)
+
+    if ok and type(value) == 'table' then
+        return value
+    end
+
+    logQbExportMissing(context)
+    return nil
+end
+
+---@param src number
+---@param msg string
+---@param notifyType string|nil
+---@return boolean
+local function notifyQBCore(src, msg, notifyType)
+    if not QBCore or not QBCore.Functions then
+        return false
+    end
+
+    local player = nil
+    if type(QBCore.Functions.GetPlayer) == 'function' then
+        player = QBCore.Functions.GetPlayer(src)
+    end
+
+    if player and player.Functions and type(player.Functions.Notify) == 'function' then
+        local ok = pcall(function()
+            player.Functions.Notify(msg, notifyType or 'primary')
+        end)
+
+        if ok then
+            return true
+        end
+    end
+
+    if type(QBCore.Functions.Notify) == 'function' then
+        local ok = pcall(function()
+            QBCore.Functions.Notify(src, msg, notifyType or 'primary')
+        end)
+
+        if ok then
+            return true
+        end
+    end
+
+    return false
+end
+
 -- ── server ────────────────────────────────────────────────
 if IsDuplicityVersion() then
-    local QBCore = exports['qb-core']:GetCoreObject()
+    QBCore = getQBCoreObject('server')
 
     Framework.Server = {}
 
@@ -15,12 +85,14 @@ if IsDuplicityVersion() then
     ---@param src number
     ---@return table|nil
     function Framework.Server.getPlayer(src)
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayer) ~= 'function' then return nil end
         return QBCore.Functions.GetPlayer(src)
     end
 
     --- Get all online players.
     ---@return table
     function Framework.Server.getPlayers()
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayers) ~= 'function' then return {} end
         return QBCore.Functions.GetPlayers()
     end
 
@@ -28,6 +100,7 @@ if IsDuplicityVersion() then
     ---@param src number
     ---@return string|nil
     function Framework.Server.getIdentifier(src)
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayer) ~= 'function' then return nil end
         local player = QBCore.Functions.GetPlayer(src)
         return player and player.PlayerData.citizenid or nil
     end
@@ -37,13 +110,20 @@ if IsDuplicityVersion() then
     ---@param msg string
     ---@param type string 'success' | 'error' | 'primary'
     function Framework.Server.notify(src, msg, type)
-        TriggerClientEvent('ox_lib:notify', src, { description = msg, type = type or 'inform' })
+        if notifyQBCore(src, msg, type) then
+            return
+        end
+
+        pcall(function()
+            TriggerClientEvent(EVENT_OX_NOTIFY, src, { description = msg, type = type or 'inform' })
+        end)
     end
 
     --- Get player job name.
     ---@param src number
     ---@return string|nil
     function Framework.Server.getJob(src)
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayer) ~= 'function' then return nil end
         local player = QBCore.Functions.GetPlayer(src)
         return player and player.PlayerData.job.name or nil
     end
@@ -52,6 +132,7 @@ if IsDuplicityVersion() then
     ---@param src number
     ---@return table
     function Framework.Server.getJobData(src)
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayer) ~= 'function' then return {} end
         local player = QBCore.Functions.GetPlayer(src)
         if not player or type(player.PlayerData) ~= 'table' then
             return {}
@@ -79,6 +160,7 @@ if IsDuplicityVersion() then
     ---@param value any
     ---@return boolean
     function Framework.Server.setPlayerState(src, key, value)
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayer) ~= 'function' then return false end
         local player = QBCore.Functions.GetPlayer(src)
         if not player or not player.Functions or type(player.Functions.SetMetaData) ~= 'function' then
             return false
@@ -96,6 +178,7 @@ if IsDuplicityVersion() then
     ---@param key string
     ---@return any
     function Framework.Server.getPlayerState(src, key)
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayer) ~= 'function' then return nil end
         local player = QBCore.Functions.GetPlayer(src)
         if not player or type(player.PlayerData) ~= 'table' then
             return nil
@@ -111,6 +194,7 @@ if IsDuplicityVersion() then
     ---@param grade number|string|nil
     ---@return boolean
     function Framework.Server.setJob(src, name, grade)
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayer) ~= 'function' then return false end
         local player = QBCore.Functions.GetPlayer(src)
         if not player or not player.Functions or type(player.Functions.SetJob) ~= 'function' then
             return false
@@ -128,6 +212,7 @@ if IsDuplicityVersion() then
     ---@param onDuty boolean
     ---@return boolean
     function Framework.Server.setJobDuty(src, onDuty)
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayer) ~= 'function' then return false end
         local player = QBCore.Functions.GetPlayer(src)
         if not player or not player.Functions then
             return false
@@ -150,7 +235,25 @@ if IsDuplicityVersion() then
 
 -- ── client ────────────────────────────────────────────────
 else
-    local QBCore = exports['qb-core']:GetCoreObject()
+    CreateThread(function()
+        local timeout_at = GetGameTimer() + 15000
+
+        while QBCore == nil and GetGameTimer() < timeout_at do
+            local status = GetResourceState('qb-core')
+            if status == 'started' or status == 'starting' then
+                QBCore = getQBCoreObject('client')
+                if QBCore ~= nil then
+                    break
+                end
+            end
+
+            Wait(500)
+        end
+
+        if QBCore == nil then
+            logQbExportMissing('client')
+        end
+    end)
 
     Framework.Client = {}
 
@@ -164,6 +267,9 @@ else
     --- Get the local player's data.
     ---@return table|nil
     function Framework.Client.getPlayerData()
+        if not QBCore or not QBCore.Functions or type(QBCore.Functions.GetPlayerData) ~= 'function' then
+            return nil
+        end
         return QBCore.Functions.GetPlayerData()
     end
 

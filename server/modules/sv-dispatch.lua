@@ -6,6 +6,12 @@
 
 DispatchModule = DispatchModule or {}
 
+local CALLBACK_GET_DISPATCH_MODULE_STATE = 'TG_MDT:getDispatchModuleState'
+local CALLBACK_GET_RUNNING_DISPATCHES = 'TG_MDT:getRunningDispatches'
+local CALLBACK_GET_DISPATCH_LOGS = 'TG_MDT:getDispatchLogs'
+local CALLBACK_GET_DISPATCH_DATA_BUNDLE = 'TG_MDT:getDispatchDataBundle'
+local EVENT_SERVER_CREATE_DISPATCH = 'TG_MDT:server:createDispatch'
+
 local function normalizeJobName(job)
     if type(job) ~= 'string' then
         return ''
@@ -540,7 +546,7 @@ local function getDispatchDataBundle(src, options)
     return bundle
 end
 
-lib.callback.register('TG_MDT:getDispatchModuleState', function(src)
+lib.callback.register(CALLBACK_GET_DISPATCH_MODULE_STATE, function(src)
     if not hasMdtAccess(src) then
         return { dispatch = false, livemap = false, reason = 'unauthorized' }
     end
@@ -548,7 +554,7 @@ lib.callback.register('TG_MDT:getDispatchModuleState', function(src)
     return DispatchModule.getModuleStateForSource(src)
 end)
 
-lib.callback.register('TG_MDT:getRunningDispatches', function(src)
+lib.callback.register(CALLBACK_GET_RUNNING_DISPATCHES, function(src)
     if not hasMdtAccess(src) then
         return {}
     end
@@ -560,7 +566,7 @@ lib.callback.register('TG_MDT:getRunningDispatches', function(src)
     return DispatchModule.getCurrentDispatches(src)
 end)
 
-lib.callback.register('TG_MDT:getDispatchLogs', function(src, options)
+lib.callback.register(CALLBACK_GET_DISPATCH_LOGS, function(src, options)
     if not hasMdtAccess(src) then
         return {}
     end
@@ -572,7 +578,7 @@ lib.callback.register('TG_MDT:getDispatchLogs', function(src, options)
     return DispatchModule.getDispatchLogs(options)
 end)
 
-lib.callback.register('TG_MDT:getDispatchDataBundle', function(src, options)
+lib.callback.register(CALLBACK_GET_DISPATCH_DATA_BUNDLE, function(src, options)
     if not hasMdtAccess(src) then
         return { running = {}, logs = {}, history = {} }
     end
@@ -584,7 +590,7 @@ lib.callback.register('TG_MDT:getDispatchDataBundle', function(src, options)
     return getDispatchDataBundle(src, options)
 end)
 
-RegisterNetEvent('TG_MDT:server:createDispatch', function(payload)
+RegisterNetEvent(EVENT_SERVER_CREATE_DISPATCH, function(payload)
     local src = source
     local result = DispatchModule.createFromExternal(src, payload)
     if result.ok ~= true then

@@ -6,6 +6,8 @@
 
 if Framework.name ~= 'standalone' then return end
 
+local EVENT_OX_NOTIFY = 'ox_lib:notify'
+
 Debug.warn('No framework detected — using standalone bridge. Implement stubs as needed.')
 
 -- ── server ────────────────────────────────────────────────
@@ -40,7 +42,20 @@ if IsDuplicityVersion() then
     ---@param msg string
     ---@param type string
     function Framework.Server.notify(src, msg, type)
-        TriggerClientEvent('ox_lib:notify', src, { description = msg, type = type or 'inform' })
+        local ok = pcall(function()
+            TriggerClientEvent(EVENT_OX_NOTIFY, src, { description = msg, type = type or 'inform' })
+        end)
+
+        if ok then
+            return
+        end
+
+        pcall(function()
+            TriggerClientEvent('chat:addMessage', src, {
+                color = { 255, 255, 255 },
+                args = { 'TG_MDT', msg },
+            })
+        end)
     end
 
     ---@param src number

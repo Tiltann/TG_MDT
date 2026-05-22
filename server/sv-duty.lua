@@ -7,6 +7,13 @@ Duty = Duty or {}
 
 local DUTY_KEY_DEFAULT = 'tg_mdt_duty'
 local LAST_JOB_KEY_DEFAULT = 'tg_mdt_duty_last_job'
+local EVENT_DUTY_STATE_CHANGED = 'TG_MDT:dutyStateChanged'
+local EVENT_PLAYER_DROPPED = 'playerDropped'
+
+local CALLBACK_GET_DUTY_STATE = 'TG_MDT:getDutyState'
+local CALLBACK_SET_DUTY_STATE = 'TG_MDT:setDutyState'
+local CALLBACK_TOGGLE_DUTY = 'TG_MDT:toggleDuty'
+
 local DutyCache = {}
 local LastJobCache = {}
 
@@ -163,7 +170,7 @@ end
 ---@param src number
 ---@param state table
 local function pushState(src, state)
-    TriggerClientEvent('TG_MDT:dutyStateChanged', src, state)
+    TriggerClientEvent(EVENT_DUTY_STATE_CHANGED, src, state)
 end
 
 ---@param src number
@@ -269,7 +276,7 @@ local function hasAccess(src)
     return false
 end
 
-lib.callback.register('TG_MDT:getDutyState', function(src)
+lib.callback.register(CALLBACK_GET_DUTY_STATE, function(src)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized duty state access: Player %s'):format(src))
         return { enabled = false, onDuty = false, reason = 'unauthorized' }
@@ -278,7 +285,7 @@ lib.callback.register('TG_MDT:getDutyState', function(src)
     return Duty.getState(src)
 end)
 
-lib.callback.register('TG_MDT:setDutyState', function(src, payload)
+lib.callback.register(CALLBACK_SET_DUTY_STATE, function(src, payload)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized duty state change: Player %s'):format(src))
         return { enabled = false, onDuty = false, reason = 'unauthorized' }
@@ -296,7 +303,7 @@ lib.callback.register('TG_MDT:setDutyState', function(src, payload)
     return state
 end)
 
-lib.callback.register('TG_MDT:toggleDuty', function(src, payload)
+lib.callback.register(CALLBACK_TOGGLE_DUTY, function(src, payload)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized duty toggle: Player %s'):format(src))
         return { enabled = false, onDuty = false, reason = 'unauthorized' }
@@ -313,7 +320,7 @@ lib.callback.register('TG_MDT:toggleDuty', function(src, payload)
     return state
 end)
 
-AddEventHandler('playerDropped', function()
+AddEventHandler(EVENT_PLAYER_DROPPED, function()
     local src = source
     local cfg = getDutyConfig()
 

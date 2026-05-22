@@ -123,6 +123,14 @@ An in-game tablet that every faction gets. Each faction only sees its own stuff,
 - 💬 **Live chat** for direct MDT communication
 - 🛠️ **Admin / leadership area** — manage members, ranks, permissions
 - 🔔 **Notifications** (new call, new record, etc.)
+- Weapon Register
+- Medical files?
+- Emergency Vehicles System?
+- Rank Management System
+- Licenses
+- Manhunts
+- Lawbook
+- Trainings?
 
 ### Design principles
 

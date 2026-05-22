@@ -5,6 +5,8 @@
 
 DispatchClient = DispatchClient or {}
 
+local CALLBACK_GET_DISPATCH_MODULE_STATE = 'TG_MDT:getDispatchModuleState'
+
 local moduleStateCache = {
     dispatch = true,
     livemap = true,
@@ -13,7 +15,7 @@ local moduleStateCache = {
 ---@return table
 function DispatchClient.getModuleState()
     local ok, state = pcall(function()
-        return lib.callback.await('TG_MDT:getDispatchModuleState', false)
+        return lib.callback.await(CALLBACK_GET_DISPATCH_MODULE_STATE, false)
     end)
 
     if ok and type(state) == 'table' then

@@ -75,10 +75,10 @@ type NuiMetaPayload = {
       job_overrides?: Record<string, { title?: string; subtitle?: string; logo_url?: string }>;
     };
     dispatch?: {
-      share_between_jobs?: boolean;
+      share_between_jobs?: boolean | string | Array<string | string[]>;
       default_status?: string;
       off_duty_status?: string;
-      status_codes?: Array<{ code?: string; label?: string; color?: "green" | "blue" | "yellow" | "purple" | "gray" | "red" }>;
+      status_codes?: Array<{ code?: string; label_key?: string; label?: string; color?: "green" | "blue" | "yellow" | "purple" | "gray" | "red" }>;
     };
   };
   akteModels?: {
@@ -477,10 +477,10 @@ const DEV_META: NuiMetaPayload = {
       default_status: "10-8",
       off_duty_status: "10-7",
       status_codes: [
-        { code: "10-8", label: "Available", color: "green" },
-        { code: "10-6", label: "Busy", color: "yellow" },
-        { code: "10-97", label: "On Scene", color: "blue" },
-        { code: "10-7", label: "Off Duty", color: "gray" },
+        { code: "10-8", label_key: "tablet.dispatch.status.10-8", label: "Available", color: "green" },
+        { code: "10-6", label_key: "tablet.dispatch.status.10-6", label: "Busy", color: "yellow" },
+        { code: "10-97", label_key: "tablet.dispatch.status.10-97", label: "On Scene", color: "blue" },
+        { code: "10-7", label_key: "tablet.dispatch.status.10-7", label: "Out of Service", color: "gray" },
       ],
     },
   },
@@ -1252,22 +1252,28 @@ export default function Home({ devMode = false }: HomeProps) {
     const rawOptions = typedMeta.mdt?.dispatch?.status_codes;
     if (!Array.isArray(rawOptions) || rawOptions.length === 0) {
       return [
-        { code: "10-8", label: "Available", color: "green" },
-        { code: "10-6", label: "Busy", color: "yellow" },
-        { code: "10-97", label: "On Scene", color: "blue" },
-        { code: "10-23", label: "En Route", color: "blue" },
-        { code: "10-7", label: "Out of Service", color: "gray" },
+        { code: "10-8", label: t("tablet.dispatch.status.10-8", undefined, "Available"), color: "green" },
+        { code: "10-6", label: t("tablet.dispatch.status.10-6", undefined, "Busy"), color: "yellow" },
+        { code: "10-97", label: t("tablet.dispatch.status.10-97", undefined, "On Scene"), color: "blue" },
+        { code: "10-23", label: t("tablet.dispatch.status.10-23", undefined, "En Route"), color: "blue" },
+        { code: "10-7", label: t("tablet.dispatch.status.10-7", undefined, "Out of Service"), color: "gray" },
       ];
     }
 
     return rawOptions
-      .map((entry) => ({
-        code: typeof entry?.code === "string" ? entry.code : "",
-        label: typeof entry?.label === "string" ? entry.label : (typeof entry?.code === "string" ? entry.code : "Status"),
-        color: entry?.color,
-      }))
+      .map((entry) => {
+        const code = typeof entry?.code === "string" ? entry.code : "";
+        const fallback = typeof entry?.label === "string" ? entry.label : (code || "Status");
+        const labelKey = typeof entry?.label_key === "string" ? entry.label_key : "";
+
+        return {
+          code,
+          label: labelKey !== "" ? t(labelKey, undefined, fallback) : fallback,
+          color: entry?.color,
+        };
+      })
       .filter((entry) => entry.code !== "");
-  }, [typedMeta.mdt?.dispatch?.status_codes]);
+  }, [t, typedMeta.mdt?.dispatch?.status_codes]);
   const dispatchDefaultStatus =
     (typeof typedMeta.mdt?.dispatch?.default_status === "string" && typedMeta.mdt?.dispatch?.default_status) ||
     (dispatchStatusOptions[0]?.code || "10-8");

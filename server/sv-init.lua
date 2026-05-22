@@ -22,7 +22,7 @@ local MAP_TILE_WARNING = [[
 ║                                                              ║
 ║  HOW TO FIX:                                                 ║
 ║  1. Download the map tiles from:                             ║
-║     https://drive.proton.me/urls/YZE057HH5G#KN3aoWGvPXb8    ║
+║     https://drive.proton.me/urls/YZE057HH5G#KN3aoWGvPXb8     ║
 ║                                                              ║
 ║  2. Extract and place the folders so the structure looks     ║
 ║     like this inside your resource:                          ║
@@ -40,6 +40,35 @@ local MAP_TILE_WARNING = [[
 ║     All credit goes to RiceaRaul and contributors.           ║
 ╚══════════════════════════════════════════════════════════════╝
 ]]
+
+local EVENT_MAP_TILES_MISSING = 'TG_MDT:mapTilesMissing'
+local EVENT_SERVER_JOIN_RADIO = 'TG_MDT:server:joinRadioChannel'
+local EVENT_SERVER_LEAVE_RADIO = 'TG_MDT:server:leaveRadioChannel'
+local EVENT_PLAYER_DROPPED = 'playerDropped'
+local EVENT_CLIENT_AKTE_UPDATED = 'TG_MDT:akteUpdated'
+local EVENT_CLIENT_UPDATE_RADIO_MEMBERS = 'TG_MDT:client:updateRadioMembers'
+local EVENT_CLIENT_DISPATCH_STATE_CHANGED = 'TG_MDT:dispatchStateChanged'
+local EVENT_CLIENT_DISPATCH_HISTORY_CHANGED = 'TG_MDT:dispatchHistoryChanged'
+
+local CALLBACK_GET_PERSONS = 'TG_MDT:getPersons'
+local CALLBACK_GET_VEHICLES = 'TG_MDT:getVehicles'
+local CALLBACK_GET_AKTE_BOOTSTRAP = 'TG_MDT:getAkteBootstrap'
+local CALLBACK_GET_AKTE_COMPARTMENTS = 'TG_MDT:getAkteCompartments'
+local CALLBACK_GET_PERSON_AKTE = 'TG_MDT:getPersonAkte'
+local CALLBACK_SAVE_PERSON_AKTE = 'TG_MDT:savePersonAkte'
+local CALLBACK_GET_VEHICLE_AKTE = 'TG_MDT:getVehicleAkte'
+local CALLBACK_SAVE_VEHICLE_AKTE = 'TG_MDT:saveVehicleAkte'
+local CALLBACK_REMOVE_AKTE_COMPARTMENT = 'TG_MDT:removeAkteCompartment'
+local CALLBACK_SET_DISPATCH_STATUS = 'TG_MDT:setDispatchStatus'
+local CALLBACK_CREATE_DISPATCH = 'TG_MDT:createDispatch'
+local CALLBACK_GET_DISPATCH_STATE = 'TG_MDT:getDispatchState'
+local CALLBACK_GET_DISPATCH_HISTORY = 'TG_MDT:getDispatchHistory'
+local CALLBACK_ASSIGN_DISPATCH_UNIT = 'TG_MDT:assignDispatchUnit'
+local CALLBACK_UNASSIGN_DISPATCH_UNIT = 'TG_MDT:unassignDispatchUnit'
+local CALLBACK_ASSIGN_DISPATCH_VEHICLE = 'TG_MDT:assignDispatchVehicle'
+local CALLBACK_UNASSIGN_DISPATCH_VEHICLE = 'TG_MDT:unassignDispatchVehicle'
+local CALLBACK_ACCEPT_DISPATCH_CASE = 'TG_MDT:acceptDispatchCase'
+local CALLBACK_CLOSE_DISPATCH_CASE = 'TG_MDT:closeDispatchCase'
 
 --- Check whether map tile assets are installed.
 ---@return boolean
@@ -1078,7 +1107,7 @@ if not checkMapTiles() then
 end
 
 -- ── Map tile missing event (reported by NUI via client) ────
-RegisterNetEvent('TG_MDT:mapTilesMissing', function()
+RegisterNetEvent(EVENT_MAP_TILES_MISSING, function()
     local src = source
     Debug.warn(('Map tiles missing — reported by client %s'):format(tostring(src)))
     print(MAP_TILE_WARNING)
@@ -1086,7 +1115,7 @@ end)
 
 
 -- ── Persons callback (framework-backed) ────────────────────
-lib.callback.register('TG_MDT:getPersons', function(src)
+lib.callback.register(CALLBACK_GET_PERSONS, function(src)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized MDT access attempt: Player %s'):format(src))
         return {}
@@ -1098,7 +1127,7 @@ lib.callback.register('TG_MDT:getPersons', function(src)
 end)
 
 -- ── Vehicles callback (framework-backed) ───────────────────
-lib.callback.register('TG_MDT:getVehicles', function(src)
+lib.callback.register(CALLBACK_GET_VEHICLES, function(src)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized MDT access attempt: Player %s'):format(src))
         return {}
@@ -1113,7 +1142,7 @@ local akteBootstrapCache = {}
 local AKTE_CACHE_TTL = 60000
 
 -- ── Akte callbacks (db-backed + live sync) ────────────────
-lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
+lib.callback.register(CALLBACK_GET_AKTE_BOOTSTRAP, function(src)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized akte bootstrap attempt: Player %s'):format(src))
         return { personAkten = {}, vehicleAkten = {} }
@@ -1160,7 +1189,7 @@ lib.callback.register('TG_MDT:getAkteBootstrap', function(src)
     return result
 end)
 
-lib.callback.register('TG_MDT:getAkteCompartments', function(src, kind, value)
+lib.callback.register(CALLBACK_GET_AKTE_COMPARTMENTS, function(src, kind, value)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized compartments access: Player %s'):format(src))
         return {}
@@ -1177,7 +1206,7 @@ lib.callback.register('TG_MDT:getAkteCompartments', function(src, kind, value)
     return {}
 end)
 
-lib.callback.register('TG_MDT:getPersonAkte', function(src, identifier, compartment)
+lib.callback.register(CALLBACK_GET_PERSON_AKTE, function(src, identifier, compartment)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized person akte access: Player %s'):format(src))
         return defaultPersonAkte(src)
@@ -1189,7 +1218,7 @@ lib.callback.register('TG_MDT:getPersonAkte', function(src, identifier, compartm
     return getPersonAkte(identifier, src, compartment)
 end)
 
-lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, compartment)
+lib.callback.register(CALLBACK_SAVE_PERSON_AKTE, function(src, identifier, akte, compartment)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized person akte save: Player %s'):format(src))
         return nil
@@ -1226,7 +1255,7 @@ lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, c
     for i = 1, #players do
         local targetSrc = tonumber(players[i])
         if targetSrc and hasAccess(targetSrc) then
-            TriggerClientEvent('TG_MDT:akteUpdated', targetSrc, {
+            TriggerClientEvent(EVENT_CLIENT_AKTE_UPDATED, targetSrc, {
                 kind = 'person',
                 identifier = identifier,
                 compartment = scope,
@@ -1238,7 +1267,7 @@ lib.callback.register('TG_MDT:savePersonAkte', function(src, identifier, akte, c
     return merged
 end)
 
-lib.callback.register('TG_MDT:getVehicleAkte', function(src, plate, compartment)
+lib.callback.register(CALLBACK_GET_VEHICLE_AKTE, function(src, plate, compartment)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized vehicle akte access: Player %s'):format(src))
         return defaultVehicleAkte(src)
@@ -1250,7 +1279,7 @@ lib.callback.register('TG_MDT:getVehicleAkte', function(src, plate, compartment)
     return getVehicleAkte(plate, src, compartment)
 end)
 
-lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compartment)
+lib.callback.register(CALLBACK_SAVE_VEHICLE_AKTE, function(src, plate, akte, compartment)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized vehicle akte save: Player %s'):format(src))
         return nil
@@ -1287,7 +1316,7 @@ lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compa
     for i = 1, #players do
         local targetSrc = tonumber(players[i])
         if targetSrc and hasAccess(targetSrc) then
-            TriggerClientEvent('TG_MDT:akteUpdated', targetSrc, {
+            TriggerClientEvent(EVENT_CLIENT_AKTE_UPDATED, targetSrc, {
                 kind = 'vehicle',
                 plate = plate,
                 compartment = scope,
@@ -1299,7 +1328,7 @@ lib.callback.register('TG_MDT:saveVehicleAkte', function(src, plate, akte, compa
     return merged
 end)
 
-lib.callback.register('TG_MDT:removeAkteCompartment', function(src, kind, value, compartment)
+lib.callback.register(CALLBACK_REMOVE_AKTE_COMPARTMENT, function(src, kind, value, compartment)
     if not hasAccess(src) then
         Debug.warn(('Unauthorized akte compartment delete: Player %s'):format(src))
         return false
@@ -1351,13 +1380,130 @@ local function getPlayerDispatchStatus(src)
     return getDispatchDefaultStatus()
 end
 
-local function isDispatchSharedBetweenJobs()
-    local dispatchCfg = Config and Config.MDT and Config.MDT.dispatch
-    if type(dispatchCfg) ~= 'table' then
-        return true
+---@param list table
+---@param out table<string, boolean>
+local function appendDepartmentJobsToSet(list, out)
+    if type(list) ~= 'table' then
+        return
     end
 
-    return dispatchCfg.share_between_jobs ~= false
+    for i = 1, #list do
+        local jobName = normalizeJobName(list[i])
+        if jobName ~= '' then
+            out[jobName] = true
+        end
+    end
+end
+
+---@param group table
+---@return table<string, boolean>|nil
+local function buildDispatchShareGroup(group)
+    if type(group) ~= 'table' then
+        return nil
+    end
+
+    local departments = Config and Config.MDT and Config.MDT.departments
+    local resolved = {}
+
+    for i = 1, #group do
+        local token = normalizeJobName(group[i])
+        if token ~= '' then
+            local dept = type(departments) == 'table' and departments[token] or nil
+            if type(dept) == 'table' and type(dept.jobs) == 'table' then
+                appendDepartmentJobsToSet(dept.jobs, resolved)
+            else
+                resolved[token] = true
+            end
+        end
+    end
+
+    if next(resolved) == nil then
+        return nil
+    end
+
+    return resolved
+end
+
+---@return boolean, table[]|nil
+local function resolveDispatchSharing()
+    local dispatchCfg = Config and Config.MDT and Config.MDT.dispatch
+    if type(dispatchCfg) ~= 'table' then
+        return true, nil
+    end
+
+    local shareSetting = dispatchCfg.share_between_jobs
+    if shareSetting == false then
+        return false, nil
+    end
+
+    if shareSetting == true then
+        return true, nil
+    end
+
+    if type(shareSetting) == 'string' then
+        local normalized = normalizeJobName(shareSetting)
+        if normalized == '' or normalized == 'all' or normalized == '*' then
+            return true, nil
+        end
+
+        local group = buildDispatchShareGroup({ normalized })
+        if group then
+            return false, { group }
+        end
+
+        return false, nil
+    end
+
+    if type(shareSetting) ~= 'table' then
+        return true, nil
+    end
+
+    local groups = {}
+    local hasNestedGroup = false
+
+    for i = 1, #shareSetting do
+        if type(shareSetting[i]) == 'table' then
+            hasNestedGroup = true
+            break
+        end
+    end
+
+    if hasNestedGroup then
+        for i = 1, #shareSetting do
+            local entry = shareSetting[i]
+            if type(entry) == 'string' then
+                local token = normalizeJobName(entry)
+                if token == 'all' or token == '*' then
+                    return true, nil
+                end
+            elseif type(entry) == 'table' then
+                local group = buildDispatchShareGroup(entry)
+                if group then
+                    groups[#groups + 1] = group
+                end
+            end
+        end
+    else
+        local normalizedFlatGroup = {}
+        for i = 1, #shareSetting do
+            local token = normalizeJobName(shareSetting[i])
+            if token == 'all' or token == '*' then
+                return true, nil
+            end
+            normalizedFlatGroup[#normalizedFlatGroup + 1] = token
+        end
+
+        local group = buildDispatchShareGroup(normalizedFlatGroup)
+        if group then
+            groups[#groups + 1] = group
+        end
+    end
+
+    if #groups == 0 then
+        return false, nil
+    end
+
+    return false, groups
 end
 
 local function resolvePlayerJobInfo(src)
@@ -1410,11 +1556,17 @@ local function resolvePlayerJobInfo(src)
 end
 
 local function canViewDispatchCall(src, call)
-    if isDispatchSharedBetweenJobs() then
+    local isSharedForAll, shareGroups = resolveDispatchSharing()
+    if isSharedForAll then
         return true
     end
 
     if type(call) ~= 'table' then
+        return false
+    end
+
+    local viewerJob = getViewerJobName(src)
+    if viewerJob == '' then
         return false
     end
 
@@ -1423,7 +1575,22 @@ local function canViewDispatchCall(src, call)
         return true
     end
 
-    return getViewerJobName(src) == scopeJob
+    if viewerJob == scopeJob then
+        return true
+    end
+
+    if type(shareGroups) ~= 'table' then
+        return false
+    end
+
+    for i = 1, #shareGroups do
+        local group = shareGroups[i]
+        if type(group) == 'table' and group[viewerJob] == true and group[scopeJob] == true then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function buildPlayerRadioData(src)
@@ -1515,7 +1682,7 @@ local function broadcastRadioMembers(freq)
 
     -- Broadcast to all members on this frequency
     for src, _ in pairs(membersMap) do
-        TriggerClientEvent('TG_MDT:client:updateRadioMembers', src, membersList)
+        TriggerClientEvent(EVENT_CLIENT_UPDATE_RADIO_MEMBERS, src, membersList)
     end
 end
 
@@ -1539,7 +1706,7 @@ local function removePlayerFromRadio(src)
     end
 end
 
-RegisterNetEvent('TG_MDT:server:joinRadioChannel', function(freq)
+RegisterNetEvent(EVENT_SERVER_JOIN_RADIO, function(freq)
     local src = source
     if not freq or freq == '' then
         removePlayerFromRadio(src)
@@ -1560,18 +1727,18 @@ RegisterNetEvent('TG_MDT:server:joinRadioChannel', function(freq)
     broadcastRadioMembers(freqStr)
 end)
 
-RegisterNetEvent('TG_MDT:server:leaveRadioChannel', function()
+RegisterNetEvent(EVENT_SERVER_LEAVE_RADIO, function()
     local src = source
     removePlayerFromRadio(src)
 end)
 
-AddEventHandler('playerDropped', function()
+AddEventHandler(EVENT_PLAYER_DROPPED, function()
     local src = source
     removePlayerFromRadio(src)
     playerDispatchStatuses[src] = nil
 end)
 
-lib.callback.register('TG_MDT:setDispatchStatus', function(src, payload)
+lib.callback.register(CALLBACK_SET_DISPATCH_STATUS, function(src, payload)
     if not hasAccess(src) then
         return false
     end
@@ -1789,7 +1956,7 @@ local function broadcastDispatchState()
         local targetSrc = tonumber(players[i])
         if targetSrc and hasAccess(targetSrc) then
             local snapshot = getDispatchCallsSnapshot(targetSrc)
-            TriggerClientEvent('TG_MDT:dispatchStateChanged', targetSrc, snapshot)
+            TriggerClientEvent(EVENT_CLIENT_DISPATCH_STATE_CHANGED, targetSrc, snapshot)
         end
     end
 end
@@ -1800,7 +1967,7 @@ local function broadcastDispatchHistory()
         local targetSrc = tonumber(players[i])
         if targetSrc and hasAccess(targetSrc) then
             local snapshot = getDispatchHistorySnapshot(targetSrc)
-            TriggerClientEvent('TG_MDT:dispatchHistoryChanged', targetSrc, snapshot)
+            TriggerClientEvent(EVENT_CLIENT_DISPATCH_HISTORY_CHANGED, targetSrc, snapshot)
         end
     end
 end
@@ -1912,7 +2079,7 @@ end
 
 TG_MDT_InternalCreateDispatch = createDispatchCall
 
-lib.callback.register('TG_MDT:createDispatch', function(src, payload)
+lib.callback.register(CALLBACK_CREATE_DISPATCH, function(src, payload)
     if not hasAccess(src) then
         return { ok = false }
     end
@@ -1933,7 +2100,7 @@ lib.callback.register('TG_MDT:createDispatch', function(src, payload)
     return { ok = true, id = call.id }
 end)
 
-lib.callback.register('TG_MDT:getDispatchState', function(src)
+lib.callback.register(CALLBACK_GET_DISPATCH_STATE, function(src)
     if not hasAccess(src) then
         return {}
     end
@@ -1945,7 +2112,7 @@ lib.callback.register('TG_MDT:getDispatchState', function(src)
     return getDispatchCallsSnapshot(src)
 end)
 
-lib.callback.register('TG_MDT:getDispatchHistory', function(src)
+lib.callback.register(CALLBACK_GET_DISPATCH_HISTORY, function(src)
     if not hasAccess(src) then
         return {}
     end
@@ -1957,7 +2124,7 @@ lib.callback.register('TG_MDT:getDispatchHistory', function(src)
     return getDispatchHistorySnapshot(src)
 end)
 
-lib.callback.register('TG_MDT:assignDispatchUnit', function(src, payload)
+lib.callback.register(CALLBACK_ASSIGN_DISPATCH_UNIT, function(src, payload)
     if not hasAccess(src) then return false end
     if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
         if not DispatchModule.isDispatchEnabledForSource(src) then return false end
@@ -1988,7 +2155,7 @@ lib.callback.register('TG_MDT:assignDispatchUnit', function(src, payload)
     return true
 end)
 
-lib.callback.register('TG_MDT:unassignDispatchUnit', function(src, payload)
+lib.callback.register(CALLBACK_UNASSIGN_DISPATCH_UNIT, function(src, payload)
     if not hasAccess(src) then return false end
     if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
         if not DispatchModule.isDispatchEnabledForSource(src) then return false end
@@ -2012,7 +2179,7 @@ lib.callback.register('TG_MDT:unassignDispatchUnit', function(src, payload)
     return true
 end)
 
-lib.callback.register('TG_MDT:assignDispatchVehicle', function(src, payload)
+lib.callback.register(CALLBACK_ASSIGN_DISPATCH_VEHICLE, function(src, payload)
     if not hasAccess(src) then return false end
     if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
         if not DispatchModule.isDispatchEnabledForSource(src) then return false end
@@ -2042,7 +2209,7 @@ lib.callback.register('TG_MDT:assignDispatchVehicle', function(src, payload)
     return true
 end)
 
-lib.callback.register('TG_MDT:unassignDispatchVehicle', function(src, payload)
+lib.callback.register(CALLBACK_UNASSIGN_DISPATCH_VEHICLE, function(src, payload)
     if not hasAccess(src) then return false end
     if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
         if not DispatchModule.isDispatchEnabledForSource(src) then return false end
@@ -2066,7 +2233,7 @@ lib.callback.register('TG_MDT:unassignDispatchVehicle', function(src, payload)
     return true
 end)
 
-lib.callback.register('TG_MDT:acceptDispatchCase', function(src, payload)
+lib.callback.register(CALLBACK_ACCEPT_DISPATCH_CASE, function(src, payload)
     if not hasAccess(src) then return false end
     local body = type(payload) == 'table' and payload or {}
     local dispatchId = type(body.dispatchId) == 'string' and body.dispatchId or ''
@@ -2118,7 +2285,7 @@ lib.callback.register('TG_MDT:acceptDispatchCase', function(src, payload)
     return true
 end)
 
-lib.callback.register('TG_MDT:closeDispatchCase', function(src, payload)
+lib.callback.register(CALLBACK_CLOSE_DISPATCH_CASE, function(src, payload)
     if not hasAccess(src) then return false end
     if DispatchModule and type(DispatchModule.isDispatchEnabledForSource) == 'function' then
         if not DispatchModule.isDispatchEnabledForSource(src) then return false end

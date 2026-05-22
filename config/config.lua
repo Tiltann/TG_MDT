@@ -75,7 +75,7 @@ Config.MDT = {
         },
     },
 
-    -- If true, players without allowed jobs will get a notify.
+    -- If true, players without allowed jobs will get a notify if they want to open the MDT.
     notify_on_denied = true,
 
     -- How long (ms) the MDT open/close animation takes.
@@ -154,9 +154,20 @@ Config.MDT = {
     -- Dispatch status codes shown in tablet (dispatch + topbar when on-duty).
     dispatch = {
         -- Share dispatch calls between different MDT jobs.
-        -- true  = everyone with MDT access sees all dispatch calls.
-        -- false = users only see calls created by their own job.
-        share_between_jobs = true,
+        -- Supported values:
+        --   'all'  = everyone with MDT access sees all dispatch calls.
+        --   true   = same as 'all' (backward compatible).
+        --   false  = users only see calls created by their own job.
+        --   table  = sharing setup using one or more share groups:
+        --            Single group (everyone in this group shares together):
+        --              { 'police', 'sheriff', 'ems' }
+        --            Multiple groups (independent share clusters):
+        --              {
+        --                  { 'police', 'sheriff' },
+        --                  { 'ambulance', 'mechanic' },
+        --              }
+        --            You can use job names OR department keys from MDT.departments.
+        share_between_jobs = 'all',
 
         -- Default status when none is set.
         default_status = '10-8',
@@ -165,26 +176,18 @@ Config.MDT = {
         off_duty_status = '10-7',
 
         -- Configurable status catalog (numeric/radio-style codes).
+        -- IMPORTANT: Use label_key for localization and add the key to locales/en.json and locales/de.json.
+        -- Optional `label` acts as fallback if the localization key is missing.
         -- color supports: green, blue, yellow, purple, gray, red
         status_codes = {
-            { code = '10-8', label = 'Available', color = 'green' },
-            { code = '10-6', label = 'Busy', color = 'yellow' },
-            { code = '10-97', label = 'On Scene', color = 'blue' },
-            { code = '10-23', label = 'En Route', color = 'blue' },
-            { code = '10-7', label = 'Out of Service', color = 'gray' },
+            { code = '10-8', label_key = 'tablet.dispatch.status.10-8', label = 'Available', color = 'green' },
+            { code = '10-6', label_key = 'tablet.dispatch.status.10-6', label = 'Busy', color = 'yellow' },
+            { code = '10-97', label_key = 'tablet.dispatch.status.10-97', label = 'On Scene', color = 'blue' },
+            { code = '10-23', label_key = 'tablet.dispatch.status.10-23', label = 'En Route', color = 'blue' },
+            { code = '10-7', label_key = 'tablet.dispatch.status.10-7', label = 'Out of Service', color = 'gray' },
         },
 
         -- Number of closed dispatch records kept for history panels/log views.
         history_limit = 500,
     },
 }
-
--- ── BOLO / Warrants ───────────────────────────────────────
-
--- Config.BOLO = {
---     -- Maximum active BOLOs stored per officer
---     max_per_officer = 5,
-
---     -- Auto-expire BOLOs after this many hours (0 = never)
---     expire_hours = 72,
--- }

@@ -5,6 +5,39 @@
 
 if Framework.name ~= 'qbox' then return end
 
+local EVENT_OX_NOTIFY = 'ox_lib:notify'
+
+---@param src number
+---@param msg string
+---@param notifyType string|nil
+---@return boolean
+local function notifyQbox(src, msg, notifyType)
+    local player = exports.qbx_core:GetPlayer(src)
+    if player and player.Functions and type(player.Functions.Notify) == 'function' then
+        local ok = pcall(function()
+            player.Functions.Notify(msg, notifyType or 'inform')
+        end)
+
+        if ok then
+            return true
+        end
+    end
+
+    local ok = pcall(function()
+        exports.qbx_core:Notify(src, msg, notifyType or 'inform')
+    end)
+
+    if ok then
+        return true
+    end
+
+    ok = pcall(function()
+        exports.qbx_core:Notify(src, msg)
+    end)
+
+    return ok
+end
+
 -- ── server ────────────────────────────────────────────────
 if IsDuplicityVersion() then
     Framework.Server = {}
@@ -35,7 +68,13 @@ if IsDuplicityVersion() then
     ---@param msg string
     ---@param type string
     function Framework.Server.notify(src, msg, type)
-        TriggerClientEvent('ox_lib:notify', src, { description = msg, type = type or 'inform' })
+        if notifyQbox(src, msg, type) then
+            return
+        end
+
+        pcall(function()
+            TriggerClientEvent(EVENT_OX_NOTIFY, src, { description = msg, type = type or 'inform' })
+        end)
     end
 
     --- Get player job name.

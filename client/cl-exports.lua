@@ -3,10 +3,12 @@
 --  Public client exports for integrations.
 -- ============================================================
 
+local CALLBACK_CREATE_DISPATCH = 'TG_MDT:createDispatch'
+
 exports('CreateDispatch', function(payload)
     local body = type(payload) == 'table' and payload or {}
     local ok, result = pcall(function()
-        return lib.callback.await('TG_MDT:createDispatch', false, body)
+        return lib.callback.await(CALLBACK_CREATE_DISPATCH, false, body)
     end)
 
     if not ok or type(result) ~= 'table' or result.ok ~= true then
