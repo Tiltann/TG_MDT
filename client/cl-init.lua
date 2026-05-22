@@ -44,6 +44,10 @@ local CALLBACK_IS_BOSS = 'TG_MDT:isBoss'
 local CALLBACK_GET_LEADERSHIP_MEMBERS = 'TG_MDT:getLeadershipMembers'
 local CALLBACK_LEADERSHIP_SET_MEMBER_PERMISSION = 'TG_MDT:leadershipSetMemberPermission'
 local CALLBACK_GET_AUDIT_LOGS = 'TG_MDT:getAuditLogs'
+local CALLBACK_GET_REPORTS = 'TG_MDT:getReports'
+local CALLBACK_SAVE_REPORT = 'TG_MDT:saveReport'
+local CALLBACK_ARCHIVE_REPORT = 'TG_MDT:archiveReport'
+local CALLBACK_DELETE_REPORT = 'TG_MDT:deleteReport'
 local CALLBACK_GET_LAWS = 'TG_MDT:getLaws'
 local CALLBACK_SAVE_LAWS = 'TG_MDT:saveLaws'
 local CALLBACK_GET_DISPATCH_MODULE_STATE = 'TG_MDT:getDispatchModuleState'
@@ -396,6 +400,38 @@ NUI.onCallback('getDispatchState', function(_, cb)
 		return lib.callback.await(CALLBACK_GET_DISPATCH_STATE, false)
 	end)
 	cb(ok and result or {})
+end)
+
+NUI.onCallback('getReports', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_GET_REPORTS, false, payload)
+	end)
+	cb(ok and result or { items = {}, total = 0, page = 1, pageSize = 50 })
+end)
+
+NUI.onCallback('saveReport', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_SAVE_REPORT, false, payload)
+	end)
+	cb(ok and result or { ok = false, reason = 'callback_failed' })
+end)
+
+NUI.onCallback('archiveReport', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_ARCHIVE_REPORT, false, payload.reportId)
+	end)
+	cb(ok and result or { ok = false, reason = 'callback_failed' })
+end)
+
+NUI.onCallback('deleteReport', function(body, cb)
+	local payload = type(body) == 'table' and body or {}
+	local ok, result = pcall(function()
+		return lib.callback.await(CALLBACK_DELETE_REPORT, false, payload.reportId)
+	end)
+	cb(ok and result or { ok = false, reason = 'callback_failed' })
 end)
 
 NUI.onCallback('assignDispatchUnit', function(body, cb)

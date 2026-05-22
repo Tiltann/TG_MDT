@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, RadioReceiver, Users, Car, BookOpen, MessageSquare, Scale, Settings, Shield } from "lucide-react";
+import { Home, RadioReceiver, Users, Car, BookOpen, MessageSquare, Scale, Settings, Shield, FileText } from "lucide-react";
 import type { TFunction } from "../lib/i18n";
 
 type Branding = {
@@ -41,6 +41,7 @@ export function Sidebar({
     { id: "dispatch", label: t("tablet.sidebar.dispatch"), icon: RadioReceiver },
     { id: "persons", label: t("tablet.sidebar.persons"), icon: Users },
     { id: "vehicles", label: t("tablet.sidebar.vehicles"), icon: Car },
+    { id: "reports", label: t("tablet.sidebar.reports"), icon: FileText },
     { id: "penalties", label: t("tablet.sidebar.penalty_catalog"), icon: Scale },
     { id: "livemap", label: t("tablet.sidebar.livemap"), icon: BookOpen },
     { id: "chat", label: t("tablet.sidebar.live_chat", undefined, t("tablet.sidebar.chat")), icon: MessageSquare },

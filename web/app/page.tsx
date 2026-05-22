@@ -22,6 +22,7 @@ import PenaltiesView from "./tablet/components/views/penalties-view";
 import PersonsView from "./tablet/components/views/persons-view";
 import VehiclesView from "./tablet/components/views/vehicles-view";
 import ProfileView from "./tablet/components/views/profile-view";
+import ReportsView from "./tablet/components/views/reports-view";
 import LiveMapView from "./tablet/components/views/livemap-view";
 import SettingsView from "./tablet/components/views/settings-view";
 import LeadershipView from "./tablet/components/views/leadership-view";
@@ -2381,6 +2382,7 @@ export default function Home({ devMode = false }: HomeProps) {
                     />
                   )}
                   {activeScreen === "penalties" && <PenaltiesView t={t} isBoss={isBoss} />}
+                  {activeScreen === "reports" && <ReportsView t={t} />}
                   {activeScreen === "bolo" && (
                     <BoloView
                       t={t}

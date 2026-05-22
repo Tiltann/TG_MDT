@@ -65,6 +65,10 @@ local CALLBACK_IS_BOSS = 'TG_MDT:isBoss'
 local CALLBACK_GET_LEADERSHIP_MEMBERS = 'TG_MDT:getLeadershipMembers'
 local CALLBACK_LEADERSHIP_SET_MEMBER_PERMISSION = 'TG_MDT:leadershipSetMemberPermission'
 local CALLBACK_GET_AUDIT_LOGS = 'TG_MDT:getAuditLogs'
+local CALLBACK_GET_REPORTS = 'TG_MDT:getReports'
+local CALLBACK_SAVE_REPORT = 'TG_MDT:saveReport'
+local CALLBACK_ARCHIVE_REPORT = 'TG_MDT:archiveReport'
+local CALLBACK_DELETE_REPORT = 'TG_MDT:deleteReport'
 local CALLBACK_GET_LAWS = 'TG_MDT:getLaws'
 local CALLBACK_SAVE_LAWS = 'TG_MDT:saveLaws'
 local CALLBACK_SET_DISPATCH_STATUS = 'TG_MDT:setDispatchStatus'
@@ -1197,6 +1201,138 @@ local function ensureAkteTables()
     ]], {})
 end
 
+--- Ensure report-related database tables exist.
+--- Creates `tg_mdt_reports` with indexes used by report queries.
+--- This runs on resource startup.
+---@return nil
+local function ensureReportTables()
+    SQL.execute([[
+        CREATE TABLE IF NOT EXISTS tg_mdt_reports (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            scope VARCHAR(64) NOT NULL,
+            title VARCHAR(160) NOT NULL,
+            category VARCHAR(64) NOT NULL DEFAULT 'incident',
+            subject_identifier VARCHAR(80) NULL,
+            subject_name VARCHAR(128) NULL,
+            location VARCHAR(160) NULL,
+            priority VARCHAR(24) NOT NULL DEFAULT 'medium',
+            status VARCHAR(24) NOT NULL DEFAULT 'draft',
+            body LONGTEXT NOT NULL,
+            author_identifier VARCHAR(80) NULL,
+            author_name VARCHAR(128) NULL,
+            updated_by VARCHAR(80) NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            archived_at TIMESTAMP NULL DEFAULT NULL,
+            INDEX idx_mdt_reports_scope_status_time (scope, status, created_at),
+            INDEX idx_mdt_reports_scope_subject (scope, subject_identifier),
+            INDEX idx_mdt_reports_scope_author (scope, author_identifier)
+        )
+    ]], {})
+
+
+local function trimString(value)
+    if type(value) ~= 'string' then
+        return ''
+    end
+
+    return value:gsub('^%s+', ''):gsub('%s+$', '')
+end
+
+local function normalizeReportStatus(value)
+    local status = string.lower(trimString(value))
+    if status == 'open' or status == 'approved' or status == 'archived' or status == 'draft' then
+        return status
+    end
+    return 'draft'
+end
+
+local function normalizeReportPriority(value)
+    local priority = string.lower(trimString(value))
+    if priority == 'low' or priority == 'medium' or priority == 'high' then
+        return priority
+    end
+    return 'medium'
+end
+
+local function normalizeReportCategory(value)
+    local category = trimString(value)
+    if category == '' then
+        return 'incident'
+    end
+    return category
+end
+
+local function normalizeReportPagination(payload)
+    local page = math.floor(tonumber(type(payload) == 'table' and payload.page) or 1)
+    local pageSize = math.floor(tonumber(type(payload) == 'table' and payload.pageSize) or 50)
+
+    if page < 1 then
+        page = 1
+    end
+
+    if pageSize < 1 then
+        pageSize = 1
+    elseif pageSize > 100 then
+        pageSize = 100
+    end
+
+    return page, pageSize, (page - 1) * pageSize
+end
+
+local function serializeReportRow(row)
+    return {
+        id = tonumber(row.id) or 0,
+        title = type(row.title) == 'string' and row.title or '',
+        category = type(row.category) == 'string' and row.category or 'incident',
+        subjectIdentifier = type(row.subject_identifier) == 'string' and row.subject_identifier or '',
+        subjectName = type(row.subject_name) == 'string' and row.subject_name or '',
+        location = type(row.location) == 'string' and row.location or '',
+        priority = type(row.priority) == 'string' and row.priority or 'medium',
+        status = type(row.status) == 'string' and row.status or 'draft',
+        body = type(row.body) == 'string' and row.body or '',
+        authorIdentifier = type(row.author_identifier) == 'string' and row.author_identifier or '',
+        authorName = type(row.author_name) == 'string' and row.author_name or '',
+        updatedBy = type(row.updated_by) == 'string' and row.updated_by or '',
+        createdAt = type(row.created_at) == 'string' and row.created_at or '',
+        updatedAt = type(row.updated_at) == 'string' and row.updated_at or '',
+        archivedAt = type(row.archived_at) == 'string' and row.archived_at or '',
+    }
+end
+
+local function buildReportFilters(scope, payload)
+    local conditions = { 'scope = ?' }
+    local params = { scope }
+
+    local search = trimString(type(payload) == 'table' and payload.search or '')
+    local status = trimString(type(payload) == 'table' and payload.status or '')
+    local category = trimString(type(payload) == 'table' and payload.category or '')
+
+    if status ~= '' and status ~= 'all' then
+        table.insert(conditions, 'status = ?')
+        params[#params + 1] = normalizeReportStatus(status)
+    end
+
+    if category ~= '' and category ~= 'all' then
+        table.insert(conditions, 'category = ?')
+        params[#params + 1] = normalizeReportCategory(category)
+    end
+
+    if search ~= '' then
+        local like = ('%%%s%%'):format(search)
+        table.insert(conditions, [[(title LIKE ? OR category LIKE ? OR location LIKE ? OR body LIKE ? OR subject_name LIKE ? OR subject_identifier LIKE ? OR author_name LIKE ?)]])
+        params[#params + 1] = like
+        params[#params + 1] = like
+        params[#params + 1] = like
+        params[#params + 1] = like
+        params[#params + 1] = like
+        params[#params + 1] = like
+        params[#params + 1] = like
+    end
+
+    return table.concat(conditions, ' AND '), params
+end
+
 --- Build framework defaults for a person Akte.
 ---@param identifier string
 ---@param src number|nil
@@ -1773,6 +1909,7 @@ Debug.debug(('Framework: %s'):format(Framework.name))
 if checkDatabase() then
     Debug.info('Database connection OK')
     ensureAkteTables()
+    ensureReportTables()
 else
     Debug.warn('Database connection failed — some features may not work')
 end
@@ -2295,6 +2432,204 @@ lib.callback.register(CALLBACK_GET_AUDIT_LOGS, function(src, payload)
         page = page,
         pageSize = pageSize,
     }
+end)
+
+--- Fetch paginated reports for the caller's leadership scope.
+--- Supports optional `page`, `pageSize`, `search`, `status`, and `category` in `payload`.
+---@param src number Player server id
+---@param payload table|nil Filter and pagination options
+---@return table { items = table[], total = number, page = number, pageSize = number }
+lib.callback.register(CALLBACK_GET_REPORTS, function(src, payload)
+    if not hasAccess(src) then
+        return { items = {}, total = 0, page = 1, pageSize = 50 }
+    end
+
+    local scope = select(1, getLeadershipScopeInfo(src))
+    local page, pageSize, offset = normalizeReportPagination(payload)
+    local whereSql, params = buildReportFilters(scope, payload)
+
+    local total = tonumber(SQL.scalar(('SELECT COUNT(*) FROM tg_mdt_reports WHERE %s'):format(whereSql), params)) or 0
+    local rows = SQL.query(([[
+        SELECT id, scope, title, category, subject_identifier, subject_name, location, priority, status, body, author_identifier, author_name, updated_by, created_at, updated_at, archived_at
+        FROM tg_mdt_reports
+        WHERE %s
+        ORDER BY created_at DESC, id DESC
+        LIMIT ? OFFSET ?
+    ]]):format(whereSql), { table.unpack(params), pageSize, offset })
+
+    local items = {}
+    for i = 1, #rows do
+        items[#items + 1] = serializeReportRow(rows[i])
+    end
+
+    return {
+        items = items,
+        total = total,
+        page = page,
+        pageSize = pageSize,
+    }
+end)
+
+--- Create or update a report in the caller's scope.
+--- If `payload.reportId` is provided and valid, the report is updated.
+---@param src number Player server id
+---@param payload table Report fields: reportId?, title, category, subjectIdentifier, subjectName, location, priority, status, body
+---@return table { ok = boolean, reason = string?, reportId = number? }
+lib.callback.register(CALLBACK_SAVE_REPORT, function(src, payload)
+    if not hasAccess(src) then
+        return { ok = false, reason = 'no_access' }
+    end
+
+    if type(payload) ~= 'table' then
+        return { ok = false, reason = 'invalid_payload' }
+    end
+
+    local scope = select(1, getLeadershipScopeInfo(src))
+    local reportId = tonumber(payload.reportId)
+    local title = trimString(payload.title)
+    local category = normalizeReportCategory(payload.category)
+    local subjectIdentifier = trimString(payload.subjectIdentifier)
+    local subjectName = trimString(payload.subjectName)
+    local location = trimString(payload.location)
+    local priority = normalizeReportPriority(payload.priority)
+    local status = normalizeReportStatus(payload.status)
+    local body = trimString(payload.body)
+    local actorIdentifier = getPlayerIdentifier(src)
+    local actorName = GetPlayerName(src)
+
+    if title == '' then
+        return { ok = false, reason = 'missing_title' }
+    end
+
+    if reportId and reportId > 0 then
+        local existing = SQL.single('SELECT id, title, author_identifier FROM tg_mdt_reports WHERE id = ? AND scope = ? LIMIT 1', { reportId, scope })
+        if not existing then
+            return { ok = false, reason = 'not_found' }
+        end
+
+        SQL.execute([[
+            UPDATE tg_mdt_reports
+            SET title = ?, category = ?, subject_identifier = ?, subject_name = ?, location = ?, priority = ?, status = ?, body = ?, updated_by = ?, archived_at = CASE WHEN ? = 'archived' THEN COALESCE(archived_at, CURRENT_TIMESTAMP) ELSE NULL END
+            WHERE id = ? AND scope = ?
+        ]], {
+            title,
+            category,
+            subjectIdentifier ~= '' and subjectIdentifier or nil,
+            subjectName ~= '' and subjectName or nil,
+            location ~= '' and location or nil,
+            priority,
+            status,
+            body,
+            actorIdentifier,
+            status,
+            reportId,
+            scope,
+        })
+
+        appendLeadershipAuditLog(scope, 'report_update', src, tostring(reportId), title, {
+            status = status,
+            category = category,
+        })
+
+        return { ok = true, reportId = reportId }
+    end
+
+    local insertedId = SQL.insert([[
+        INSERT INTO tg_mdt_reports (
+            scope, title, category, subject_identifier, subject_name, location, priority, status, body, author_identifier, author_name, updated_by, archived_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ]], {
+        scope,
+        title,
+        category,
+        subjectIdentifier ~= '' and subjectIdentifier or nil,
+        subjectName ~= '' and subjectName or nil,
+        location ~= '' and location or nil,
+        priority,
+        status,
+        body,
+        actorIdentifier,
+        actorName,
+        actorIdentifier,
+        status == 'archived' and os.date('%Y-%m-%d %H:%M:%S') or nil,
+    })
+
+    appendLeadershipAuditLog(scope, 'report_create', src, tostring(insertedId or 0), title, {
+        status = status,
+        category = category,
+    })
+
+    return { ok = true, reportId = insertedId }
+end)
+
+--- Archive a report. Only the original author or a boss may archive.
+---@param src number Player server id
+---@param reportId number|string Report id to archive
+---@return table { ok = boolean, reason = string? }
+lib.callback.register(CALLBACK_ARCHIVE_REPORT, function(src, reportId)
+    if not hasAccess(src) then
+        return { ok = false, reason = 'no_access' }
+    end
+
+    local id = tonumber(reportId)
+    if not id then
+        return { ok = false, reason = 'invalid_report_id' }
+    end
+
+    local scope = select(1, getLeadershipScopeInfo(src))
+    local actorIdentifier = getPlayerIdentifier(src)
+    local boss = isBossSource(src)
+    local row = SQL.single('SELECT id, title, author_identifier FROM tg_mdt_reports WHERE id = ? AND scope = ? LIMIT 1', { id, scope })
+    if not row then
+        return { ok = false, reason = 'not_found' }
+    end
+
+    if not boss and type(row.author_identifier) == 'string' and row.author_identifier ~= actorIdentifier then
+        return { ok = false, reason = 'not_allowed' }
+    end
+
+    SQL.execute([[
+        UPDATE tg_mdt_reports
+        SET status = 'archived', archived_at = COALESCE(archived_at, CURRENT_TIMESTAMP), updated_by = ?
+        WHERE id = ? AND scope = ?
+    ]], { actorIdentifier, id, scope })
+
+    appendLeadershipAuditLog(scope, 'report_archive', src, tostring(id), type(row.title) == 'string' and row.title or nil, {})
+
+    return { ok = true }
+end)
+
+--- Delete a report. Only the original author or a boss may delete.
+---@param src number Player server id
+---@param reportId number|string Report id to delete
+---@return table { ok = boolean, reason = string? }
+lib.callback.register(CALLBACK_DELETE_REPORT, function(src, reportId)
+    if not hasAccess(src) then
+        return { ok = false, reason = 'no_access' }
+    end
+
+    local id = tonumber(reportId)
+    if not id then
+        return { ok = false, reason = 'invalid_report_id' }
+    end
+
+    local scope = select(1, getLeadershipScopeInfo(src))
+    local actorIdentifier = getPlayerIdentifier(src)
+    local boss = isBossSource(src)
+    local row = SQL.single('SELECT id, title, author_identifier FROM tg_mdt_reports WHERE id = ? AND scope = ? LIMIT 1', { id, scope })
+    if not row then
+        return { ok = false, reason = 'not_found' }
+    end
+
+    if not boss and type(row.author_identifier) == 'string' and row.author_identifier ~= actorIdentifier then
+        return { ok = false, reason = 'not_allowed' }
+    end
+
+    SQL.execute('DELETE FROM tg_mdt_reports WHERE id = ? AND scope = ?', { id, scope })
+
+    appendLeadershipAuditLog(scope, 'report_delete', src, tostring(id), type(row.title) == 'string' and row.title or nil, {})
+
+    return { ok = true }
 end)
 
 lib.callback.register(CALLBACK_GET_LAWS, function(src)
