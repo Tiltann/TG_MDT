@@ -90,7 +90,7 @@ boss = {
 
 ### Standards
 
-Alle Coding- und Design-Standards für dieses Projekt sind in [`STANDARDS.md`](./STANDARDS.md) dokumentiert. **Bitte vor Beiträgen lesen.**
+Alle Coding und Design-Standards für dieses Projekt sind in [`STANDARDS.md`](./STANDARDS.md) dokumentiert. **Bitte vor Beiträgen lesen.**
 
 ### 🧩 Modulares Akten-Modell (Lua)
 
