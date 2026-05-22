@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Send, Trash2, Radio, Volume2, Wifi, WifiOff, Smartphone, Sparkles, PhoneOff } from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
@@ -75,6 +75,8 @@ export default function ChatView({
   const [radioFreq, setRadioFreq] = useState(meta?.radio?.activeFrequency || "103.5");
   const [currentFreq, setCurrentFreq] = useState(meta?.radio?.activeFrequency || "");
   const [isTransmitting, setIsTransmitting] = useState(false);
+  const visibleMessages = useMemo(() => messages.slice(-80), [messages]);
+  const hiddenMessageCount = Math.max(0, messages.length - visibleMessages.length);
 
   useEffect(() => {
     if (meta?.radio?.activeFrequency) {
@@ -309,13 +311,18 @@ export default function ChatView({
         {/* Right Column: Live Text Chat */}
         <div className="lg:col-span-7 flex flex-col gap-4 h-full min-h-0">
           <Card className="p-5 bg-zinc-950/40 border-zinc-800/80 rounded-2xl flex-1 flex flex-col gap-4 overflow-hidden shadow-2xl relative glass-panel">
+            {hiddenMessageCount > 0 && (
+              <div className="rounded-xl border border-zinc-800/60 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+                Showing newest {visibleMessages.length} of {messages.length} messages
+              </div>
+            )}
             <div className="flex-1 overflow-auto space-y-3.5 pr-1.5 premium-scroll">
-              {messages.length === 0 ? (
+              {visibleMessages.length === 0 ? (
                 <div className="h-full min-h-48 flex items-center justify-center text-sm text-zinc-500 italic">
                   {t("tablet.chat.empty")}
                 </div>
               ) : (
-                messages.map((item, i) => {
+                visibleMessages.map((item, i) => {
                   const isMe = item.author === currentUserName;
                   return (
                     <div
@@ -397,11 +404,20 @@ export default function ChatView({
               <textarea
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
+                onKeyDown={(event) => {
+                  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                    event.preventDefault();
+                    handleSend();
+                  }
+                }}
                 rows={2}
                 className="w-full p-3 bg-black/40 border border-zinc-800/60 focus:border-zinc-700/80 rounded-xl text-white text-sm placeholder-zinc-500 focus:outline-none transition-all duration-300 resize-none"
                 placeholder={t("tablet.chat.placeholder")}
               />
               <div className="flex items-center justify-end gap-2">
+                <span className="mr-auto text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+                  Ctrl+Enter to send
+                </span>
                 <Button
                   variant="ghost"
                   className="h-9 rounded-xl hover:bg-zinc-900/60 text-zinc-400 hover:text-white transition-all active:scale-95 duration-100"

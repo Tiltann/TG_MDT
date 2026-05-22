@@ -168,6 +168,11 @@ export function DashboardView({
     () => [...boardPosts].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)),
     [boardPosts]
   );
+  const [showAllBoardPosts, setShowAllBoardPosts] = useState(false);
+  const visibleBoardPosts = useMemo(
+    () => (showAllBoardPosts ? sortedBoardPosts : sortedBoardPosts.slice(0, 6)),
+    [showAllBoardPosts, sortedBoardPosts]
+  );
 
   const [chatDraft, setChatDraft] = useState("");
 
@@ -306,6 +311,15 @@ export function DashboardView({
             <div className="rounded-full border border-zinc-900 bg-black/50 px-3 py-0.5 text-[9px]  font-bold text-zinc-400">
               {sortedBoardPosts.length} ACTIVE NOTICES
             </div>
+            {sortedBoardPosts.length > 6 && (
+              <button
+                type="button"
+                onClick={() => setShowAllBoardPosts((prev) => !prev)}
+                className="ml-3 rounded-full border border-zinc-900 bg-black/40 px-3 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-300 transition-colors hover:border-zinc-800 hover:text-white"
+              >
+                {showAllBoardPosts ? "Show less" : `Show all (${sortedBoardPosts.length})`}
+              </button>
+            )}
           </div>
 
           <div className="space-y-4 p-5 overflow-y-auto max-h-[30rem] premium-scroll">
@@ -318,7 +332,7 @@ export function DashboardView({
                 <p className="mt-1 max-w-xs text-[10px] text-zinc-650 leading-relaxed">{t("tablet.dashboard.black_board_hint")}</p>
               </div>
             ) : (
-              sortedBoardPosts.map((post, index) => (
+              visibleBoardPosts.map((post, index) => (
                 <article 
                   key={post.id} 
                   className="rounded-2xl border border-zinc-900 bg-black/15 p-5 hover:border-zinc-800 transition-all duration-300 relative group animate-mdt-fade-in-up"

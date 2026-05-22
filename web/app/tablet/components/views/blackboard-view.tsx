@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Camera, Plus, ClipboardList, Sparkles, BookOpen, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -56,6 +56,12 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
   const [images, setImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [expiryHours, setExpiryHours] = useState("48");
+  const [showAllPosts, setShowAllPosts] = useState(false);
+
+  const visibleBoardPosts = useMemo(
+    () => (showAllPosts ? boardPosts : boardPosts.slice(0, 6)),
+    [boardPosts, showAllPosts]
+  );
 
   const handleTakeImage = async () => {
     if (!boardAdmin || !onTakeBoardImage) return;
@@ -96,8 +102,19 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
           </h3>
           <p className="text-xs text-[var(--mdt-text-muted)] mt-1">{t("tablet.dashboard.black_board_hint")}</p>
         </div>
-        <div className="rounded-full border border-zinc-800 bg-zinc-900/50 px-4 py-1.5 text-xs text-zinc-300 font-bold uppercase tracking-wider shadow-sm">
-          {boardPosts.length} Active Posts
+        <div className="flex items-center gap-2">
+          <div className="rounded-full border border-zinc-800 bg-zinc-900/50 px-4 py-1.5 text-xs text-zinc-300 font-bold uppercase tracking-wider shadow-sm">
+            {boardPosts.length} Active Posts
+          </div>
+          {boardPosts.length > 6 && (
+            <button
+              type="button"
+              onClick={() => setShowAllPosts((prev) => !prev)}
+              className="rounded-full border border-zinc-800 bg-black/35 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white"
+            >
+              {showAllPosts ? "Show less" : `Show all (${boardPosts.length})`}
+            </button>
+          )}
         </div>
       </div>
 
@@ -112,7 +129,7 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
               </p>
             </div>
           ) : (
-            boardPosts.map((post, index) => (
+            visibleBoardPosts.map((post, index) => (
               <article 
                 key={post.id} 
                 style={{ animationDelay: `${index * 55}ms`, animationFillMode: "both" }}

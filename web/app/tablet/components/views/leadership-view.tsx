@@ -68,6 +68,8 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
   const [logSearch, setLogSearch] = useState("");
   const [logActionFilter, setLogActionFilter] = useState("all");
   const [logsLoading, setLogsLoading] = useState(false);
+  const [auditPage, setAuditPage] = useState(1);
+  const AUDIT_PAGE_SIZE = 25;
 
   const fetchMembers = () => {
     setLoading(true);
@@ -110,6 +112,10 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
 
     return () => window.clearTimeout(timeout);
   }, [activeSubTab, fetchLogs]);
+
+  useEffect(() => {
+    setAuditPage(1);
+  }, [activeSubTab, logActionFilter, logSearch]);
 
   const selectedMember = useMemo(() => {
     return members.find((m) => m.identifier === selectedMemberId) || null;
@@ -228,6 +234,12 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
         return action;
     }
   };
+
+  const totalAuditPages = Math.max(1, Math.ceil(auditLogs.length / AUDIT_PAGE_SIZE));
+  const visibleAuditLogs = useMemo(() => {
+    const startIndex = (auditPage - 1) * AUDIT_PAGE_SIZE;
+    return auditLogs.slice(startIndex, startIndex + AUDIT_PAGE_SIZE);
+  }, [auditPage, auditLogs]);
 
   return (
     <div className="space-y-5 animate-mdt-view flex flex-col h-full min-h-0">
@@ -526,7 +538,7 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
               ) : auditLogs.length === 0 ? (
                 <p className="text-xs text-zinc-500 italic text-center py-8">Keine Protokolleinträge gefunden.</p>
               ) : (
-                auditLogs.map((log) => (
+                visibleAuditLogs.map((log) => (
                   <div
                     key={log.id}
                     className="rounded-lg border border-zinc-900 bg-zinc-950/40 p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
@@ -554,6 +566,32 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
                 ))
               )}
             </div>
+
+            {auditLogs.length > AUDIT_PAGE_SIZE && (
+              <div className="flex items-center justify-between gap-3 border-t border-zinc-900 pt-3 mt-3 flex-shrink-0">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+                  Page {auditPage} of {totalAuditPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    className="h-8 rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 text-xs"
+                    onClick={() => setAuditPage((page) => Math.max(1, page - 1))}
+                    disabled={auditPage <= 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="h-8 rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 text-xs"
+                    onClick={() => setAuditPage((page) => Math.min(totalAuditPages, page + 1))}
+                    disabled={auditPage >= totalAuditPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         )}
       </div>
