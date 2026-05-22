@@ -163,8 +163,8 @@ Config.MDT = {
         --              { 'police', 'sheriff', 'ems' }
         --            Multiple groups (independent share clusters):
         --              {
-        --                  { 'police', 'sheriff' },
-        --                  { 'ambulance', 'mechanic' },
+        --                  { 'pd' },                  -- entire PD agency (department key)
+        --                  { 'ems', 'mechanic' },     -- mixed agency/job group
         --              }
         --            You can use job names OR department keys from MDT.departments.
         share_between_jobs = 'all',
@@ -178,13 +178,17 @@ Config.MDT = {
         -- Configurable status catalog (numeric/radio-style codes).
         -- IMPORTANT: Use label_key for localization and add the key to locales/en.json and locales/de.json.
         -- Optional `label` acts as fallback if the localization key is missing.
+        -- Optional scope fields per status entry:
+        --   jobs     = { 'police', 'sheriff' }   -- only these jobs can use/see this status
+        --   agencies = { 'pd', 'ems' }           -- only these department keys can use/see this status
+        -- If both are set, both conditions must match.
         -- color supports: green, blue, yellow, purple, gray, red
         status_codes = {
             { code = '10-8', label_key = 'tablet.dispatch.status.10-8', label = 'Available', color = 'green' },
             { code = '10-6', label_key = 'tablet.dispatch.status.10-6', label = 'Busy', color = 'yellow' },
-            { code = '10-97', label_key = 'tablet.dispatch.status.10-97', label = 'On Scene', color = 'blue' },
+            { code = '10-97', label_key = 'tablet.dispatch.status.10-97', label = 'On Scene', color = 'blue', agencies = { 'pd' } },
             { code = '10-23', label_key = 'tablet.dispatch.status.10-23', label = 'En Route', color = 'blue' },
-            { code = '10-7', label_key = 'tablet.dispatch.status.10-7', label = 'Out of Service', color = 'gray' },
+            { code = '10-7', label_key = 'tablet.dispatch.status.10-7', label = 'Out of Service', color = 'gray', jobs = { 'ambulance' } },
         },
 
         -- Number of closed dispatch records kept for history panels/log views.

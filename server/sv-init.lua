@@ -1476,6 +1476,10 @@ local function resolveDispatchSharing()
                 if token == 'all' or token == '*' then
                     return true, nil
                 end
+                local group = buildDispatchShareGroup({ token })
+                if group then
+                    groups[#groups + 1] = group
+                end
             elseif type(entry) == 'table' then
                 local group = buildDispatchShareGroup(entry)
                 if group then
@@ -1504,6 +1508,23 @@ local function resolveDispatchSharing()
     end
 
     return false, groups
+end
+
+---@param left table<string, boolean>
+---@param right table<string, boolean>
+---@return boolean
+local function setsIntersect(left, right)
+    if type(left) ~= 'table' or type(right) ~= 'table' then
+        return false
+    end
+
+    for key, value in pairs(left) do
+        if value == true and right[key] == true then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function resolvePlayerJobInfo(src)
@@ -1570,12 +1591,19 @@ local function canViewDispatchCall(src, call)
         return false
     end
 
-    local scopeJob = normalizeJobName(call.scopeJob)
-    if scopeJob == '' then
+    local viewerSet = { [viewerJob] = true }
+
+    local scopeToken = normalizeJobName(call.scopeJob)
+    if scopeToken == '' then
         return true
     end
 
-    if viewerJob == scopeJob then
+    local scopeSet = buildDispatchShareGroup({ scopeToken })
+    if type(scopeSet) ~= 'table' then
+        return false
+    end
+
+    if setsIntersect(viewerSet, scopeSet) then
         return true
     end
 
@@ -1585,7 +1613,101 @@ local function canViewDispatchCall(src, call)
 
     for i = 1, #shareGroups do
         local group = shareGroups[i]
-        if type(group) == 'table' and group[viewerJob] == true and group[scopeJob] == true then
+        if type(group) == 'table' and setsIntersect(viewerSet, group) and setsIntersect(scopeSet, group) then
+            return true
+        end
+    end
+
+    return false
+end
+
+---@param viewerJob string
+---@return string
+local function resolveViewerAgencyKey(viewerJob)
+    local departments = Config and Config.MDT and Config.MDT.departments
+    if viewerJob == '' or type(departments) ~= 'table' then
+        return ''
+    end
+
+    for agencyKey, deptCfg in pairs(departments) do
+        if type(deptCfg) == 'table' and jobListContains(deptCfg.jobs, viewerJob) then
+            return normalizeJobName(agencyKey)
+        end
+    end
+
+    return ''
+end
+
+---@param value any
+---@return table|nil
+local function normalizeStatusScopeList(value)
+    if type(value) == 'table' then
+        return value
+    end
+    if type(value) == 'string' and value ~= '' then
+        return { value }
+    end
+    return nil
+end
+
+---@param statusCfg table
+---@param viewerJob string
+---@param viewerAgency string
+---@return boolean
+local function statusCodeMatchesScope(statusCfg, viewerJob, viewerAgency)
+    if type(statusCfg) ~= 'table' then
+        return false
+    end
+
+    local jobsScope = normalizeStatusScopeList(statusCfg.jobs)
+    if jobsScope and not jobListContains(jobsScope, viewerJob) then
+        return false
+    end
+
+    local agenciesScope = normalizeStatusScopeList(statusCfg.agencies or statusCfg.departments)
+    if agenciesScope and not jobListContains(agenciesScope, viewerAgency) then
+        return false
+    end
+
+    return true
+end
+
+---@param src number
+---@return table
+local function getScopedDispatchStatusCodes(src)
+    local dispatchCfg = Config and Config.MDT and Config.MDT.dispatch
+    local rawCodes = type(dispatchCfg) == 'table' and dispatchCfg.status_codes or nil
+    if type(rawCodes) ~= 'table' then
+        return {}
+    end
+
+    local viewerJob = getViewerJobName(src)
+    local viewerAgency = resolveViewerAgencyKey(viewerJob)
+    local filtered = {}
+
+    for i = 1, #rawCodes do
+        local entry = rawCodes[i]
+        if type(entry) == 'table' and type(entry.code) == 'string' and entry.code ~= '' then
+            if statusCodeMatchesScope(entry, viewerJob, viewerAgency) then
+                filtered[#filtered + 1] = entry
+            end
+        end
+    end
+
+    return filtered
+end
+
+---@param src number
+---@param status string
+---@return boolean
+local function isDispatchStatusAllowedForSource(src, status)
+    local scopedCodes = getScopedDispatchStatusCodes(src)
+    if #scopedCodes == 0 then
+        return true
+    end
+
+    for i = 1, #scopedCodes do
+        if scopedCodes[i].code == status then
             return true
         end
     end
@@ -1752,6 +1874,10 @@ lib.callback.register(CALLBACK_SET_DISPATCH_STATUS, function(src, payload)
     local body = type(payload) == 'table' and payload or {}
     local status = type(body.status) == 'string' and body.status or ''
     if status == '' then
+        return false
+    end
+
+    if not isDispatchStatusAllowedForSource(src, status) then
         return false
     end
 

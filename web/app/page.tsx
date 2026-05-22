@@ -78,7 +78,15 @@ type NuiMetaPayload = {
       share_between_jobs?: boolean | string | Array<string | string[]>;
       default_status?: string;
       off_duty_status?: string;
-      status_codes?: Array<{ code?: string; label_key?: string; label?: string; color?: "green" | "blue" | "yellow" | "purple" | "gray" | "red" }>;
+      status_codes?: Array<{
+        code?: string;
+        label_key?: string;
+        label?: string;
+        jobs?: string[];
+        agencies?: string[];
+        departments?: string[];
+        color?: "green" | "blue" | "yellow" | "purple" | "gray" | "red";
+      }>;
     };
   };
   akteModels?: {
@@ -1250,6 +1258,47 @@ export default function Home({ devMode = false }: HomeProps) {
   const currentOfficerId = "self";
   const dispatchStatusOptions = useMemo<DispatchStatusOption[]>(() => {
     const rawOptions = typedMeta.mdt?.dispatch?.status_codes;
+    const departments = typedMeta.mdt?.departments || {};
+    const activeJob = normalizeJobKey(
+      dutyState.dutyJobName || dutyState.jobName || sessionJob
+    );
+
+    let activeAgency = "";
+    if (activeJob !== "") {
+      for (const [agencyKey, dept] of Object.entries(departments)) {
+        if (!dept || !Array.isArray(dept.jobs)) continue;
+        if (dept.jobs.some((jobName) => normalizeJobKey(jobName) === activeJob)) {
+          activeAgency = normalizeJobKey(agencyKey);
+          break;
+        }
+      }
+    }
+
+    const matchesScope = (entry: {
+      jobs?: string[];
+      agencies?: string[];
+      departments?: string[];
+    }): boolean => {
+      const scopedJobs = Array.isArray(entry.jobs)
+        ? entry.jobs.map((job) => normalizeJobKey(job)).filter(Boolean)
+        : [];
+      if (scopedJobs.length > 0 && !scopedJobs.includes(activeJob)) {
+        return false;
+      }
+
+      const rawAgencyScope = Array.isArray(entry.agencies)
+        ? entry.agencies
+        : Array.isArray(entry.departments)
+          ? entry.departments
+          : [];
+      const scopedAgencies = rawAgencyScope.map((agency) => normalizeJobKey(agency)).filter(Boolean);
+      if (scopedAgencies.length > 0 && !scopedAgencies.includes(activeAgency)) {
+        return false;
+      }
+
+      return true;
+    };
+
     if (!Array.isArray(rawOptions) || rawOptions.length === 0) {
       return [
         { code: "10-8", label: t("tablet.dispatch.status.10-8", undefined, "Available"), color: "green" },
@@ -1261,6 +1310,7 @@ export default function Home({ devMode = false }: HomeProps) {
     }
 
     return rawOptions
+      .filter((entry) => matchesScope(entry || {}))
       .map((entry) => {
         const code = typeof entry?.code === "string" ? entry.code : "";
         const fallback = typeof entry?.label === "string" ? entry.label : (code || "Status");
@@ -1273,7 +1323,7 @@ export default function Home({ devMode = false }: HomeProps) {
         };
       })
       .filter((entry) => entry.code !== "");
-  }, [t, typedMeta.mdt?.dispatch?.status_codes]);
+  }, [dutyState.dutyJobName, dutyState.jobName, sessionJob, t, typedMeta.mdt?.departments, typedMeta.mdt?.dispatch?.status_codes]);
   const dispatchDefaultStatus =
     (typeof typedMeta.mdt?.dispatch?.default_status === "string" && typedMeta.mdt?.dispatch?.default_status) ||
     (dispatchStatusOptions[0]?.code || "10-8");
