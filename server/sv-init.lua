@@ -203,6 +203,27 @@ local function getIdentifierDebugSummary(src)
     return table.concat(candidates, ',')
 end
 
+---@param value any
+---@return string
+local function normalizeResolvedJobName(value)
+    if type(value) == 'string' then
+        local job = value:gsub('^%s+', ''):gsub('%s+$', '')
+        if job ~= '' then
+            return string.lower(job)
+        end
+    elseif type(value) == 'table' then
+        if type(value.name) == 'string' and value.name ~= '' then
+            return normalizeResolvedJobName(value.name)
+        end
+
+        if type(value.job) == 'table' then
+            return normalizeResolvedJobName(value.job)
+        end
+    end
+
+    return ''
+end
+
 ---@param src number
 ---@return string
 ---@return number|nil
@@ -290,21 +311,23 @@ local function resolveAccessJobName(src)
 
     if type(Framework.Server.getJob) == 'function' then
         local okJob, job = pcall(Framework.Server.getJob, src)
-        if okJob and type(job) == 'string' and job ~= '' then
-            return string.lower(job)
+        local resolvedJob = okJob and normalizeResolvedJobName(job) or ''
+        if resolvedJob ~= '' then
+            return resolvedJob
         end
     end
 
     if type(Framework.Server.getJobData) == 'function' then
         local okJobData, jobData = pcall(Framework.Server.getJobData, src)
-        if okJobData and type(jobData) == 'table' and type(jobData.name) == 'string' and jobData.name ~= '' then
-            return string.lower(jobData.name)
+        local resolvedJob = okJobData and normalizeResolvedJobName(jobData) or ''
+        if resolvedJob ~= '' then
+            return resolvedJob
         end
     end
 
     if type(Framework.Server.getPlayer) == 'function' then
         local okPlayer, player = pcall(Framework.Server.getPlayer, src)
-        if okPlayer and player then
+        if okPlayer and type(player) == 'table' then
             local rawJob = nil
             if type(player.job) == 'table' then
                 rawJob = player.job
@@ -314,13 +337,14 @@ local function resolveAccessJobName(src)
                 local okGetJob, resolvedJob = pcall(function()
                     return player.getJob()
                 end)
-                if okGetJob and type(resolvedJob) == 'table' then
+                if okGetJob then
                     rawJob = resolvedJob
                 end
             end
 
-            if type(rawJob) == 'table' and type(rawJob.name) == 'string' and rawJob.name ~= '' then
-                return string.lower(rawJob.name)
+            local resolvedJob = normalizeResolvedJobName(rawJob)
+            if resolvedJob ~= '' then
+                return resolvedJob
             end
         end
     end
