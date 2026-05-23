@@ -86,7 +86,18 @@ export function useNuiEvent<T = unknown>(
 ): void {
   useEffect(() => {
     const listener = (event: MessageEvent) => {
-      const { type: evtType, data } = event.data ?? {};
+      // In FiveM NUI, messages originate from the game engine via the resource URL
+      // (nui://<resource>). Reject any message that does not carry a plain-object
+      // payload — this filters out browser/extension noise in dev mode.
+      if (!event.data || typeof event.data !== "object") return;
+
+      // In production (inside FiveM) the origin is the resource NUI URL.
+      // In dev mode (browser) we allow same-origin messages only.
+      if (IS_FIVEM && event.origin && !event.origin.startsWith("nui://") && event.origin !== window.location.origin) {
+        return;
+      }
+
+      const { type: evtType, data } = event.data as { type?: unknown; data?: unknown };
       if (evtType === type) handler(data as T);
     };
     window.addEventListener("message", listener);

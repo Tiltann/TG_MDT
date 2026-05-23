@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Camera, Plus, ClipboardList, Sparkles, BookOpen, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import type { TFunction } from "../../lib/i18n";
@@ -158,7 +159,7 @@ export default function BlackboardView({ t, boardPosts, boardAdmin, onTakeBoardI
                 </div>
 
                 <div className="prose prose-invert max-w-none mt-4 text-xs leading-relaxed text-zinc-300 prose-p:my-1.5 prose-li:my-0.5 font-medium border-t border-zinc-800/40 pt-3">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.body}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{post.body}</ReactMarkdown>
                 </div>
 
                 {post.images.length > 0 && (

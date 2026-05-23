@@ -1081,6 +1081,11 @@ export default function Home({ devMode = false }: HomeProps) {
 
   useNuiEvent<NuiDataPayload>("setData", (data) => {
     if (!data?.key) return;
+    const ALLOWED_KEYS = new Set([
+      "meta", "player", "duty", "dispatchState", "dispatchHistory",
+      "radioMembers", "akteSync",
+    ]);
+    if (!ALLOWED_KEYS.has(data.key as string)) return;
     setScreenData((prev) => ({
       ...prev,
       [data.key as string]: data.value,

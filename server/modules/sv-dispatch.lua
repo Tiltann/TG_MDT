@@ -731,6 +731,10 @@ end)
 
 RegisterNetEvent(EVENT_SERVER_CREATE_DISPATCH, function(payload)
     local src = source
+    if not hasMdtAccess(src) then
+        Debug.warn(('Dispatch event create denied: Player %s has no MDT access'):format(src))
+        return
+    end
     local result = DispatchModule.createFromExternal(src, payload)
     if result.ok ~= true then
         Debug.warn(('Dispatch event create failed: %s'):format(tostring(result.reason or 'unknown')))

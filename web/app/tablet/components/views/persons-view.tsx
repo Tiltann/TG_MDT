@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { fetchNui } from "../../../../lib/useNui";
@@ -768,7 +769,10 @@ export default function PersonsView({
       });
   };
 
-  const updateAkteField = (field: string, value: string, editable = true) => {
+  // Debounce ref so rapid text input does not fire a network request per keystroke.
+  const persistDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateAkteField = useCallback((field: string, value: string, editable = true) => {
     if (!selectedPerson) return;
     if (!editable) return;
 
@@ -787,9 +791,13 @@ export default function PersonsView({
       };
     });
 
-    // Persist only the changed field so stale defaults cannot overwrite image data.
-    persistAkte(identifier, { [field]: value });
-  };
+    // Debounce: wait 500 ms of inactivity before persisting to the server.
+    if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current);
+    persistDebounceRef.current = setTimeout(() => {
+      persistAkte(identifier, { [field]: value });
+    }, 500);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPerson, selectedCompartment]);
 
   const saveAkte = () => {
     if (!selectedPerson) return;
@@ -1603,7 +1611,7 @@ export default function PersonsView({
                             </button>
                           </div>
                           <div className="text-xs text-zinc-300 whitespace-pre-wrap break-words prose prose-invert max-w-none prose-p:my-1 prose-li:my-0 leading-relaxed font-medium bg-black/10 p-2.5 rounded border border-zinc-900">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.text}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{note.text}</ReactMarkdown>
                           </div>
                         </div>
                       ))
@@ -1626,7 +1634,7 @@ export default function PersonsView({
                       <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.02] p-3 animate-mdt-scale-in glass-panel">
                         <p className="text-[9px] uppercase tracking-widest text-amber-500 font-bold mb-1.5">{t("tablet.notes.preview")}</p>
                         <div className="text-xs text-zinc-200 prose prose-invert max-w-none prose-p:my-1 prose-li:my-0 leading-relaxed">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{newNoteText}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{newNoteText}</ReactMarkdown>
                         </div>
                       </div>
                     )}

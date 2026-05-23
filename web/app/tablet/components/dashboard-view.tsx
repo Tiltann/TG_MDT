@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import type { TFunction } from "../lib/i18n";
@@ -354,7 +355,7 @@ export function DashboardView({
                   </div>
 
                   <div className="prose prose-invert max-w-none text-xs leading-relaxed text-zinc-300 font-medium pl-1 prose-p:my-1.5 prose-strong:text-white prose-strong:font-bold">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.body}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{post.body}</ReactMarkdown>
                   </div>
 
                   {post.images.length > 0 && (

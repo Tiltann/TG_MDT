@@ -1552,11 +1552,37 @@ end
 ---@param requestedScope string|nil
 ---@return string
 local function resolveRequestedAkteScope(src, requestedScope)
-    if type(requestedScope) == 'string' and requestedScope ~= '' then
-        return normalizeAkteScopeName(requestedScope)
+    -- Always compute the server-authoritative scope for this player first.
+    local own_scope = getAkteScope(src)
+
+    if type(requestedScope) ~= 'string' or requestedScope == '' then
+        return own_scope
     end
 
-    return getAkteScope(src)
+    local normalized = normalizeAkteScopeName(requestedScope)
+
+    -- Build the whitelist of scopes this player is allowed to access.
+    local models = Config.AkteModels or {}
+    local job_models = type(models.job_models) == 'table' and models.job_models or {}
+    local viewer_job = getViewerJobName(src)
+    local allowed = { [own_scope] = true }
+
+    for owner_job, cfg in pairs(job_models) do
+        if type(cfg) == 'table' then
+            if jobListContains(cfg.jobs, viewer_job) or jobListContains(cfg.shared_with, viewer_job) then
+                local s = normalizeAkteScopeName(cfg.compartment or cfg.scope or cfg.group or owner_job or viewer_job)
+                allowed[s] = true
+            end
+        end
+    end
+
+    if allowed[normalized] then
+        return normalized
+    end
+
+    -- Requested scope is not in the whitelist — fall back to own scope and log.
+    Debug.warn(('Akte scope denied: src=%s requested="%s" own="%s"'):format(tostring(src), normalized, own_scope))
+    return own_scope
 end
 
 ---@param src number|nil
@@ -2640,6 +2666,12 @@ lib.callback.register(CALLBACK_SAVE_REPORT, function(src, payload)
         local existing = SQL.single('SELECT id, title, author_identifier FROM tg_mdt_reports WHERE id = ? AND scope = ? LIMIT 1', { reportId, scope })
         if not existing then
             return { ok = false, reason = 'not_found' }
+        end
+
+        -- Only the original author or a boss may update a report (same rule as archive/delete).
+        local boss = isBossSource(src)
+        if not boss and type(existing.author_identifier) == 'string' and existing.author_identifier ~= actorIdentifier then
+            return { ok = false, reason = 'not_allowed' }
         end
 
         SQL.execute([[

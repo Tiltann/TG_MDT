@@ -105,6 +105,9 @@ exports('ToggleDutyState', function(src, options)
 end)
 
 --- Create dispatch with optional autofill (coords, street, caller).
+--- NOTE: This export is intended for trusted server-side resources only.
+--- Direct use with a valid player source is permitted; sourceOverride = 0
+--- creates an anonymous (system) dispatch.
 ---@param payload table
 ---@param sourceOverride number|nil
 ---@return table
@@ -114,6 +117,10 @@ exports('CreateDispatch', function(payload, sourceOverride)
     end
 
     local src = type(sourceOverride) == 'number' and sourceOverride or 0
+    -- When a real player source is provided, verify MDT access.
+    if src > 0 and not GetPlayerName(src) then
+        return { ok = false, reason = 'invalid_source' }
+    end
     return DispatchModule.createFromExternal(src, payload)
 end)
 
@@ -193,6 +200,7 @@ exports('GetDispatchDataBundle', function(viewerSource, options)
 end)
 
 --- Returns a person case (Akte) by identifier.
+--- NOTE: Server-side export for trusted integrations. No player-facing access check.
 ---@param identifier string
 ---@param options table|nil
 ---@return table
@@ -206,7 +214,12 @@ exports('GetPersonCaseByIdentifier', function(identifier, options)
     end
 
     local opts = type(options) == 'table' and options or {}
-    return TG_MDT_GetPersonCaseByIdentifier(identifier, opts.src, opts.compartment)
+    -- If a viewer source is provided, validate it is a real connected player.
+    local src = type(opts.src) == 'number' and opts.src or nil
+    if src ~= nil and not GetPlayerName(src) then
+        return {}
+    end
+    return TG_MDT_GetPersonCaseByIdentifier(identifier, src, opts.compartment)
 end)
 
 --- Returns a person case (Akte) by online player source id.

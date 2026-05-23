@@ -8,6 +8,7 @@ import type { TFunction } from "../../lib/i18n";
 import { fetchNui } from "@/lib/useNui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 
 type Offense = {
   code: string;
@@ -446,6 +447,7 @@ export default function PenaltiesView({ t, isBoss = false }: { t: TFunction; isB
                   <div className="p-2">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeSanitize]}
                       components={{
                         h1: ({node, ...props}) => <h1 className="text-2xl font-black text-white mt-4 mb-4 border-b border-zinc-800 pb-2 tracking-tight" {...props} />,
                         h2: ({node, ...props}) => <h2 className="text-xl font-bold text-zinc-100 mt-5 mb-3 tracking-tight" {...props} />,
@@ -500,6 +502,7 @@ export default function PenaltiesView({ t, isBoss = false }: { t: TFunction; isB
                 <div className="max-w-4xl mx-auto py-2">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeSanitize]}
                     components={{
                       h1: ({node, ...props}) => <h1 className="text-2xl font-black text-white mt-4 mb-4 border-b border-zinc-800 pb-2 tracking-tight" {...props} />,
                       h2: ({node, ...props}) => <h2 className="text-xl font-bold text-zinc-100 mt-5 mb-3 tracking-tight" {...props} />,
