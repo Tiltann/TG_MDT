@@ -269,6 +269,25 @@ if IsDuplicityVersion() then
 
 -- ── client ────────────────────────────────────────────────
 else
+    local PlayerData = {}
+
+    --- Pre-populate PlayerData from ESX once the shared object is available.
+    ---@param esx_obj table
+    local function preFetchPlayerData(esx_obj)
+        if type(esx_obj.GetPlayerData) == 'function' then
+            local ok, data = pcall(esx_obj.GetPlayerData)
+            if ok and type(data) == 'table' and (data.firstname or data.charinfo) then
+                PlayerData = data
+                TriggerEvent('TG_MDT:internal:playerDataReady')
+                return
+            end
+        end
+        if type(esx_obj.PlayerData) == 'table' and (esx_obj.PlayerData.firstname or esx_obj.PlayerData.charinfo) then
+            PlayerData = esx_obj.PlayerData
+            TriggerEvent('TG_MDT:internal:playerDataReady')
+        end
+    end
+
     CreateThread(function()
         local timeout_at = GetGameTimer() + 15000
 
@@ -277,6 +296,8 @@ else
             if status == 'started' or status == 'starting' then
                 ESX = getEsxObject('client')
                 if ESX ~= nil then
+                    -- Player may already be loaded (e.g. resource restart while in-game).
+                    preFetchPlayerData(ESX)
                     break
                 end
             end
@@ -289,11 +310,10 @@ else
         end
     end)
 
-    local PlayerData = {}
-
     RegisterNetEvent(EVENT_ESX_PLAYER_LOADED)
     AddEventHandler(EVENT_ESX_PLAYER_LOADED, function(xPlayer)
         PlayerData = xPlayer
+        TriggerEvent('TG_MDT:internal:playerDataReady')
     end)
 
     RegisterNetEvent(EVENT_ESX_SET_JOB)

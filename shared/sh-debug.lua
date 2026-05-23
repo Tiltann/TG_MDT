@@ -4,11 +4,11 @@
 --  Exposes a global `Debug` table loaded by every context.
 --
 --  Levels:
---    Debug.info      – debug only, normal flow
---    Debug.warn      – always printed, something is off
---    Debug.error     – always printed, something broke
---    Debug.debug     – opt-in verbose output
---    Debug.sensitive – separate opt-in, never in prod
+--    Debug.info      – always visible: startup messages, state changes
+--    Debug.warn      – always visible: missing optional config, degraded function
+--    Debug.error     – always visible: failures that break features
+--    Debug.debug     – opt-in: verbose internals, raw data dumps
+--    Debug.sensitive – separate opt-in: IDs, payloads — dev only
 --
 --  Enable via config or convar:
 --    Config.Debug = true
@@ -18,7 +18,8 @@
 -- ============================================================
 
 local RESOURCE = GetCurrentResourceName()
-local PREFIX   = ('[TG][%s]'):format(RESOURCE)
+local CONTEXT  = IsDuplicityVersion() and 'SV' or 'CL'
+local PREFIX   = ('[TG][%s][%s]'):format(RESOURCE, CONTEXT)
 
 -- ── helper: resolve a convar bool ──────────────────────────
 local function getConvar(name)
@@ -30,7 +31,6 @@ local function resolveFlags()
     local debug_on     = false
     local sensitive_on = false
 
-    -- check Config.Debug (set in config/config.lua or similar)
     if type(Config) == 'table' and Config.Debug ~= nil then
         local d = Config.Debug
         if type(d) == 'boolean' then
@@ -41,7 +41,6 @@ local function resolveFlags()
         end
     end
 
-    -- convar fallback / override
     if not debug_on then
         debug_on = getConvar(('debug_%s'):format(RESOURCE))
     end
@@ -59,18 +58,16 @@ local function log(level, color, ...)
         local v = select(i, ...)
         parts[#parts + 1] = type(v) == 'table' and json.encode(v) or tostring(v)
     end
-    print(('^%d%s[%s]^7 %s'):format(color, PREFIX, level, table.concat(parts, ' ')))
+    print(('^%d%s ^7[^%d%s^7]^7 %s'):format(color, PREFIX, color, level, table.concat(parts, ' ')))
 end
 
 -- ── public API ────────────────────────────────────────────
 Debug = {}
 
---- Debug-only. Use for startup messages and normal state changes.
+--- Always visible. Use for startup messages and normal state changes.
 ---@param ... any
 function Debug.info(...)
-    local enabled, _ = resolveFlags()
-    if not enabled then return end
-    log('INFO', 6, ...)
+    log('INFO', 2, ...)
 end
 
 --- Always visible. Use when something optional is missing or degraded.

@@ -18,6 +18,7 @@ local EVENT_CLIENT_AKTE_UPDATED = 'TG_MDT:akteUpdated'
 local EVENT_CLIENT_DUTY_STATE_CHANGED = 'TG_MDT:dutyStateChanged'
 local EVENT_CLIENT_DISPATCH_STATE_CHANGED = 'TG_MDT:dispatchStateChanged'
 local EVENT_CLIENT_DISPATCH_HISTORY_CHANGED = 'TG_MDT:dispatchHistoryChanged'
+local EVENT_INTERNAL_PLAYER_DATA_READY = 'TG_MDT:internal:playerDataReady'
 
 local CALLBACK_TOGGLE_DUTY = 'TG_MDT:toggleDuty'
 local CALLBACK_SET_DUTY_STATE = 'TG_MDT:setDutyState'
@@ -156,8 +157,6 @@ local function buildPlayerUiData()
 		name = first
 	elseif type(last) == 'string' and last ~= '' then
 		name = last
-	elseif type(GetPlayerName(PlayerId())) == 'string' then
-		name = GetPlayerName(PlayerId())
 	end
 
 	if type(job) == 'table' then
@@ -665,6 +664,16 @@ RegisterNetEvent(EVENT_CLIENT_DISPATCH_HISTORY_CHANGED, function(payload)
 	NUI.send('setData', {
 		key = 'dispatchHistory',
 		value = payload,
+	})
+end)
+
+--- Re-send player data to the NUI as soon as the framework bridge has character data.
+--- Fired by the ESX bridge after the shared object is acquired or esx:playerLoaded fires.
+AddEventHandler(EVENT_INTERNAL_PLAYER_DATA_READY, function()
+	Debug.debug('playerDataReady — refreshing player UI data')
+	NUI.send('setData', {
+		key = 'player',
+		value = buildPlayerUiData(),
 	})
 end)
 

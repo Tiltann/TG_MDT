@@ -46,6 +46,7 @@ if IsDuplicityVersion() then
         Bridge.initialized = true
     end
 
+
     --- Get Qbox player object by server id.
     ---@param src number
     ---@return table|nil

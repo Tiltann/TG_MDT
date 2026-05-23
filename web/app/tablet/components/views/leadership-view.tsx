@@ -406,7 +406,7 @@ export default function LeadershipView({ t, actorGrade, actorName }: LeadershipV
                       <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
                         selectedMember.online ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-zinc-900 text-zinc-500 border border-zinc-900"
                       }`}>
-                        {selectedMember.online ? `Online (Source ${selectedMember.source})` : "Offline"}
+                        {selectedMember.online ? `Online (ID: ${selectedMember.source})` : "Offline"}
                       </span>
                       {selectedMember.online && selectedMember.radioCode && (
                         <p className="text-[10px] text-zinc-400 mt-1 flex items-center gap-1 justify-end font-semibold">

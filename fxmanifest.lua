@@ -51,5 +51,6 @@ files {
 dependencies {
     'ox_lib',
     'oxmysql',
-    'screenshot-basic'
+    'screenshot-basic',
+    'es_extended',
 }

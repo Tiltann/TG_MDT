@@ -2404,7 +2404,7 @@ lib.callback.register(CALLBACK_GET_LEADERSHIP_MEMBERS, function(src)
                     or (data.gradeDisplay ~= '' and data.gradeDisplay or ('Grade %s'):format(gradeLevel))
 
                 members[#members + 1] = {
-                    identifier = identifier ~= '' and identifier or ('src:%s'):format(targetSrc),
+                    identifier = identifier ~= '' and identifier or tostring(targetSrc),
                     name = data.name,
                     grade = gradeLevel,
                     gradeLabel = gradeLabel,
@@ -3676,7 +3676,7 @@ end
 local function getDispatchOfficerFromSource(src)
     local member = buildPlayerRadioData(src)
     return {
-        id = ('src:%s'):format(src),
+        id = tostring(src),
         name = type(member.name) == 'string' and member.name or ('Officer %s'):format(src),
         status = getPlayerDispatchStatus(src),
         assignedAt = os.time(),
